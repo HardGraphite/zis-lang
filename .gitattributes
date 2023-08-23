@@ -1,0 +1,7 @@
+*       text=auto
+
+*.c     diff=cpp
+*.h     diff=cpp
+*.md    diff=markdown
+
+.*      export-ignore
