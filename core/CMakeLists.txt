@@ -22,40 +22,40 @@ file(CONFIGURE OUTPUT "${zis_conf_header_dir}/zis_config.h" @ONLY CONTENT [==[
 ##### Collect source files #####
 ################################
 
-aux_source_directory(. zis_lib_src)
+aux_source_directory(. zis_core_src)
 
 ################################
 ##### Define build targets #####
 ################################
 
 if(ZIS_BUILD_SHARED)
-    add_library(zis_lib_shared SHARED ${zis_lib_src})
+    add_library(zis_core_shared SHARED ${zis_core_src})
     target_compile_definitions(
-        zis_lib_shared
+        zis_core_shared
         PRIVATE "ZIS_EXPORT_API=1"
         INTERFACE "ZIS_IMPORT_API=1"
     )
     if(ZIS_MALLOC_LINK)
-        target_link_libraries(zis_lib_shared PRIVATE ${ZIS_MALLOC_LINK})
+        target_link_libraries(zis_core_shared PRIVATE ${ZIS_MALLOC_LINK})
     endif()
-    set(zis_lib_tgt zis_lib_shared)
+    set(zis_core_tgt zis_core_shared)
 else()
-    add_library(zis_lib_static STATIC ${zis_lib_src})
+    add_library(zis_core_static STATIC ${zis_core_src})
     if(ZIS_MALLOC_LINK)
-        target_link_libraries(zis_lib_static INTERFACE ${ZIS_MALLOC_LINK})
+        target_link_libraries(zis_core_static INTERFACE ${ZIS_MALLOC_LINK})
     endif()
-    set(zis_lib_tgt zis_lib_static)
+    set(zis_core_tgt zis_core_static)
 endif()
-set(zis_lib_tgt ${zis_lib_tgt} PARENT_SCOPE)
+set(zis_core_tgt ${zis_core_tgt} PARENT_SCOPE)
 # Output name and prefix.
-set_target_properties(${zis_lib_tgt} PROPERTIES OUTPUT_NAME "${ZIS_NAME}")
-get_target_property(prefix ${zis_lib_tgt} PREFIX)
+set_target_properties(${zis_core_tgt} PROPERTIES OUTPUT_NAME "${ZIS_NAME}")
+get_target_property(prefix ${zis_core_tgt} PREFIX)
 if(NOT prefix)
-    set_target_properties(${zis_lib_tgt} PROPERTIES PREFIX "lib")
+    set_target_properties(${zis_core_tgt} PROPERTIES PREFIX "lib")
 endif()
 # Include directory.
 target_include_directories(
-    ${zis_lib_tgt}
+    ${zis_core_tgt}
     PUBLIC "${CMAKE_SOURCE_DIR}/include"
     PRIVATE "${zis_conf_header_dir}"
 )
@@ -67,7 +67,7 @@ target_include_directories(
 include(installdir)
 
 ### Install rules.
-install(TARGETS ${zis_lib_targets} DESTINATION ${zis_install_lib_dir})
+install(TARGETS ${zis_core_tgt} DESTINATION ${zis_install_lib_dir})
 if(ZIS_PACK_HEADER)
     file(GLOB zis_install_headers "${CMAKE_SOURCE_DIR}/include/*.h")
     install(FILES ${zis_install_headers} DESTINATION ${zis_install_inc_dir})

@@ -1,5 +1,5 @@
 aux_source_directory(. zis_test_src_list)
-set(zis_test_link_lib ${zis_lib_tgt})
+set(zis_test_link_lib ${zis_core_tgt})
 
 foreach(zis_test_src IN LISTS zis_test_src_list)
     get_filename_component(zis_test_name "${zis_test_src}" NAME_WLE)
