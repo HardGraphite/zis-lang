@@ -46,6 +46,7 @@ else()
     endif()
     set(zis_lib_tgt zis_lib_static)
 endif()
+set(zis_lib_tgt ${zis_lib_tgt} PARENT_SCOPE)
 # Output name and prefix.
 set_target_properties(${zis_lib_tgt} PROPERTIES OUTPUT_NAME "${ZIS_NAME}")
 get_target_property(prefix ${zis_lib_tgt} PREFIX)
