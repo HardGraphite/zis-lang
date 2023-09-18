@@ -13,6 +13,8 @@ project(
 
 option(ZIS_BUILD_IPO     "Enable inter-procedural optimization."             ON)
 option(ZIS_BUILD_SHARED  "Build and link shared library (static otherwise)" OFF)
+option(ZIS_BUILD_CORE    "Build `core', the ZIS library"                     ON)
+option(ZIS_BUILD_START   "Build `start', an executable entry"                ON)
 option(ZIS_TEST          "Build test files and prepare for ctest command."  OFF)
 option(ZIS_PACK          "Configure for cpack command."                     OFF)
 option(ZIS_PACK_HEADER   "Include header files when installing."            OFF)
@@ -55,7 +57,13 @@ else() # GCC, Clang, ...
     )
 endif()
 
-add_subdirectory("src")
+if(ZIS_BUILD_CORE)
+    add_subdirectory("core")
+endif()
+
+if(ZIS_BUILD_START)
+    add_subdirectory("start")
+endif()
 
 if(ZIS_TEST)
     enable_testing()

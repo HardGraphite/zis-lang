@@ -29,6 +29,27 @@
 extern "C" {
 #endif /* __cplusplus */
 
+/**
+ * Runtime context.
+ */
+struct zis_context;
+
+/**
+ * Create a runtime context.
+ *
+ * @return Returns the pointer to the newly created context.
+ *
+ * @warning To avoid a memory leak, the context must be finalized with `zis_destroy()`.
+ */
+ZIS_API struct zis_context *zis_create(void) ZIS_NOEXCEPT;
+
+/**
+ * Delete a runtime context.
+ *
+ * @param z Pointer to the context to destroy.
+ */
+ZIS_API void zis_destroy(struct zis_context *z) ZIS_NOEXCEPT;
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
