@@ -23,6 +23,22 @@ typedef void(*zis_test_func_t)(struct zis_context *);
     }                      \
 // ^^^ zis_test_list() ^^^
 
+/// Type of a test0 function.
+typedef void(*zis_test0_func_t)(void);
+
+/// Define a test0 function.
+#define zis_test0_define(__name) \
+    static void __name (void)
+
+/// Enumerate test0 functions defined by `zis_test0_define()`.
+#define zis_test0_list(...) \
+    int main(void) {       \
+        zis_test0_func_t l[] = { __VA_ARGS__ NULL }; \
+        for (zis_test0_func_t *p = l; *p; p++)       \
+            (*p)();        \
+    }                      \
+// ^^^ zis_test0_list() ^^^
+
 /// Print log.
 #define zis_test_log(__level, ...) \
     __zis_test_log((__level), __FILE__, __LINE__, __VA_ARGS__)

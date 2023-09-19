@@ -2,7 +2,7 @@
 ##### Collect source files #####
 ################################
 
-aux_source_directory(. zis_start_src)
+set(zis_start_src "start.c" "clopts.c")
 
 ################################
 ##### Define build targets #####
