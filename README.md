@@ -11,3 +11,4 @@ This is the **ZIS** programming language.
 | `core`    | source code for the core runtime     |
 | `start`   | source code for the executable entry |
 | `test`    | test code                            |
+| `doc`     | documentations                       |

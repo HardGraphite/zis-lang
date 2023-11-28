@@ -23,6 +23,7 @@ struct zis_object_meta {
      * @struct zis_object_meta
      * ## Object Meta Layout
      *
+     * ```
      *      W-1    ...      2     1        0     (W = width of uintptr_t)
      *      +----------------+-----------------+
      * [_1] |    TYPE_PTR    |     GC_STATE    |
@@ -30,6 +31,7 @@ struct zis_object_meta {
      *      +----------------+--------+--------+
      * [_2] |     GC_PTR     |(unused)| GC_MARK|
      *      +----------------+--------+--------+
+     * ```
      */
 
     uintptr_t _1, _2;

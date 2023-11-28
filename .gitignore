@@ -5,6 +5,9 @@
 
 *build*/
 
+CMakeCache.txt
+CMakeFiles/
+
 *.patch
 *.orig
 *.rej
