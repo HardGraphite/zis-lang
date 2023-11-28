@@ -2,6 +2,8 @@
 ##### Options and configurations #####
 ######################################
 
+option(ZIS_DEBUG_MEMORY     "Build debug code for memory management."  ZIS_DEBUG)
+
 set(ZIS_MALLOC_INCLUDE "" CACHE FILEPATH
     "Path to a file to include, which defines malloc(), realloc(), and free().")
 set(ZIS_MALLOC_LINK "" CACHE FILEPATH
@@ -15,7 +17,10 @@ set(zis_conf_header_dir "${CMAKE_CURRENT_BINARY_DIR}")
 
 file(CONFIGURE OUTPUT "${zis_conf_header_dir}/zis_config.h" @ONLY CONTENT [==[
 #pragma once
-#cmakedefine  ZIS_MALLOC_INCLUDE  "@ZIS_MALLOC_INCLUDE@"
+#cmakedefine    ZIS_MALLOC_INCLUDE  "@ZIS_MALLOC_INCLUDE@"
+#cmakedefine01  ZIS_DEBUG
+#cmakedefine01  ZIS_DEBUG_LOGGING
+#cmakedefine01  ZIS_DEBUG_MEMORY
 ]==])
 
 ################################

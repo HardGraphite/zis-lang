@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
+#include "algorithm.h"
 #include "attributes.h"
 
 /* ----- bit-wise operations ------------------------------------------------ */
@@ -59,7 +60,7 @@ struct zis_bitset {
 
 /// The minimum size in bytes required for an `n_bits` bit map.
 #define zis_bitset_required_size(n_bits) \
-    (zis_round_up_to(sizeof(zis_bitset_cell_t) * 8, n_bits) / 8)
+    (zis_round_up_to_n_pow2(sizeof(zis_bitset_cell_t) * 8, n_bits) / 8)
 
 /// Convert bit index to internal indices.
 #define zis_bitset_extract_index( \

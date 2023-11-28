@@ -1,0 +1,153 @@
+#include "debug.h"
+
+#include <assert.h>
+
+#include "platform.h"
+
+#if ZIS_DEBUG
+
+#include <time.h>
+
+void zis_debug_time(struct timespec *tp) {
+#if ZIS_SYSTEM_POSIX
+    clock_gettime(CLOCK_MONOTONIC, tp);
+#else
+    timespec_get(ts, TIME_UTC);
+#endif
+}
+
+#endif // ZIS_DEBUG
+
+#if ZIS_DEBUG_LOGGING
+
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define ZIS_DEBUG_LOGGING_ENV "ZIS_DEBUG_LOGGING"
+
+static FILE *logging_stream = NULL;
+static char logging_group[32] = { 0 };
+static enum zis_debug_log_level logging_level = ZIS_DEBUG_LOG_WARN;
+
+static const char *const logging_level_name[] = {
+    [ZIS_DEBUG_LOG_FATAL] = "Fatal",
+    [ZIS_DEBUG_LOG_ERROR] = "Error",
+    [ZIS_DEBUG_LOG_WARN ] = "Warn" ,
+    [ZIS_DEBUG_LOG_INFO ] = "Info" ,
+    [ZIS_DEBUG_LOG_TRACE] = "Trace",
+};
+
+#define logging_level_count (sizeof logging_level_name / sizeof logging_level_name[0])
+
+static void logging_parse_config(const char *conf_str) {
+    // "[LEVEL]:[GROUP]:[FILE]"
+    if (!*conf_str)
+        return;
+    char level_name[8], group_name[32], file_ch;
+    const int n = sscanf(conf_str, "%7[^:]:%31[^:]:%c", level_name, group_name, &file_ch);
+    if (n < 1)
+        return;
+    for (size_t i = 0; i < logging_level_count; i++) {
+        if (strcmp(level_name, logging_level_name[i]) == 0) {
+            logging_level = (enum zis_debug_log_level)i;
+            break;
+        }
+    }
+    if (n < 2)
+        return;
+    strcpy(logging_group, group_name);
+    if (n < 3)
+        return;
+    const char *const file_name = strchr(strchr(conf_str, ':') + 1, ':') + 1;
+    zis_unused_var(file_ch);
+    assert(file_ch == file_name[0]);
+    logging_stream = fopen(file_name, "w");
+}
+
+static void logging_fini(void) {
+    if (logging_stream) {
+        if (logging_stream != stdout && logging_stream != stderr)
+            fclose(logging_stream);
+        logging_stream = NULL;
+    }
+}
+
+static void logging_init(void) {
+    if (logging_stream) // FIXME: use atomic operation or mutex.
+        return;
+
+    const char *config_string = getenv(ZIS_DEBUG_LOGGING_ENV);
+    logging_stream = stderr;
+    if (config_string)
+        logging_parse_config(config_string);
+
+    at_quick_exit(logging_fini);
+
+    char time_str[24];
+    const time_t time_num = time(NULL);
+    strftime(time_str, sizeof time_str, "%F %T", localtime(&time_num));
+    zis_debug_log(
+        INFO, "Debug", "logging_init@|%s|: level=%s, group=%s",
+        time_str,
+        logging_level_name[logging_level],
+        *logging_group ? logging_group : "<any>"
+    );
+}
+
+static bool logging_check(enum zis_debug_log_level level, const char *group) {
+    if ((size_t)level >= logging_level_count || (int)level > (int)logging_level)
+        return false;
+    if (*logging_group && strcmp(group, logging_group) != 0)
+        return false;
+    return true;
+}
+
+static uintmax_t logging_timestamp(void) {
+    const time_t t = clock();
+    return t / (CLOCKS_PER_SEC / 1000);
+}
+
+void _zis_debug_log(
+    enum zis_debug_log_level level, const char *group,
+    zis_printf_fn_arg_fmtstr const char *fmt, ...
+) {
+    if (!logging_check(level, group))
+        return;
+    const uintmax_t time = logging_timestamp();
+    const char *const level_name = logging_level_name[(unsigned)level];
+    va_list ap;
+    va_start(ap, fmt);
+    char buffer[256];
+    const int n = vsnprintf(buffer, sizeof buffer, fmt, ap);
+    va_end(ap);
+    fprintf(
+        logging_stream, "[%ju] (Zis|%s|%s) %.*s\n",
+        time, level_name, group, n >= 0 ? n : 0, buffer
+    );
+}
+
+void _zis_debug_log_with(
+    enum zis_debug_log_level level, const char *group,
+    const char *prompt, zis_debug_log_with_func_t func, void *func_arg
+) {
+    if (!logging_check(level, group))
+        return;
+    const uintmax_t time = logging_timestamp();
+    const char *const level_name = logging_level_name[(unsigned)level];
+    fprintf(logging_stream, "[%ju] (Zis|%s|%s) %s %s\n", time, level_name, group, prompt, "...");
+    func(func_arg, logging_stream);
+    fprintf(logging_stream, "[%ju] (Zis|%s|%s) %s %s\n", time, level_name, group, prompt, "^^^");
+}
+
+#endif // ZIS_DEBUG_LOGGING
+
+void zis_debug_try_init(void) {
+#if ZIS_DEBUG_LOGGING
+    logging_init();
+#endif // ZIS_DEBUG_LOGGING
+}

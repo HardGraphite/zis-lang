@@ -4,11 +4,15 @@
 
 #include "attributes.h"
 
+struct zis_objmem_context;
+
+/// Runtime context.
 struct zis_context {
-    int _;
+    struct zis_objmem_context *objmem_context;
 };
 
 /// Create a runtime context.
 zis_nodiscard struct zis_context *zis_context_create(void);
+
 /// Delete a runtime context.
 void zis_context_destroy(struct zis_context *z);
