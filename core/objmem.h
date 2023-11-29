@@ -260,9 +260,9 @@ do {                                        \
         break;                              \
     zis_object_meta_set_gc_mark(__obj->_meta);      \
     if (zis_object_meta_young_is_new(__obj->_meta)) \
-       _zis_objmem_mark_object_slots_rec_x(__obj);  \
-   else                                     \
-       _zis_objmem_mark_object_slots_rec_o2x(__obj);\
+        _zis_objmem_mark_object_slots_rec_x(__obj); \
+    else                                    \
+        _zis_objmem_mark_object_slots_rec_o2x(__obj); \
 } while (0)                                 \
 // ^^^ _zis_objmem_mark_object_rec_x_() ^^^
 
@@ -274,9 +274,9 @@ do {                                        \
         break;                              \
     zis_object_meta_set_gc_mark(__obj->_meta);      \
     if (zis_object_meta_young_is_new(__obj->_meta)) \
-       _zis_objmem_mark_object_slots_rec_y(__obj);  \
-   else                                     \
-       _zis_objmem_mark_object_slots_rec_o2y(__obj);\
+        _zis_objmem_mark_object_slots_rec_y(__obj); \
+    else                                    \
+        _zis_objmem_mark_object_slots_rec_o2y(__obj); \
 } while (0)                                 \
 // ^^^ _zis_objmem_mark_object_rec_y_() ^^^
 
