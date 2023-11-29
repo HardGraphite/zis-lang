@@ -4,11 +4,13 @@
 
 #include "attributes.h"
 
+struct zis_callstack;
 struct zis_objmem_context;
 
 /// Runtime context.
 struct zis_context {
     struct zis_objmem_context *objmem_context;
+    struct zis_callstack      *callstack;
 };
 
 /// Create a runtime context.
