@@ -21,7 +21,7 @@ void zis_type_obj_from_native_def(
     self->_slots_num = def->slots_num;
     self->_bytes_len = def->bytes_size;
     const bool extendable = self->_slots_num == (size_t)-1 || self->_bytes_len == (size_t)-1;
-    self->_obj_size = extendable ? 0 : self->_slots_num + self->_bytes_len;
+    self->_obj_size = extendable ? 0 : ZIS_OBJECT_HEAD_SIZE + self->_slots_num + self->_bytes_len;
     // TODO: create slot table, methods, and static members.
 }
 

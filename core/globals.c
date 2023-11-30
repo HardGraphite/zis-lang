@@ -6,7 +6,17 @@
 #include "memory.h"
 #include "ndefutil.h"
 #include "objmem.h"
+
+#include "boolobj.h"
+#include "nilobj.h"
 #include "typeobj.h"
+
+/// Initialize values.
+static void globals_init_values(struct zis_context_globals *g, struct zis_context *z) {
+    g->val_nil = _zis_nil_obj_new(z);
+    g->val_true = _zis_bool_obj_new(z, true);
+    g->val_false = _zis_bool_obj_new(z, false);
+}
 
 // Declare type definitions.
 #define E(NAME)  extern const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR(NAME);
@@ -16,9 +26,6 @@ E(Type)
 
 /// Initialize type globals.
 static void globals_init_types(struct zis_context_globals *g, struct zis_context *z) {
-    void *const orig_z_g = z->globals;
-    z->globals = g;
-
     // Make type for Type.
     struct zis_type_obj dummy_type_Type;
     dummy_type_Type._slots_num = ZIS_NATIVE_TYPE_VAR(Type).slots_num;
@@ -34,12 +41,10 @@ static void globals_init_types(struct zis_context_globals *g, struct zis_context
     // Make other types.
 #define E(NAME)  \
     zis_type_obj_from_native_def( \
-        z, (struct zis_object **)& g->type_##NAME, &ZIS_NATIVE_TYPE_VAR(Type)) \
+        z, (struct zis_object **)& g->type_##NAME, &ZIS_NATIVE_TYPE_VAR(NAME) \
     );
     _ZIS_BUILTIN_TYPE_LIST
 #undef E
-
-    z->globals = orig_z_g;
 }
 
 /// GC visitor. See `zis_objmem_object_visitor_t`.
@@ -55,7 +60,11 @@ struct zis_context_globals *zis_context_globals_create(struct zis_context *z) {
     struct zis_context_globals *const g = zis_mem_alloc(sizeof(struct zis_context_globals));
     memset(g, 0xff, sizeof *g); // Fill globals with small integers.
     zis_objmem_add_gc_root(z, g, globals_gc_visitor);
-    globals_init_types(g, z);
+    void *const orig_z_g = z->globals;
+    z->globals = g;
+    globals_init_types(g, z); // types first
+    globals_init_values(g, z);
+    z->globals = orig_z_g;
     return g;
 }
 
