@@ -1,5 +1,7 @@
 # The ZIS programming language
 
+![](doc/logo.svg)
+
 This is the **ZIS** programming language.
 
 ## File Organization

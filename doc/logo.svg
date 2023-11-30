@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<svg
+   version="1.1"
+   width="80"
+   height="75"
+   id="zis-lang-logo"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg"
+>
+  <g>
+    <rect
+       style="fill:#000080;stroke-width:0.123339;stroke-dasharray:0.123339, 0.37002"
+       width="82.703247"
+       height="11.027916"
+       x="-82.703247"
+       y="62.976192"
+       transform="matrix(-0.9673138,0.25358235,0,1,0,0)"
+    />
+    <rect
+       style="fill:#000080;stroke-width:0.123339;stroke-dasharray:0.123339, 0.37002"
+       width="82.703247"
+       height="11.027916"
+       x="-82.703247"
+       y="20.972084"
+       transform="matrix(-0.9673138,0.25358235,0,1,0,0)"
+    />
+    <rect
+       style="fill:#800000;stroke-width:0.123339;stroke-dasharray:0.123339, 0.37002"
+       width="82.703247"
+       height="11.027916"
+       x="-82.703247"
+       y="41.94854"
+       transform="matrix(-0.9673138,0.25358235,0,1,0,0)"
+    />
+    <rect
+       style="fill:#ff5555;stroke-width:0.123339;stroke-dasharray:0.123339, 0.37002"
+       width="82.703247"
+       height="11.027916"
+       x="-9.181906e-16"
+       y="2.3283692e-16"
+       transform="matrix(0.9673138,0.25358235,0,1,0,0)"
+    />
+    <rect
+       style="fill:#ff5555;stroke-width:0.123339;stroke-dasharray:0.123339, 0.37002"
+       width="82.703247"
+       height="11.027916"
+       x="0"
+       y="42.004108"
+       transform="matrix(0.9673138,0.25358235,0,1,0,0)"
+    />
+    <rect
+       style="fill:#2a7fff;stroke-width:0.123339;stroke-dasharray:0.123339, 0.37002"
+       width="82.703247"
+       height="11.027916"
+       x="0"
+       y="20.976456"
+       transform="matrix(0.9673138,0.25358235,0,1,0,0)"
+    />
+  </g>
+</svg>
