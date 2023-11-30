@@ -12,3 +12,7 @@ This is the **ZIS** programming language.
 | `start`   | source code for the executable entry |
 | `test`    | test code                            |
 | `doc`     | documentations                       |
+
+## More
+
+- [Conventions](doc/conventions.md)
