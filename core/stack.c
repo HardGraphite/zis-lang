@@ -1,5 +1,7 @@
 #include "stack.h"
 
+#include <string.h>
+
 #include "attributes.h"
 #include "debug.h"
 #include "memory.h"
@@ -80,9 +82,13 @@ static void callstack_gc_visitor(void *_cs, enum zis_objmem_obj_visit_op op) {
 zis_static_force_inline void
 callstack_clear_range(struct zis_object **first, struct zis_object **last) {
     assert(first <= last);
+#if 0
     struct zis_object *const v = zis_smallint_to_ptr(0); // Fill with small integer `0`.
     for (struct zis_object **p = first; p <= last; p++)
         *p = v;
+#else
+    memset(first, 0xff, (size_t)(last - first));
+#endif
 }
 
 /* ----- public functions --------------------------------------------------- */

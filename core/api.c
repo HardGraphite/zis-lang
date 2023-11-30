@@ -2,10 +2,10 @@
 
 #include "context.h"
 
-ZIS_API struct zis_context *zis_create(void) {
+ZIS_API zis_t zis_create(void) {
     return zis_context_create();
 }
 
-ZIS_API void zis_destroy(struct zis_context *z) {
+ZIS_API void zis_destroy(zis_t z) {
     zis_context_destroy(z);
 }

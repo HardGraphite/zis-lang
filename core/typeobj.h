@@ -8,6 +8,9 @@
 #include "attributes.h"
 #include "object.h"
 
+struct zis_context;
+struct zis_native_type_def;
+
 /// `Type` object.
 struct zis_type_obj {
     ZIS_OBJECT_HEAD
@@ -18,6 +21,12 @@ struct zis_type_obj {
     size_t _bytes_len; ///< Size (bytes) of the bytes part. `-1` means extendable.
     size_t _obj_size;  ///< Object size. `0` means SLOTS or BYTES extendable and the size needs to be calculated.
 };
+
+/// Create type from native def.
+void zis_type_obj_from_native_def(
+    struct zis_context *z,
+    struct zis_object **ret, const struct zis_native_type_def *def
+);
 
 /// Get number of slots in SLOTS of an object.
 zis_static_force_inline size_t zis_object_slot_count(const struct zis_object *obj) {
