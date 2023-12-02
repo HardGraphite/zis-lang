@@ -14,6 +14,8 @@ struct zis_type_obj;
 #define _ZIS_BUILTIN_TYPE_LIST \
     /* E(Type) */              \
     E(Bool)                    \
+    E(Float)                   \
+    E(Int)                     \
     E(Nil)                     \
 // ^^^ _ZIS_BUILTIN_TYPE_LIST ^^^
 
