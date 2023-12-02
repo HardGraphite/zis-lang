@@ -5,6 +5,7 @@
 #include <stdlib.h> // abort()
 #include <string.h>
 
+#include "algorithm.h"
 #include "attributes.h"
 #include "bits.h"
 #include "compat.h"
@@ -206,7 +207,7 @@ static void mem_chunk_destroy(struct mem_chunk *chunk) {
 
 /// Allocate from the chunk. On failure (no enough space), returns `NULL`.
 zis_force_inline static void *mem_chunk_alloc(struct mem_chunk *chunk, size_t size) {
-    assert(size > 0);
+    assert(size > 0 && !(size & (sizeof(void *) - 1)));
     char *const ptr = chunk->_free;
     char *const new_free = ptr + size;
     if (zis_unlikely(new_free >= chunk->_end))
@@ -303,7 +304,7 @@ static void mem_chunk_list_init(struct mem_chunk_list *list) {
     list->_head._free = _mem_chunk_list_head(list)->_mem;
     list->_head._end  = _mem_chunk_list_head(list)->_mem;
     list->_head._next = NULL;
-    assert(!mem_chunk_alloc(_mem_chunk_list_head(list), 1));
+    assert(!mem_chunk_alloc(_mem_chunk_list_head(list), ZIS_OBJECT_HEAD_SIZE));
 }
 
 /// Delete all chunks in the list.
@@ -1581,7 +1582,7 @@ struct zis_object *zis_objmem_alloc_ex(
         obj_size =
             ZIS_OBJECT_HEAD_SIZE +
             (has_ext_slots ? ext_slots : obj_type->_slots_num) * sizeof(void *) +
-            (has_ext_bytes ? ext_bytes : obj_type->_bytes_len);
+            (has_ext_bytes ? zis_round_up_to_n_pow2(ext_bytes, sizeof(void *)) : obj_type->_bytes_len);
     }
 
     if (zis_likely(alloc_type == ZIS_OBJMEM_ALLOC_AUTO)) {

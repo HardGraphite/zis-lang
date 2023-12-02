@@ -143,6 +143,8 @@ struct zis_object *zis_objmem_alloc(
 
 /// Allocate object memory like `zis_objmem_alloc()`, but provides more options.
 /// Type objects must be allocated with type `ZIS_OBJMEM_ALLOC_SURV`.
+/// Params `ext_slots` (count) and `ext_bytes` (size) are for extendable objects;
+/// `ext_bytes` is always rounded up to a multiplication of `sizeof(void*)` inside.
 struct zis_object *zis_objmem_alloc_ex(
     struct zis_context *z, enum zis_objmem_alloc_type alloc_type,
     struct zis_type_obj *obj_type, size_t ext_slots, size_t ext_bytes
