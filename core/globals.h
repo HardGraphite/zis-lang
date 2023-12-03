@@ -9,6 +9,7 @@ struct zis_type_obj;
     E(struct zis_nil_obj, nil)\
     E(struct zis_bool_obj, true) \
     E(struct zis_bool_obj, false)\
+    E(struct zis_string_obj, empty_string) \
 // ^^^ _ZIS_BUILTIN_VAL_LIST ^^^
 
 #define _ZIS_BUILTIN_TYPE_LIST \
@@ -17,6 +18,7 @@ struct zis_type_obj;
     E(Float)                   \
     E(Int)                     \
     E(Nil)                     \
+    E(String)                  \
 // ^^^ _ZIS_BUILTIN_TYPE_LIST ^^^
 
 /// Globals. This is a GC root.

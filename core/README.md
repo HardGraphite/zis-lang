@@ -9,6 +9,7 @@ Source code for the runtime core.
   - [`compat.h`](compat.h)
   - [`ndefutil.h`](ndefutil.h)
   - [`platform.h`](platform.h)
+  - [`strutil.h`](strutil.h), [`strutil.c`](strutil.c)
 + runtime context
   - [`api.c`](api.c)
   - [`context.h`](context.h), [`context.c`](context.c)
@@ -25,4 +26,5 @@ Source code for the runtime core.
   - [`floatobj.h`](floatobj.h), [`floatobj.c`](floatobj.c)
   - [`intobj.h`](intobj.h), [`intobj.c`](intobj.c)
   - [`nilobj.h`](nilobj.h), [`nilobj.c`](nilobj.c)
+  - [`stringobj.h`](stringobj.h), [`stringobj.c`](stringobj.c)
   - [`typeobj.h`](typeobj.h), [`typeobj.c`](typeobj.c)
