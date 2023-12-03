@@ -14,8 +14,8 @@ struct zis_object;
 /// Small int, an integer that is small enough to be held in an object pointer.
 typedef intptr_t zis_smallint_t;
 
-#define ZIS_SMALLINT_MIN (INTPTR_MIN / 2)
-#define ZIS_SMALLINT_MAX (INTPTR_MAX / 2)
+#define ZIS_SMALLINT_MIN (INTPTR_MIN >> 1)
+#define ZIS_SMALLINT_MAX (INTPTR_MAX >> 1)
 
 /// Check whether an object pointer is a small int.
 zis_static_force_inline bool zis_object_is_smallint(const struct zis_object *obj_ptr) {
@@ -37,7 +37,7 @@ zis_static_force_inline struct zis_object *zis_smallint_to_ptr(zis_smallint_t va
 
 /// Try to convert small int to object pointer. If overflows, return NULL.
 zis_static_force_inline struct zis_object *zis_smallint_try_to_ptr(zis_smallint_t val) {
-    struct zis_object *const ptr = zis_smallint_to_ptr(val);
+    void *const ptr = (void *)((val << 1) | (zis_smallint_t)1); // See `zis_smallint_to_ptr()`.
     if (zis_likely(zis_smallint_from_ptr(ptr) == val))
         return ptr;
     return NULL;

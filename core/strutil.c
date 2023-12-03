@@ -42,7 +42,7 @@ size_t zis_u8char_from_code(
 size_t zis_u8char_to_code(
     zis_wchar_t *restrict code, const zis_char8_t *restrict utf8_char
 ) {
-    const size_t n = zis_u8char_len_s(utf8_char, 4);
+    const size_t n = zis_u8char_len_1(*utf8_char); // Or `zis_u8char_len_s()`?
     switch (n) {
     case 0:
         break;

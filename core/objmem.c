@@ -1580,9 +1580,14 @@ struct zis_object *zis_objmem_alloc_ex(
         assert(!has_ext_slots || ext_slots >= 1);
         assert(!has_ext_bytes || ext_bytes >= 1);
         obj_size =
-            ZIS_OBJECT_HEAD_SIZE +
-            (has_ext_slots ? ext_slots : obj_type->_slots_num) * sizeof(void *) +
-            (has_ext_bytes ? zis_round_up_to_n_pow2(ext_bytes, sizeof(void *)) : obj_type->_bytes_len);
+            ZIS_OBJECT_HEAD_SIZE + // HEAD
+            (has_ext_slots ? ext_slots : obj_type->_slots_num) * sizeof(void *); // SLOTS
+        if (has_ext_bytes) {
+            ext_bytes = zis_round_up_to_n_pow2(sizeof(void *), ext_bytes);
+            obj_size += ext_bytes; // BYTES
+        } else {
+            obj_size += obj_type->_bytes_len; // BYTES
+        }
     }
 
     if (zis_likely(alloc_type == ZIS_OBJMEM_ALLOC_AUTO)) {

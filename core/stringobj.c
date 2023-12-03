@@ -183,7 +183,7 @@ size_t zis_string_obj_length(const struct zis_string_obj *self) {
 }
 
 size_t zis_string_obj_value(const struct zis_string_obj *self, char *buf, size_t buf_sz) {
-    const size_t char_type  = string_obj_char_type(self);
+    const enum string_obj_char_type char_type  = string_obj_char_type(self);
     const size_t char_count = string_obj_length(self);
 
     switch (char_type) {
@@ -226,9 +226,9 @@ size_t zis_string_obj_value(const struct zis_string_obj *self, char *buf, size_t
     case STR_OBJ_C1:
         COPY_STR_DATA(1);
     case STR_OBJ_C2:
-        COPY_STR_DATA(1);
+        COPY_STR_DATA(2);
     case STR_OBJ_C4:
-        COPY_STR_DATA(1);
+        COPY_STR_DATA(4);
     default:
         zis_unreachable();
 

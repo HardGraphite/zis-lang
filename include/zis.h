@@ -1,7 +1,14 @@
+/**
+ * @file zis.h
+ * @brief ZIS public APIs.
+ */
+
 #ifndef ZIS_H
 #define ZIS_H
 
+#include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #if defined(_WIN32) || defined(__CYGWIN__)
 #    if ZIS_EXPORT_API
@@ -40,6 +47,8 @@ extern "C" {
 
 #define ZIS_E_ARG       (-11)  ///< Illegal argument.
 #define ZIS_E_IDX       (-12)  ///< Index out of range.
+#define ZIS_E_TYPE      (-13)  ///< Type mismatched.
+#define ZIS_E_BUF       (-14)  ///< Buffer is not big enough.
 
 /** @} */
 
@@ -106,6 +115,131 @@ struct zis_native_type_def {
     const struct zis_native_func_def *methods;   ///< A zero-terminated array of functions that define methods. Optional.
     const struct zis_native_func_def *statics;   ///< Static methods definitions like `methods`. Optional.
 };
+
+/** @} */
+
+/** @defgroup zis-api-values API: build and read values */
+/**  @{ */
+
+/**
+ * Load `nil` to registers from `reg`-th to (`reg+n-1`)-th.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param n number of registers to fill with `nil`
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`).
+ *
+ * @warning If `n` is too big, it is going to be adjusted automatically.
+ */
+ZIS_API int zis_load_nil(zis_t z, unsigned int reg, size_t n);
+
+/**
+ * Check whether a variable is `nil`.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_TYPE` (`reg` is not `nil`).
+ */
+ZIS_API int zis_read_nil(zis_t z, unsigned int reg);
+
+/**
+ * Load a `Bool` object.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param val the boolean value
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`).
+ */
+ZIS_API int zis_load_bool(zis_t z, unsigned int reg, bool val);
+
+/**
+ * Read value of a `Bool` object.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param val pointer to a variable where the value will be stored
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_TYPE` (wrong type of `reg`).
+ */
+ZIS_API int zis_read_bool(zis_t z, unsigned int reg, bool *val);
+
+/**
+ * Create an `Int` object.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param val the value of the integer
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`).
+ */
+ZIS_API int zis_make_int(zis_t z, unsigned int reg, int64_t val);
+
+/**
+ * Read value of an `Int` object.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param val pointer to a variable where the value will be stored
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_TYPE` (wrong type of `reg`),
+ * `ZIS_E_BUF` (`int64_t` is not big enough to hold the value).
+ */
+ZIS_API int zis_read_int(zis_t z, unsigned int reg, int64_t *val);
+
+/**
+ * Create an `Float` object.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param val the value of the floating-point number
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`).
+ */
+ZIS_API int zis_make_float(zis_t z, unsigned int reg, double val);
+
+/**
+ * Read value of a `Float` object.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param val pointer to a variable where the value will be stored
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_TYPE` (wrong type of `reg`).
+ */
+ZIS_API int zis_read_float(zis_t z, unsigned int reg, double *val);
+
+/**
+ * Create an `String` object.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param str pointer to the UTF-8 string
+ * @param sz size in bytes of the string `str`, or `-1` to take `str` as a NUL-terminated string
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_ARG` (illegal UTF-8 string `str`).
+ */
+ZIS_API int zis_make_string(zis_t z, unsigned int reg, const char *str, size_t sz);
+
+/**
+ * Get content of a `String` object as a UTF-8 string.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param buf pointer to a buffer to store UTF-8 string, or `NULL` to get expected buffer size
+ * @param sz pointer to a `size_t` value that tells the buffer size and receives written size
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_TYPE` (wrong type of `reg`),
+* `ZIS_E_BUF` (`buf` is not big enough).
+ */
+ZIS_API int zis_read_string(zis_t z, unsigned int reg, char *buf, size_t *sz);
+
+/** @} */
+
+/** @defgroup zis-api-variables API: access and manipulate variables */
+/**  @{ */
+
+/**
+ * Copy object between registers (local variables).
+ *
+ * @param z zis instance
+ * @param dst destination register index
+ * @param src source register index
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `dst` or `src`).
+ */
+ZIS_API int zis_move_local(zis_t z, unsigned int dst, unsigned int src);
 
 /** @} */
 

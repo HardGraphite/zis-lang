@@ -2,9 +2,9 @@
 
 #pragma once
 
-/// Round up to `to_n`, where `to_n` must be a power of 2.
+/// Round up to a multiple of `to_n`, where `to_n` must be a power of 2.
 #define zis_round_up_to_n_pow2(to_n, num) \
-    (((num) + ((to_n) - 1)) & ~((to_n) - 1))
+    (((num) + ((to_n) - 1U)) & ~((to_n) - 1U))
 
 /// Unreachable statement.
 #define zis_unreachable() (_zis_unreachable_impl())

@@ -39,15 +39,22 @@ typedef void(*zis_test0_func_t)(void);
     }                      \
 // ^^^ zis_test0_list() ^^^
 
-/// Print log.
+/// Log levels.
+enum zis_test_log_level {
+    ZIS_TEST_LOG_ERROR,
+    ZIS_TEST_LOG_WARNING,
+    ZIS_TEST_LOG_TRACE,
+};
+
+/// Print log with location and function name.
 #define zis_test_log(__level, ...) \
-    __zis_test_log((__level), __FILE__, __LINE__, __VA_ARGS__)
+    __zis_test_log((__level), __FILE__, __LINE__, __func__, __VA_ARGS__)
 
 /// Assertion.
 #define zis_test_assert(__expr) \
     do {                        \
         if (!(__expr))          \
-            __zis_test_assertion_fail(__FILE__, __LINE__, #__expr); \
+            __zis_test_assertion_fail(__FILE__, __LINE__, __func__, #__expr); \
     } while (0)                 \
 // ^^^ zis_test_assert() ^^^
 
@@ -65,8 +72,8 @@ typedef void(*zis_test0_func_t)(void);
 #include <stdio.h>
 #include <stdlib.h>
 
-zis_printf_fn_attrs(4, 5) zis_static_inline void __zis_test_log(
-    int level, const char *file, unsigned int line,
+zis_printf_fn_attrs(5, 6) zis_static_inline void __zis_test_log(
+    int level, const char *file, unsigned int line, const char *func,
     const char *restrict zis_printf_fn_arg_fmtstr(fmt), ...
 ) {
     zis_unused_var(level);
@@ -78,12 +85,12 @@ zis_printf_fn_attrs(4, 5) zis_static_inline void __zis_test_log(
         buffer[0] = 0;
     va_end(ap);
 
-    fprintf(stderr, "[ZIS-TEST] ** %s:%u: %s\n", file, line, buffer);
+    fprintf(stderr, "[ZIS-TEST] ** %s:%u: %s: %s\n", file, line, func, buffer);
 }
 
 zis_noreturn zis_static_inline void __zis_test_assertion_fail(
-    const char *file, unsigned int line, const char *expr
+    const char *file, unsigned int line, const char *func, const char *expr
 ) {
-    fprintf(stderr, "[ZIS-TEST] !! %s:%u: assertion failed: %s\n", file, line, expr);
+    fprintf(stderr, "[ZIS-TEST] !! %s:%u: %s: assertion failed: %s\n", file, line, func, expr);
     quick_exit(EXIT_FAILURE);
 }
