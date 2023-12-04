@@ -7,6 +7,50 @@
 
 #include "../core/smallint.h" // ZIS_SMALLINT_MIN, ZIS_SMALLINT_MAX
 
+#define REG_MAX 100
+
+// zis-api-natives //
+
+#define TEST_NATIVE_BLOCK_ARG   ((void *)1234)
+#define TEST_NATIVE_BLOCK_RET   5678
+#define TEST_NATIVE_BLOCK_R0I   9876
+#define TEST_NATIVE_BLOCK_R0O   5432
+#define TEST_NATIVE_BLOCK_REGS  10
+
+static int do_test_native_block(zis_t z, void *arg) {
+    const unsigned int reg_max = TEST_NATIVE_BLOCK_REGS;
+    int64_t v_i64 = 0;
+    // Check function arg.
+    zis_test_assert_eq(arg, TEST_NATIVE_BLOCK_ARG);
+    // Check REG-0.
+    zis_test_assert_eq(zis_read_int(z, 0, &v_i64), ZIS_OK);
+    zis_test_assert_eq(v_i64, TEST_NATIVE_BLOCK_R0I);
+    // Check register range.
+    for (unsigned int i = 0; i <= reg_max; i++)
+        zis_test_assert_eq(zis_move_local(z, i, i), ZIS_OK);
+    zis_test_assert_eq(zis_move_local(z, reg_max + 1, reg_max + 1), ZIS_E_IDX);
+    // Write REG-0.
+    zis_make_int(z, 0, TEST_NATIVE_BLOCK_R0O);
+    // Return.
+    return TEST_NATIVE_BLOCK_RET;
+}
+
+zis_test_define(test_native_block, z) {
+    int64_t v_i64 = 0;
+    // Write REG-0.
+    zis_make_int(z, 0, TEST_NATIVE_BLOCK_R0I);
+    // Call.
+    const int ret = zis_native_block(
+        z, TEST_NATIVE_BLOCK_REGS,
+        do_test_native_block, TEST_NATIVE_BLOCK_ARG
+    );
+    // Check return value.
+    zis_test_assert_eq(ret, TEST_NATIVE_BLOCK_RET);
+    // Check REG-0.
+    zis_test_assert_eq(zis_read_int(z, 0, &v_i64), ZIS_OK);
+    zis_test_assert_eq(v_i64, TEST_NATIVE_BLOCK_R0O);
+}
+
 // zis-api-values //
 
 zis_test_define(test_nil, z) {
@@ -136,7 +180,12 @@ zis_test_define(test_string, z) {
     do_test_bad_string(z, u8"你好", 4); // U+4F60 U+597D => [e4 bd a0] [e5 a5 bd]
 }
 
+// main
+
 zis_test_list(
+    REG_MAX,
+    // zis-api-native //
+    test_native_block,
     // zis-api-values //
     test_nil,
     test_bool,

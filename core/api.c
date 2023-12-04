@@ -49,6 +49,19 @@ ZIS_API void zis_destroy(zis_t z) {
     zis_context_destroy(z);
 }
 
+/* ----- zis-api-natives ---------------------------------------------------- */
+
+ZIS_API int zis_native_block(zis_t z, size_t reg_max, int(*fn)(zis_t, void *), void *arg) {
+    if (!zis_callstack_enter(z->callstack, reg_max + 1U, NULL))
+        return ZIS_E_ARG;
+    z->callstack->frame[0] = zis_callstack_frame_info(z->callstack)->prev_frame[0];
+    const int ret_val = fn(z, arg);
+    zis_callstack_frame_info(z->callstack)->prev_frame[0] = z->callstack->frame[0];
+    assert(zis_callstack_frame_info(z->callstack)->return_ip == NULL);
+    zis_callstack_leave(z->callstack);
+    return ret_val;
+}
+
 /* ----- zis-api-values ----------------------------------------------------- */
 
 ZIS_API int zis_load_nil(zis_t z, unsigned int reg, size_t n) {

@@ -116,6 +116,21 @@ struct zis_native_type_def {
     const struct zis_native_func_def *statics;   ///< Static methods definitions like `methods`. Optional.
 };
 
+/**
+ * Call a C function within an isolated zis frame.
+ *
+ * Enter a new frame with `reg_max + 1` registers and call C function `fn`.
+ * REG-0 is copied from the previous frame and will be copied back to there.
+ *
+ * @param z zis instance
+ * @param reg_max maximum register index
+ * @param fn the function to call
+ * @param arg argument to pass to `fn`
+ * @return Return the return value from function `fn`. If the stack overflows,
+ * `ZIS_E_ARG` will be returned and C function `fn` will not be called.
+ */
+ZIS_API int zis_native_block(zis_t z, size_t reg_max, int(*fn)(zis_t, void *), void *arg);
+
 /** @} */
 
 /** @defgroup zis-api-values API: build and read values */

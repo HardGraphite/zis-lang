@@ -100,7 +100,7 @@ struct zis_callstack *zis_callstack_create(struct zis_context *z) {
     cs->top = cs->_data;
     cs->frame = cs->_data;
     fi_list_init(&cs->_fi_list);
-    cs->_data_end = cs->_data;
+    cs->_data_end = cs->_data + (cs_size - sizeof(struct zis_callstack)) / sizeof(void *);
     zis_objmem_add_gc_root(z, cs, callstack_gc_visitor);
     zis_debug_log(
         INFO, "Stack", "new stack @%p: size=%zu,n_slots=%zu",

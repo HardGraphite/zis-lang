@@ -13,14 +13,18 @@ typedef void(*zis_test_func_t)(struct zis_context *);
     static void __name ( struct zis_context * __zis_context_var )
 
 /// Enumerate test functions defined by `zis_test_define()`.
-#define zis_test_list(...) \
-    int main(void) {       \
-        zis_test_func_t l[] = { __VA_ARGS__ NULL }; \
+#define zis_test_list(__reg_max, ...) \
+    int _test_block(zis_t z, void *_arg) { \
+        for (zis_test_func_t *f = _arg; *f; f++) \
+            (*f)(z);                  \
+        return 0;                     \
+    }                                 \
+    int main(void) {                  \
+        zis_test_func_t f[] = { __VA_ARGS__ NULL }; \
         struct zis_context *const z = zis_create(); \
-        for (zis_test_func_t *p = l; *p; p++)       \
-            (*p)(z);       \
-        zis_destroy(z);    \
-    }                      \
+        zis_native_block(z, __reg_max, _test_block, f); \
+        zis_destroy(z);               \
+    }                                 \
 // ^^^ zis_test_list() ^^^
 
 /// Type of a test0 function.
