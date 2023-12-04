@@ -60,6 +60,19 @@ const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( NAME ) = {  \
 }                               \
 // ^^^ ZIS_NATIVE_TYPE_DEF_NB() ^^^
 
+/// Generate a non-static `zis_native_type_def` variable with extendable SLOTS part and no BYTES part.
+#define ZIS_NATIVE_TYPE_DEF_XS_NB( \
+    NAME, STRUCT, SLOT_NAME_LIST, METHOD_LIST, STATIC_LIST \
+)                               \
+const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( NAME ) = {  \
+    .name = #NAME,              \
+    .slots_num = (size_t)-1, \
+    .bytes_size = 0,   \
+    .slots = SLOT_NAME_LIST,    \
+    .methods = METHOD_LIST,     \
+    .statics = STATIC_LIST,     \
+} // ^^^ ZIS_NATIVE_TYPE_DEF_XB() ^^^
+
 /// Generate a non-static `zis_native_type_def` variable with extendable BYTES part.
 #define ZIS_NATIVE_TYPE_DEF_XB( \
     NAME, STRUCT, BYTES_SIZE_VAR, SLOT_NAME_LIST, METHOD_LIST, STATIC_LIST \

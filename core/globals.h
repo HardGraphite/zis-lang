@@ -10,15 +10,20 @@ struct zis_type_obj;
     E(struct zis_bool_obj, true) \
     E(struct zis_bool_obj, false)\
     E(struct zis_string_obj, empty_string) \
+    E(struct zis_tuple_obj, empty_tuple)   \
+    E(struct zis_array_slots_obj, empty_array_slots) \
 // ^^^ _ZIS_BUILTIN_VAL_LIST ^^^
 
 #define _ZIS_BUILTIN_TYPE_LIST \
     /* E(Type) */              \
+    E(Array)                   \
+    E(Array_Slots)             \
     E(Bool)                    \
     E(Float)                   \
     E(Int)                     \
     E(Nil)                     \
     E(String)                  \
+    E(Tuple)                   \
 // ^^^ _ZIS_BUILTIN_TYPE_LIST ^^^
 
 /// Globals. This is a GC root.
