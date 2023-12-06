@@ -10,7 +10,9 @@ function(zis_test_available file result)
 endfunction()
 
 aux_source_directory(. zis_test_src_list)
-set(zis_test_link_lib ${zis_core_tgt})
+list(REMOVE_ITEM zis_test_src_list "test.c" "./test.c" ".\\test.c")
+add_library(zis_test_util STATIC "test.c")
+set(zis_test_link_lib ${zis_core_tgt} zis_test_util)
 
 foreach(zis_test_src IN LISTS zis_test_src_list)
     zis_test_available("${zis_test_src}" ok)
