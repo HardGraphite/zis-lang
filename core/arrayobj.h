@@ -77,6 +77,12 @@ void zis_array_obj_new(
     struct zis_object *v[], size_t n
 );
 
+/// Create an `Array` object. Initialize data `v` can be NULL.
+void zis_array_obj_new2(
+    struct zis_context *z, struct zis_object **ret,
+    size_t reserve, struct zis_object *v[], size_t n
+);
+
 /// Return number of elements.
 zis_static_force_inline size_t zis_array_obj_length(
     const struct zis_array_obj *self
@@ -103,6 +109,12 @@ zis_static_force_inline bool zis_array_obj_set(
     return true;
 }
 
+/// Get vector of elements.
+zis_static_force_inline struct zis_object *const *
+zis_array_obj_data(const struct zis_array_obj *self) {
+    return self->_data->_data;
+}
+
 /// Add new element to the end of the array.
 void zis_array_obj_append(
     struct zis_context *z,
@@ -114,4 +126,16 @@ void zis_array_obj_append(
 struct zis_object *zis_array_obj_pop(
     struct zis_context *z,
     struct zis_array_obj *self
+);
+
+/// Mx: `array[ index ] -> ?value`.
+struct zis_object *zis_array_obj_Mx_get_element(
+    struct zis_context *z, const struct zis_array_obj *self,
+    struct zis_object *index
+);
+
+/// Mx: `array[ index ] = value -> ok`.
+bool zis_array_obj_Mx_set_element(
+    struct zis_context *z, struct zis_array_obj *self,
+    struct zis_object *index, struct zis_object *value
 );

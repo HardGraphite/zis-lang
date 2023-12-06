@@ -36,3 +36,9 @@ zis_static_force_inline struct zis_object *const *
 zis_tuple_obj_data(const struct zis_tuple_obj *self) {
     return self->_data;
 }
+
+/// Mx: `tuple[ index ] ?`
+struct zis_object *zis_tuple_obj_Mx_get_element(
+    struct zis_context *z, const struct zis_tuple_obj *self,
+    struct zis_object *index
+);

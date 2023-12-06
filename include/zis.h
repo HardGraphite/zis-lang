@@ -241,6 +241,70 @@ ZIS_API int zis_make_string(zis_t z, unsigned int reg, const char *str, size_t s
  */
 ZIS_API int zis_read_string(zis_t z, unsigned int reg, char *buf, size_t *sz);
 
+/**
+ * Create values and store them to `REG[reg_begin ...]`.
+ *
+ * @param z zis instance
+ * @param reg_begin first register to store values to
+ * @param fmt a NUL-terminated string specifying how to interpret the data
+ * @param ... the data
+ * @return Number of stored values (zero or positive);
+ * `ZIS_E_IDX` (invalid `reg_begin`), `ZIS_E_ARG` (invalid `fmt` or `...`).
+ *
+ * @details The format string `fmt` consists of the following specifiers:
+ * + Equivalent to `zis_load_*` or `zis_make_*` functions.
+ *   - `%`: register (local variable); the argument is `unsigned int reg`.
+ *   - `n`: `nil` value; no argument.
+ *   - `x`: `Bool` value; see `zis_load_bool()`.
+ *   - `i`: `Int` value; see `zis_make_int()`.
+ *   - `f`: `Float` value; see `zis_make_float()`.
+ *   - `s`: `String` value; see `zis_make_string()`.
+ * + A collection of other values, inside which other specifiers can be used.
+ *   However, **nested collections are not allowed**.
+ *   - `(` [`*`] [`<spec>`...] `)`: `Tuple` value.
+ *   - `[` [`*`] [`<spec>`...] `]`: `Array` value.
+ * + Others.
+ *   - `-`: skip one value; no argument.
+ *   - `*`: reserve storage for collection types; the argument is `size_t n`.
+ *
+ * @warning No error will be reported if write pointer reaches the end of
+ * current frame during interpretation.
+ *
+ * @warning REG-0 may be used by this function. The value in it can be modified.
+ */
+ZIS_API int zis_make_values(zis_t z, unsigned int reg_begin, const char *fmt, ...);
+
+/**
+ * Read values from `REG[reg_begin ...]`.
+ *
+ * @param z zis instance
+ * @param reg_begin first register to read values from
+ * @param fmt a NUL-terminated string specifying how to interpret the data
+ * @param ... the data
+ * @return Number of read values (zero or positive);  `ZIS_E_IDX` (invalid `reg_begin`),
+ * `ZIS_E_ARG` (invalid `fmt` or `...`), `ZIS_E_TYPE` (type mismatched).
+ *
+ * @details The format string `fmt` consists of the following specifiers:
+ * + Equivalent to `zis_load_*` or `zis_read_*` functions.
+ *   - `%`: register (local variable); the argument is `unsigned int reg`.
+ *   - `n`: check if it is a `nil`; no argument.
+ *   - `x`: `Bool` value; see `zis_read_bool()`.
+ *   - `i`: `Int` value; see `zis_read_int()`.
+ *   - `f`: `Float` value; see `zis_read_float()`.
+ *   - `s`: `String` value; see `zis_read_string()`.
+ * + A collection of other values, inside which other specifiers can be used.
+ *   However, **nested collections are not allowed**.
+ *   - `(` [`*`] [`<spec>`...] `)`: read `Tuple`.
+ *   - `[` [`*`] [`<spec>`...] `]`: read `Array`.
+ * + Others.
+ *   - `-`: skip one value; no argument.
+ *   - `*`: get length of a collection type value; the argument is `size_t *n`.
+ *   - `?`: ignore type errors if the actual type is `Nil`; no argument.
+ *
+ * @warning REG-0 may be used by this function. The value in it can be modified.
+ */
+ZIS_API int zis_read_values(zis_t z, unsigned int reg_begin, const char *fmt, ...);
+
 /** @} */
 
 /** @defgroup zis-api-variables API: access and manipulate variables */
@@ -249,12 +313,42 @@ ZIS_API int zis_read_string(zis_t z, unsigned int reg, char *buf, size_t *sz);
 /**
  * Copy object between registers (local variables).
  *
+ * `REG[dst] <- REG[src]`
+ *
  * @param z zis instance
  * @param dst destination register index
  * @param src source register index
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `dst` or `src`).
  */
 ZIS_API int zis_move_local(zis_t z, unsigned int dst, unsigned int src);
+
+/**
+ * Get element from an object.
+ *
+ * `REG[reg_elem] <- ( REG[reg_obj] )[ REG[reg_key] ]`
+ *
+ * @param z zis instance
+ * @param reg_obj register where the object is
+ * @param reg_key register where the key is
+ * @param reg_val register to load the element to
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index); `ZIS_E_ARG` (key does not exist);
+ * `ZIS_E_TYPE` (`reg_obj` does not allow elements).
+ */
+ZIS_API int zis_load_element(zis_t z, unsigned int reg_obj, unsigned int reg_key, unsigned int reg_val);
+
+/**
+ * Set object element.
+ *
+ * `( REG[reg_obj] )[ REG[reg_key] ] <- REG[reg_elem]`
+ *
+ * @param z zis instance
+ * @param reg_obj register where the object is
+ * @param reg_key register where the key is
+ * @param reg_val register where the new value of the element is
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index); `ZIS_E_ARG` (key does not exist);
+ * `ZIS_E_TYPE` (`reg_obj` does not allow elements).
+ */
+ZIS_API int zis_store_element(zis_t z, unsigned int reg_obj, unsigned int reg_key, unsigned int reg_val);
 
 /** @} */
 

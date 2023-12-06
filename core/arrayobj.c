@@ -36,8 +36,6 @@ struct zis_array_slots_obj *zis_array_slots_obj_new2(
     struct zis_context *z, size_t len,
     struct zis_object *v[], size_t n
 ) {
-    assert(v);
-
     if (zis_unlikely(!len))
         return z->globals->val_empty_array_slots;
     if (zis_unlikely(n > len))
@@ -50,7 +48,9 @@ struct zis_array_slots_obj *zis_array_slots_obj_new2(
         zis_object_cast(obj, struct zis_array_slots_obj);
     assert(zis_array_slots_obj_length(self) == len);
 
+    assert(v);
     memcpy(self->_data, v, n * sizeof(struct zis_object *));
+    zis_object_assert_no_write_barrier(self);
     memset(self->_data + n, 0xff, (len - n) * sizeof(struct zis_object *));
 
     return self;
@@ -83,6 +83,26 @@ void zis_array_obj_new(
     self->length = n;
     if (n) {
         self->_data = zis_array_slots_obj_new(z, v, n);
+        zis_object_assert_no_write_barrier(self);
+    }
+}
+
+void zis_array_obj_new2(
+    struct zis_context *z, struct zis_object **ret,
+    size_t reserve, struct zis_object *v[], size_t n
+) {
+    struct zis_object *const obj = zis_objmem_alloc(z, z->globals->type_Array);
+    *ret = obj;
+    struct zis_array_obj *const self = zis_object_cast(obj, struct zis_array_obj);
+    self->_data = z->globals->val_empty_array_slots;
+    zis_object_assert_no_write_barrier(self);
+    self->length = n;
+    if (reserve < n)
+        reserve = n;
+    if (reserve) {
+        self->_data = v ?
+            zis_array_slots_obj_new2(z, reserve, v, n) :
+            zis_array_slots_obj_new(z, NULL, n);
         zis_object_assert_no_write_barrier(self);
     }
 }
@@ -131,6 +151,61 @@ struct zis_object *zis_array_obj_pop(
     assert(zis_object_is_smallint(self_data->_data[new_len]));
 
     return elem;
+}
+
+struct zis_object *zis_array_obj_Mx_get_element(
+    struct zis_context *z, const struct zis_array_obj *self,
+    struct zis_object *index_obj
+) {
+    if (zis_object_is_smallint(index_obj)) {
+        zis_smallint_t idx = zis_smallint_from_ptr(index_obj);
+        const size_t len = self->length;
+        assert(len <= ZIS_SMALLINT_MAX);
+        const zis_smallint_t len_smi = (zis_smallint_t)len;
+        if (idx > 0) {
+            idx--;
+            if (zis_unlikely(idx >= len_smi))
+                return NULL;
+        } else {
+            if (zis_unlikely(idx == 0))
+                return NULL;
+            idx = len_smi + idx;
+            if (zis_unlikely((size_t)idx >= len))
+                return NULL;
+        }
+        assert(idx >= 0 && idx < len_smi);
+        return zis_array_slots_obj_get(self->_data, (size_t)idx);
+    }
+    zis_unused_var(z);
+    return NULL;
+}
+
+bool zis_array_obj_Mx_set_element(
+    struct zis_context *z, struct zis_array_obj *self,
+    struct zis_object *index_obj, struct zis_object *value
+) {
+    if (zis_object_is_smallint(index_obj)) {
+        zis_smallint_t idx = zis_smallint_from_ptr(index_obj);
+        const size_t len = self->length;
+        assert(len <= ZIS_SMALLINT_MAX);
+        const zis_smallint_t len_smi = (zis_smallint_t)len;
+        if (idx > 0) {
+            idx--;
+            if (zis_unlikely(idx >= len_smi))
+                return false;
+        } else {
+            if (zis_unlikely(idx == 0))
+                return false;
+            idx = len_smi + idx;
+            if (zis_unlikely((size_t)idx >= len))
+                return false;
+        }
+        assert(idx >= 0 && idx < len_smi);
+        zis_array_slots_obj_set(self->_data, (size_t)idx, value);
+        return true;
+    }
+    zis_unused_var(z);
+    return false;
 }
 
 ZIS_NATIVE_TYPE_DEF(

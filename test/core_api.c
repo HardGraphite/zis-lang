@@ -180,6 +180,273 @@ zis_test_define(test_string, z) {
     do_test_bad_string(z, u8"你好", 4); // U+4F60 U+597D => [e4 bd a0] [e5 a5 bd]
 }
 
+static void do_test_make_values__basic(zis_t z) {
+    int status;
+    const int64_t rand_num = 13579;
+    const bool in_bool = true;
+    const int64_t in_i64 = 24680;
+    const double in_double = 3.14;
+    const char *const in_str = "Hello, World!";
+    bool v_bool;
+    int64_t v_i64;
+    double v_double;
+    char v_str[64];
+    size_t v_size;
+
+    zis_make_int(z, 20, rand_num);
+    status = zis_make_values(
+        z, 1, "%nxifs(ifs)[ifs][*i]",
+        // CNT 1234567890 1234 5 6
+        // REG 1234567    8    9
+        20, in_bool, in_i64, in_double, in_str, (size_t)-1,
+        in_i64, in_double, in_str, (size_t)-1,
+        in_i64, in_double, in_str, (size_t)-1,
+        (size_t)100, in_i64
+    );
+    zis_test_assert_eq(status, 16);
+
+    status = zis_read_int(z, 1, &v_i64);
+    zis_test_assert_eq(status, ZIS_OK);
+    zis_test_assert_eq(v_i64, rand_num);
+
+    status = zis_read_nil(z, 2);
+    zis_test_assert_eq(status, ZIS_OK);
+
+    status = zis_read_bool(z, 3, &v_bool);
+    zis_test_assert_eq(status, ZIS_OK);
+    zis_test_assert_eq(v_bool, in_bool);
+
+    status = zis_read_int(z, 4, &v_i64);
+    zis_test_assert_eq(status, ZIS_OK);
+    zis_test_assert_eq(v_i64, in_i64);
+
+    status = zis_read_float(z, 5, &v_double);
+    zis_test_assert_eq(status, ZIS_OK);
+    zis_test_assert_eq(v_double, in_double);
+
+    v_size = sizeof v_str;
+    status = zis_read_string(z, 6, v_str, &v_size);
+    zis_test_assert_eq(status, ZIS_OK);
+    zis_test_assert_eq(v_size, strlen(in_str));
+    zis_test_assert_eq(memcmp(v_str, in_str, v_size), 0);
+
+    for (unsigned int reg = 7; reg <= 8; reg++) {
+        zis_make_int(z, 0, 1);
+        status = zis_load_element(z, reg, 0, 0);
+        zis_test_assert_eq(status, ZIS_OK);
+        status = zis_read_int(z, 0, &v_i64);
+        zis_test_assert_eq(status, ZIS_OK);
+        zis_test_assert_eq(v_i64, in_i64);
+
+        zis_make_int(z, 0, 2);
+        status = zis_load_element(z, reg, 0, 0);
+        zis_test_assert_eq(status, ZIS_OK);
+        status = zis_read_float(z, 0, &v_double);
+        zis_test_assert_eq(status, ZIS_OK);
+        zis_test_assert_eq(v_double, in_double);
+
+        zis_make_int(z, 0, 3);
+        status = zis_load_element(z, reg, 0, 0);
+        zis_test_assert_eq(status, ZIS_OK);
+        v_size = sizeof v_str;
+        status = zis_read_string(z, 0, v_str, &v_size);
+        zis_test_assert_eq(status, ZIS_OK);
+        zis_test_assert_eq(v_size, strlen(in_str));
+        zis_test_assert_eq(memcmp(v_str, in_str, v_size), 0);
+
+        zis_make_int(z, 0, 4);
+        status = zis_load_element(z, reg, 0, 0);
+        zis_test_assert_eq(status, ZIS_E_ARG); // out of range
+    }
+
+    {
+        const unsigned int reg = 9;
+
+        zis_make_int(z, 0, 1);
+        status = zis_load_element(z, reg, 0, 0);
+        zis_test_assert_eq(status, ZIS_OK);
+        status = zis_read_int(z, 0, &v_i64);
+        zis_test_assert_eq(status, ZIS_OK);
+        zis_test_assert_eq(v_i64, in_i64);
+
+        zis_make_int(z, 0, 2);
+        status = zis_load_element(z, reg, 0, 0);
+        zis_test_assert_eq(status, ZIS_E_ARG); // out of range
+    }
+}
+
+static void do_test_make_values__insufficient_regs(zis_t z) {
+    int status;
+
+    status = zis_make_values(z, REG_MAX + 1, "n");
+    zis_test_assert_eq(status, ZIS_E_IDX);
+
+    status = zis_make_values(z, REG_MAX, "n");
+    zis_test_assert_eq(status, 1);
+
+    status = zis_make_values(z, REG_MAX, "nn");
+    zis_test_assert_eq(status, 1);
+}
+
+static void do_test_make_values__nested_collections(zis_t z) {
+    int status;
+
+    status = zis_make_values(z, 1, "(())");
+    zis_test_assert_eq(status, ZIS_E_ARG);
+
+    status = zis_make_values(z, 1, "[()]");
+    zis_test_assert_eq(status, ZIS_E_ARG);
+
+    status = zis_make_values(z, 1, "[[]]");
+    zis_test_assert_eq(status, ZIS_E_ARG);
+}
+
+zis_test_define(test_make_values, z) {
+    do_test_make_values__basic(z);
+    do_test_make_values__insufficient_regs(z);
+    do_test_make_values__nested_collections(z);
+}
+
+static void do_test_read_values__basic(zis_t z) {
+    int status;
+    const bool in_bool = true;
+    const int64_t in_i64 = 24680;
+    const double in_double = 3.14;
+    const char *const in_str = "Hello, World!";
+    bool v_bool;
+    int64_t v_i64;
+    double v_double;
+    char v_str[64];
+    size_t v_size;
+
+    zis_load_bool(z, 1, in_bool);
+    zis_make_int(z, 2, in_i64);
+    zis_make_float(z, 3, in_double);
+    zis_make_string(z, 4, in_str, -1);
+
+    v_size = strlen(in_str);
+    status = zis_read_values(z, 1, "xifs", &v_bool, &v_i64, &v_double, &v_str, &v_size);
+    zis_test_assert_eq(status, 4);
+    zis_test_assert_eq(v_bool, in_bool);
+    zis_test_assert_eq(v_i64, in_i64);
+    zis_test_assert_eq(v_double, in_double);
+    zis_test_assert_eq(v_size, strlen(in_str));
+    zis_test_assert_eq(memcmp(v_str, in_str, v_size), 0);
+
+    zis_make_values(z, 1, "(if)[if]", in_i64, in_double, in_i64, in_double);
+
+    status = zis_read_values(z, 1, "(*if)", &v_size, &v_i64, &v_double);
+    zis_test_assert_eq(status, 3);
+    zis_test_assert_eq(v_size, 2);
+    zis_test_assert_eq(v_i64, in_i64);
+    zis_test_assert_eq(v_double, in_double);
+    status = zis_read_values(z, 2, "[*if]", &v_size, &v_i64, &v_double);
+    zis_test_assert_eq(status, 3);
+    zis_test_assert_eq(v_size, 2);
+    zis_test_assert_eq(v_i64, in_i64);
+    zis_test_assert_eq(v_double, in_double);
+}
+
+static void do_test_read_values__ignore_type_err(zis_t z) {
+    int status;
+    const int64_t in[2] = { 6, 10 };
+    int64_t v[2] = { 0, 0 };
+
+    zis_make_values(z, 1, "nn");
+    status = zis_read_values(z, 1, "ii", &v[0], &v[1]);
+    zis_test_assert_eq(status, ZIS_E_TYPE);
+
+    v[0] = in[0], v[1] = in[1];
+    status = zis_read_values(z, 1, "?ii", &v[0], &v[1]);
+    zis_test_assert_eq(status, 2);
+    zis_test_assert_eq(v[0], in[0]);
+    zis_test_assert_eq(v[1], in[1]);
+
+    zis_make_values(z, 1, "in", in[0]);
+    v[0] = in[0], v[1] = in[1];
+    status = zis_read_values(z, 1, "i?i", &v[0], &v[1]);
+    zis_test_assert_eq(status, 2);
+    zis_test_assert_eq(v[0], in[0]);
+    zis_test_assert_eq(v[1], in[1]);
+
+    zis_make_values(z, 1, "ff", 0.0, 0.0);
+    status = zis_read_values(z, 1, "?ii", &v[0], &v[1]);
+    zis_test_assert_eq(status, ZIS_E_TYPE);
+}
+
+zis_test_define(test_read_values, z) {
+    do_test_read_values__basic(z);
+    do_test_read_values__ignore_type_err(z);
+}
+
+// zis-api-variables //
+
+zis_test_define(test_load_element, z) {
+    int status;
+
+    const double in[] = { 0.618, 2.71, 3.14 };
+    double v_double;
+
+    status = zis_make_values(z, 1, "(fff)[fff]", in[0], in[1], in[2], in[0], in[1], in[2]);
+    zis_test_assert_eq(status, 8);
+    for (unsigned int i = 1; i <= 2; i++) {
+        for (int j = -5; j <= 5; j++) {
+            const int jx = j >= 0 ? j : (3 + 1) + j;
+            status = zis_make_int(z, 0, j); // index
+            zis_test_assert_eq(status, ZIS_OK);
+            status = zis_load_element(z, i, 0, 0);
+            if (1 <= jx && jx <= 3) {
+                zis_test_assert_eq(status, ZIS_OK);
+                status = zis_read_float(z, 0, &v_double);
+                zis_test_assert_eq(status, ZIS_OK);
+                zis_test_assert_eq(v_double, in[jx - 1]);
+            } else {
+                zis_test_assert_eq(status, ZIS_E_ARG); // out of range
+            }
+        }
+    }
+
+    status = zis_load_nil(z, 1, 1);
+    zis_test_assert_eq(status, ZIS_OK);
+    status = zis_make_int(z, 0, 1);
+    zis_test_assert_eq(status, ZIS_OK);
+    status = zis_load_element(z, 1, 0, 0);
+    zis_test_assert_eq(status, ZIS_E_TYPE);
+}
+
+zis_test_define(test_store_element, z) {
+    int status;
+
+    const double in[] = { 0.618, 2.71, 3.14 };
+
+    status = zis_make_values(z, 1, "(nnn)[nnn]");
+    zis_test_assert_eq(status, 8);
+    for (unsigned int i = 1; i <= 2; i++) {
+        for (int j = 1; j <= 5; j++) {
+            status = zis_make_int(z, 0, j); // index
+            zis_test_assert_eq(status, ZIS_OK);
+            status = zis_make_float(z, 3, in[j - 1]);
+            zis_test_assert_eq(status, ZIS_OK);
+            status = zis_store_element(z, i, 0, 3);
+            zis_test_assert_eq(status, i == 1 ? ZIS_E_TYPE : j > 3 ? ZIS_E_ARG : ZIS_OK);
+        }
+    }
+    {
+        double v[3];
+        status = zis_read_values(z, 1, "(nnn)[fff]", &v[0], &v[1], &v[2]);
+        zis_test_assert_eq(status, 6);
+        for (int i = 0; i < 3; i++)
+            zis_test_assert_eq(in[i], v[i]);
+    }
+
+    status = zis_load_nil(z, 1, 1);
+    zis_test_assert_eq(status, ZIS_OK);
+    status = zis_make_int(z, 0, 1);
+    zis_test_assert_eq(status, ZIS_OK);
+    status = zis_store_element(z, 1, 0, 0);
+    zis_test_assert_eq(status, ZIS_E_TYPE);
+}
+
 // main
 
 zis_test_list(
@@ -192,4 +459,9 @@ zis_test_list(
     test_int,
     test_float,
     test_string,
+    test_make_values,
+    test_read_values,
+    // zis-api-variables //
+    test_load_element,
+    test_store_element,
 )
