@@ -24,3 +24,6 @@ CMakeFiles/
 *.lib
 *.out
 *.exe
+
+__pycache__/
+*.py[cdo]
