@@ -128,6 +128,18 @@ struct zis_object *zis_array_obj_pop(
     struct zis_array_obj *self
 );
 
+/// Insert an element to `pos`.
+bool zis_array_obj_insert(
+    struct zis_context *z,
+    struct zis_array_obj *self, size_t pos, struct zis_object *v
+);
+
+/// Delete the element at `pos`.
+bool zis_array_obj_remove(
+    struct zis_context *z,
+    struct zis_array_obj *self, size_t pos
+);
+
 /// Mx: `array[ index ] -> ?value`.
 struct zis_object *zis_array_obj_Mx_get_element(
     struct zis_context *z, const struct zis_array_obj *self,
@@ -138,4 +150,16 @@ struct zis_object *zis_array_obj_Mx_get_element(
 bool zis_array_obj_Mx_set_element(
     struct zis_context *z, struct zis_array_obj *self,
     struct zis_object *index, struct zis_object *value
+);
+
+/// Mx: `array:insert( index , value )  -> ok`.
+bool zis_array_obj_Mx_insert_element(
+    struct zis_context *z, struct zis_array_obj *self,
+    struct zis_object *index, struct zis_object *value
+);
+
+/// Mx: `array:remove( index )  -> ok`.
+bool zis_array_obj_Mx_remove_element(
+    struct zis_context *z, struct zis_array_obj *self,
+    struct zis_object *index
 );

@@ -672,3 +672,45 @@ ZIS_API int zis_store_element(
     return ZIS_E_TYPE;
 }
 
+ZIS_API int zis_insert_element(
+    zis_t z, unsigned int reg_obj, unsigned int reg_key, unsigned int reg_val
+) {
+    struct zis_object *const obj = api_get_local(z, reg_obj);
+    if (zis_unlikely(!obj))
+        return ZIS_E_IDX;
+    struct zis_object *const key = api_get_local(z, reg_key);
+    if (zis_unlikely(!key))
+        return ZIS_E_IDX;
+    struct zis_object *const val = api_get_local(z, reg_val);
+    if (zis_unlikely(!val))
+        return ZIS_E_IDX;
+    if (zis_unlikely(zis_object_is_smallint(obj)))
+        return ZIS_E_TYPE;
+    struct zis_type_obj *const obj_type = zis_object_type(obj);
+    const struct zis_context_globals *const g = z->globals;
+    if (obj_type == g->type_Array) {
+        struct zis_array_obj *const array = zis_object_cast(obj, struct zis_array_obj);
+        const bool ok = zis_array_obj_Mx_insert_element(z, array, key, val);
+        return ok ? ZIS_OK : ZIS_E_ARG;
+    }
+    return ZIS_E_TYPE;
+}
+
+ZIS_API int zis_remove_element(zis_t z, unsigned int reg_obj, unsigned int reg_key) {
+    struct zis_object *const obj = api_get_local(z, reg_obj);
+    if (zis_unlikely(!obj))
+        return ZIS_E_IDX;
+    struct zis_object *const key = api_get_local(z, reg_key);
+    if (zis_unlikely(!key))
+        return ZIS_E_IDX;
+    if (zis_unlikely(zis_object_is_smallint(obj)))
+        return ZIS_E_TYPE;
+    struct zis_type_obj *const obj_type = zis_object_type(obj);
+    const struct zis_context_globals *const g = z->globals;
+    if (obj_type == g->type_Array) {
+        struct zis_array_obj *const array = zis_object_cast(obj, struct zis_array_obj);
+        const bool ok = zis_array_obj_Mx_remove_element(z, array, key);
+        return ok ? ZIS_OK : ZIS_E_ARG;
+    }
+    return ZIS_E_TYPE;
+}

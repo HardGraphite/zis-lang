@@ -447,6 +447,90 @@ zis_test_define(test_store_element, z) {
     zis_test_assert_eq(status, ZIS_E_TYPE);
 }
 
+static void do_test_insert_element__array(zis_t z) {
+    const struct case_ { int64_t init_val[3]; int64_t ins_pos; int64_t ins_val; }
+    cases[] = {
+        { { 2, 3, 4 }, 1, 1 },
+        { { 2, 3, 4 }, -4, 1 },
+        { { 1, 3, 4 }, 2, 2 },
+        { { 1, 3, 4 }, -3, 2 },
+        { { 1, 2, 4 }, 3, 3 },
+        { { 1, 2, 4 }, -2, 3 },
+        { { 1, 2, 3 }, 4, 4 },
+        { { 1, 2, 3 }, -1, 4 },
+        { { 1, 2, 3 }, 0, 0 },
+        { { 1, 2, 3 }, 5, 0 },
+        { { 1, 2, 3 }, -5, 0 },
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+        int status;
+        const struct case_ *c = &cases[i];
+        zis_load_nil(z, 1, 1);
+        zis_make_values(
+            z, 1, "[iii]ii",
+            c->init_val[0], c->init_val[1], c->init_val[2],
+            c->ins_pos, c->ins_val
+        );
+        status = zis_insert_element(z, 1, 2, 3);
+        if (!c->ins_val) {
+            zis_test_assert_eq(status, ZIS_E_ARG);
+            continue;
+        }
+        zis_test_assert_eq(status, ZIS_OK);
+        int64_t v[4] = { 0, 0, 0, 0 };
+        size_t n = 0;
+        status = zis_read_values(z, 1, "[*iiii]", &n, &v[0], &v[1], &v[2], &v[3]);
+        zis_test_assert_eq(status, 5);
+        zis_test_assert_eq(n, 4);
+        for (int j = 0; j < 4; j++)
+            zis_test_assert_eq(v[j], j + 1);
+    }
+}
+
+zis_test_define(test_insert_element, z) {
+    do_test_insert_element__array(z);
+}
+
+static void do_test_remove_element__array(zis_t z) {
+    const struct case_ { int64_t init_val[3]; int64_t rm_pos; int status; }
+    cases[] = {
+        { { 5, 1, 2 }, 1, ZIS_OK },
+        { { 5, 1, 2 }, -3, ZIS_OK },
+        { { 1, 5, 2 }, 2, ZIS_OK },
+        { { 1, 5, 2 }, -2, ZIS_OK },
+        { { 1, 2, 5 }, 3, ZIS_OK },
+        { { 1, 2, 5 }, -1, ZIS_OK },
+        { { 1, 2, 3 }, 0, ZIS_E_ARG },
+        { { 1, 2, 3 }, 4, ZIS_E_ARG },
+        { { 1, 2, 3 }, -4, ZIS_E_ARG },
+    };
+    for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
+        int status;
+        const struct case_ *c = &cases[i];
+        zis_load_nil(z, 1, 1);
+        zis_make_values(
+            z, 1, "[iii]ii",
+            c->init_val[0], c->init_val[1], c->init_val[2],
+            c->rm_pos
+        );
+        status = zis_remove_element(z, 1, 2);
+        zis_test_assert_eq(status, c->status);
+        if (c->status == ZIS_OK) {
+            int64_t v[2] = { 0, 0 };
+            size_t n = 0;
+            status = zis_read_values(z, 1, "[*ii]", &n, &v[0], &v[1]);
+            zis_test_assert_eq(status, 3);
+            zis_test_assert_eq(n, 2);
+            for (int j = 0; j < 2; j++)
+                zis_test_assert_eq(v[j], j + 1);
+        }
+    }
+}
+
+zis_test_define(test_remove_element, z) {
+    do_test_remove_element__array(z);
+}
+
 // main
 
 zis_test_list(
@@ -464,4 +548,6 @@ zis_test_list(
     // zis-api-variables //
     test_load_element,
     test_store_element,
+    test_insert_element,
+    test_remove_element,
 )

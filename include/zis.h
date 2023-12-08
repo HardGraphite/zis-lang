@@ -350,6 +350,33 @@ ZIS_API int zis_load_element(zis_t z, unsigned int reg_obj, unsigned int reg_key
  */
 ZIS_API int zis_store_element(zis_t z, unsigned int reg_obj, unsigned int reg_key, unsigned int reg_val);
 
+/**
+ * Insert value to an object as a new element.
+ *
+ * `( REG[reg_obj] )[ REG[reg_key] ] <- REG[reg_elem]`
+ *
+ * @param z zis instance
+ * @param reg_obj register where the object is
+ * @param reg_key register where the key is
+ * @param reg_val register where the value is
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index); `ZIS_E_ARG` (key not valid);
+ * `ZIS_E_TYPE` (`reg_obj` does not allow elements).
+ */
+ZIS_API int zis_insert_element(zis_t z, unsigned int reg_obj, unsigned int reg_key, unsigned int reg_val);
+
+/**
+ * Remove an element from an object.
+ *
+ * `delete ( REG[reg_obj] )[ REG[reg_key] ]`
+ *
+ * @param z zis instance
+ * @param reg_obj register where the object is
+ * @param reg_key register where the key is
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index); `ZIS_E_ARG` (key not valid);
+ * `ZIS_E_TYPE` (`reg_obj` does not allow elements).
+ */
+ZIS_API int zis_remove_element(zis_t z, unsigned int reg_obj, unsigned int reg_key);
+
 /** @} */
 
 #ifdef __cplusplus

@@ -26,8 +26,7 @@ void zis_tuple_obj_new(
 ) {
     struct zis_tuple_obj *const self = tuple_obj_alloc(z, ret, n);
     if (zis_likely(v)) {
-        for (size_t i = 0; i < n; i++)
-            self->_data[i] = v[i];
+        memcpy(self->_data, v, n * sizeof(struct zis_object *));
         zis_object_assert_no_write_barrier(self);
     } else {
         memset(self->_data, 0xff, n * sizeof(void *));
