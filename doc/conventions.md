@@ -51,23 +51,37 @@ the return type and specifiers can be put in stand-alone lines.
 - Macros shall be `SCREAMING_SNAKE_CASE`.
 - Use prefix "`zis_`".
 
-## Signatures and behaviors of special functions
+## Signatures and behaviors of special functions (C/C++)
 
 ### Object-creating functions
 
-Functions that creates a new object shall a pointer to an object pointer (the "receiver").
-The created object is going to be stored in the "receiver".
+Creating a new object may trigger garbage collection (GC).
+Functions that create objects shall make sure that
+pointers to objects are in GC roots during GC.
+Otherwise, the objects might be freed or moved
+and the pointers then became dangling ones.
+
+An easy solution is to put pointers onto the runtime callstack before creating objects
+and update the local variables after that.
+If the function cannot access the callstack directly,
+`zis_callstack_frame_alloc_temp()` can be used to allocate temporary stack storages.
+
+Here is an example:
 
 ```c
-void xyz_obj_new(zis_context *z, struct zis_object **ret, int flags) {
-    struct xyz_obj *obj = make_xyz(z, flags); // Create an object.
-    *ret = (struct zis_object *)obj; // Assign to the "receiver".
+struct xyz_obj *xyz_obj_add(zis_context *z, struct xyz_obj *a, struct xyz_obj *b) {
+    struct zis_object **temp_regs = zis_callstack_frame_alloc_temp(z, 2);
+    temp_regs[0] = zis_object_from(a), emp_regs[1] = zis_object_from(b); // Put onto stack.
+    struct xyz_adder_obj *adder = xyz_adder_obj_new(z); // Create object.
+    a = zis_object_cast(temp_regs[0], struct xyz_obj),
+    b = zis_object_cast(temp_regs[1], struct xyz_obj); // Update references.
+    zis_callstack_frame_free_temp(z, 2);
+    return xyz_adder_obj_add(adder, a, b);
 }
 ```
 
-It is not possible to place a write barrier in such a function.
-So, the caller must make sure that the "receiver" do not need a write barrier.
-To be practical, the "receiver" can be on the stack, which is a GC root.
+Considering that this method can slightly impact performance,
+do not use it in unnecessary situations or paths.
 
 ### Collection-traversing functions
 

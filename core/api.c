@@ -57,8 +57,7 @@ ZIS_API void zis_destroy(zis_t z) {
 /* ----- zis-api-natives ---------------------------------------------------- */
 
 ZIS_API int zis_native_block(zis_t z, size_t reg_max, int(*fn)(zis_t, void *), void *arg) {
-    if (!zis_callstack_enter(z->callstack, reg_max + 1U, NULL))
-        return ZIS_E_ARG;
+    zis_callstack_enter(z->callstack, reg_max + 1U, NULL);
     z->callstack->frame[0] = zis_callstack_frame_info(z->callstack)->prev_frame[0];
     const int ret_val = fn(z, arg);
     zis_callstack_frame_info(z->callstack)->prev_frame[0] = z->callstack->frame[0];
@@ -188,7 +187,6 @@ static int api_make_values_impl(
     struct api_make_values_state *x,
     struct zis_object **ret_p, struct zis_object **ret_end /*excluding*/,
     const char *fmt_end /*excluding*/,
-    struct zis_object *write_barrier,
     bool nested
 ) {
     struct zis_context *const z = x->z;
@@ -262,24 +260,32 @@ static int api_make_values_impl(
                 status = ZIS_E_ARG;
                 goto do_return;
             }
+            fmt_p++;
             const char *const s_end = strchr(fmt_p, ')');
             if (!s_end) {
                 zis_debug_log(ERROR, "API", "zis_make_values(): unmatched \"(...)\"");
                 status = ZIS_E_ARG;
                 goto do_return;
             }
-            const size_t elem_count = (size_t)(s_end - fmt_p) - 1;
-            zis_tuple_obj_new(z, ret_p, NULL, elem_count);
-            struct zis_object **const data = (struct zis_object **)
-                zis_tuple_obj_data(zis_object_cast(*ret_p, struct zis_tuple_obj));
-            count++;
-            fmt_p++;
-            PUSH_STATE();
-            const int rv = api_make_values_impl(x, data, data + elem_count, s_end, *ret_p, true);
-            if (rv)
-                return rv;
-            PULL_STATE();
-            count--;
+            const size_t elem_count = (size_t)(s_end - fmt_p);
+            if (elem_count) {
+                PUSH_STATE();
+                struct zis_object **tmp_regs =
+                    zis_callstack_frame_alloc_temp(z, elem_count);
+                const int rv = api_make_values_impl(
+                    x, tmp_regs, tmp_regs + elem_count, s_end, true
+                );
+                PULL_STATE();
+                if (rv == ZIS_OK) {
+                    zis_tuple_obj_new(z, ret_p, tmp_regs, elem_count);
+                    zis_callstack_frame_free_temp(z, elem_count);
+                } else {
+                    zis_callstack_frame_free_temp(z, elem_count);
+                    return rv;
+                }
+            } else {
+                zis_tuple_obj_new(z, ret_p, NULL, 0U);
+            }
             assert(*fmt_p == ')');
             break;
         }
@@ -295,24 +301,34 @@ static int api_make_values_impl(
                 fmt_p++;
                 reserve = va_arg(x->ap, size_t);
             }
+            fmt_p++;
             const char *const s_end = strchr(fmt_p, ']');
             if (!s_end){
                 zis_debug_log(ERROR, "API", "zis_make_values(): unmatched \"[...]\"");
                 status = ZIS_E_ARG;
                 goto do_return;
             }
-            const size_t elem_count = (size_t)(s_end - fmt_p) - 1;
-            zis_array_obj_new2(z, ret_p, reserve, NULL, elem_count);
-            struct zis_object **const data = (struct zis_object **)
-                zis_array_obj_data(zis_object_cast(*ret_p, struct zis_array_obj));
-            count++;
-            fmt_p++;
-            PUSH_STATE();
-            const int rv = api_make_values_impl(x, data, data + elem_count, s_end, *ret_p, true);
-            if (rv)
-                return rv;
-            PULL_STATE();
-            count--;
+            const size_t elem_count = (size_t)(s_end - fmt_p);
+            if (elem_count) {
+                PUSH_STATE();
+                struct zis_object **tmp_regs =
+                    zis_callstack_frame_alloc_temp(z, elem_count);
+                const int rv = api_make_values_impl(
+                    x, tmp_regs, tmp_regs + elem_count, s_end, true
+                );
+                if (rv == ZIS_OK) {
+                    PULL_STATE();
+                    *ret_p = zis_object_from(
+                        zis_array_obj_new2(z, reserve, tmp_regs, elem_count)
+                    );
+                    zis_callstack_frame_free_temp(z, elem_count);
+                } else {
+                    zis_callstack_frame_free_temp(z, elem_count);
+                    return rv;
+                }
+            } else {
+                *ret_p = zis_object_from(zis_array_obj_new2(z, reserve, NULL, 0U));
+            }
             assert(*fmt_p == ']');
             break;
         }
@@ -331,9 +347,6 @@ static int api_make_values_impl(
         }
 
         assert(status == ZIS_OK);
-
-        if (zis_unlikely(write_barrier))
-            zis_object_write_barrier(write_barrier, *ret_p);
 
         ret_p++;
         fmt_p++;
@@ -361,7 +374,7 @@ ZIS_API int zis_make_values(zis_t z, unsigned int reg_begin, const char *fmt, ..
     x.fmt_p = fmt;
     x.count = 0;
     va_start(x.ap, fmt);
-    const int ret = api_make_values_impl(&x, reg_beg_p, reg_end, (void *)UINTPTR_MAX, NULL, false);
+    const int ret = api_make_values_impl(&x, reg_beg_p, reg_end, (void *)UINTPTR_MAX, false);
     va_end(x.ap);
     assert(ret <= 0);
     return ret == 0 ? x.count : ret;
@@ -476,6 +489,7 @@ do {                  \
                 status = ZIS_E_BUF;
                 goto do_return;
             }
+            *sz = n;
             break;
         }
 
@@ -493,15 +507,15 @@ do {                  \
                 count++;
                 *va_arg(x->ap, size_t *) = zis_tuple_obj_length(tuple_obj);
             }
+            fmt_p++;
             const char *const s_end = strchr(fmt_p, ')');
             if (!s_end) {
                 zis_debug_log(ERROR, "API", "zis_read_values(): unmatched \"(...)\"");
                 status = ZIS_E_ARG;
                 goto do_return;
             }
-            const size_t elem_count = (size_t)(s_end - fmt_p) - 1;
+            const size_t elem_count = (size_t)(s_end - fmt_p);
             struct zis_object *const *const data = zis_tuple_obj_data(tuple_obj);
-            fmt_p++;
             PUSH_STATE();
             const int rv = api_read_values_impl(x, data, data + elem_count, s_end, true);
             if (rv)
@@ -526,15 +540,15 @@ do {                  \
                 count++;
                 *va_arg(x->ap, size_t *) = zis_array_obj_length(array_obj);
             }
+            fmt_p++;
             const char *const s_end = strchr(fmt_p, ']');
             if (!s_end){
                 zis_debug_log(ERROR, "API", "zis_read_values(): unmatched \"[...]\"");
                 status = ZIS_E_ARG;
                 goto do_return;
             }
-            const size_t elem_count = (size_t)(s_end - fmt_p) - 1;
+            const size_t elem_count = (size_t)(s_end - fmt_p);
             struct zis_object *const *const data = zis_array_obj_data(array_obj);
-            fmt_p++;
             PUSH_STATE();
             const int rv = api_read_values_impl(x, data, data + elem_count, s_end, true);
             if (rv)

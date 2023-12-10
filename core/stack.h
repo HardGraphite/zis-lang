@@ -13,6 +13,7 @@ struct zis_object;
 
 /// Info of a call stack frame.
 struct zis_callstack_frame_info {
+    struct zis_object **frame_top; // excluding temp registers
     struct zis_object **prev_frame;
     void               *return_ip;
     struct zis_callstack_frame_info *_next_node;
@@ -73,13 +74,17 @@ zis_nodiscard struct zis_callstack *zis_callstack_create(struct zis_context *z);
 /// Destroy a call stack.
 void zis_callstack_destroy(struct zis_callstack *cs, struct zis_context *z);
 
-/// Push a new frame. Return false if there is no enough free space on the stack
-/// and a new frame cannot be created.
-zis_nodiscard bool
-zis_callstack_enter(struct zis_callstack *cs, size_t frame_size, void *return_ip);
+/// Push a new frame.
+void zis_callstack_enter(struct zis_callstack *cs, size_t frame_size, void *return_ip);
 
 /// Pop the current frame.
 void zis_callstack_leave(struct zis_callstack *cs);
+
+/// Allocate temporary storage in current frame.
+struct zis_object **zis_callstack_frame_alloc_temp(struct zis_context *z, size_t n);
+
+/// Free temporary storage allocated with `zis_callstack_frame_alloc_temp()`.
+void zis_callstack_frame_free_temp(struct zis_context *z, size_t n);
 
 /// Get frame info of the current frame.
 zis_static_force_inline const struct zis_callstack_frame_info *

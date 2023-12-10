@@ -3,7 +3,9 @@
 #pragma once
 
 #include <stddef.h>
+#include <string.h>
 
+#include "attributes.h"
 #include "object.h"
 #include "zis.h" // zis_native_*
 
@@ -89,3 +91,21 @@ const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( NAME ) = {  \
 /// Size of fixed part of extendable BYTES part of a native object based on the C struct.
 #define ZIS_NATIVE_TYPE_STRUCT_XB_FIXED_SIZE(STRUCT, BYTES_SIZE_VAR) \
     (sizeof(STRUCT) - offsetof(STRUCT, BYTES_SIZE_VAR))
+
+/// Copy a vector of object pointers like `memcpy()`.
+zis_static_force_inline struct zis_object **
+zis_object_vec_copy(struct zis_object **restrict dst, struct zis_object **restrict src, size_t n) {
+    return memcpy(dst, src, n * sizeof(struct zis_object *));
+}
+
+/// Copy a vector of object pointers like `memmove()`.
+zis_static_force_inline struct zis_object **
+zis_object_vec_move(struct zis_object **restrict dst, struct zis_object **restrict src, size_t n) {
+    return memmove(dst, src, n * sizeof(struct zis_object *));
+}
+
+/// Fill a vector of object pointers with small integers like `memset()`.
+zis_static_force_inline struct zis_object **
+zis_object_vec_zero(struct zis_object **restrict vec, size_t n) {
+    return memset(vec, 0xff, n * sizeof(struct zis_object *));
+}

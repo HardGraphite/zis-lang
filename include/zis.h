@@ -126,8 +126,7 @@ struct zis_native_type_def {
  * @param reg_max maximum register index
  * @param fn the function to call
  * @param arg argument to pass to `fn`
- * @return Return the return value from function `fn`. If the stack overflows,
- * `ZIS_E_ARG` will be returned and C function `fn` will not be called.
+ * @return Return the return value from function `fn`.
  */
 ZIS_API int zis_native_block(zis_t z, size_t reg_max, int(*fn)(zis_t, void *), void *arg);
 
@@ -261,7 +260,7 @@ ZIS_API int zis_read_string(zis_t z, unsigned int reg, char *buf, size_t *sz);
  *   - `s`: `String` value; see `zis_make_string()`.
  * + A collection of other values, inside which other specifiers can be used.
  *   However, **nested collections are not allowed**.
- *   - `(` [`*`] [`<spec>`...] `)`: `Tuple` value.
+ *   - `(` [`<spec>`...] `)`: `Tuple` value.
  *   - `[` [`*`] [`<spec>`...] `]`: `Array` value.
  * + Others.
  *   - `-`: skip one value; no argument.

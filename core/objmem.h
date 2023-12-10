@@ -261,7 +261,7 @@ do {                                        \
     if (zis_object_meta_test_gc_mark(__obj->_meta)) \
         break;                              \
     zis_object_meta_set_gc_mark(__obj->_meta);      \
-    if (zis_object_meta_young_is_new(__obj->_meta)) \
+    if (zis_object_meta_get_gc_state(__obj->_meta) == ZIS_OBJMEM_OBJ_NEW) \
         _zis_objmem_mark_object_slots_rec_x(__obj); \
     else                                    \
         _zis_objmem_mark_object_slots_rec_o2x(__obj); \
@@ -272,7 +272,7 @@ do {                                        \
 #define _zis_objmem_mark_object_rec_y_(obj) \
 do {                                        \
     struct zis_object *__obj = (obj);       \
-    if (zis_object_meta_test_gc_mark(__obj->_meta)) \
+    if (zis_object_meta_is_not_young(__obj->_meta) || zis_object_meta_test_gc_mark(__obj->_meta)) \
         break;                              \
     zis_object_meta_set_gc_mark(__obj->_meta);      \
     if (zis_object_meta_young_is_new(__obj->_meta)) \

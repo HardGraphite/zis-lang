@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include "attributes.h"
+#include "context.h"
 #include "debug.h"
 #include "memory.h"
 #include "objmem.h"
@@ -79,19 +80,18 @@ static void callstack_gc_visitor(void *_cs, enum zis_objmem_obj_visit_op op) {
 }
 
 /// Fill slots with known objects.
-zis_static_force_inline void
-callstack_clear_range(struct zis_object **first, struct zis_object **last) {
-    assert(first <= last);
-#if 0
-    struct zis_object *const v = zis_smallint_to_ptr(0); // Fill with small integer `0`.
-    for (struct zis_object **p = first; p <= last; p++)
-        *p = v;
-#else
-    memset(first, 0xff, (size_t)(last - first));
-#endif
+zis_static_force_inline struct zis_object **
+callstack_clear_range(struct zis_object **begin, size_t count) {
+    return memset(begin, 0xff, count * sizeof(struct zis_object *));
 }
 
 /* ----- public functions --------------------------------------------------- */
+
+zis_noinline zis_noreturn static void callstack_error_overflow(struct zis_callstack *cs) {
+    zis_unused_var(cs);
+    zis_debug_log(FATAL, "Stack", "stack@%p overflow", (void *)cs);
+    abort(); // TODO: configurable error handling
+}
 
 struct zis_callstack *zis_callstack_create(struct zis_context *z) {
     static_assert(ZIS_CALLSTACK_SIZE > sizeof(struct zis_callstack), "");
@@ -101,6 +101,7 @@ struct zis_callstack *zis_callstack_create(struct zis_context *z) {
     cs->frame = cs->_data;
     fi_list_init(&cs->_fi_list);
     cs->_data_end = cs->_data + (cs_size - sizeof(struct zis_callstack)) / sizeof(void *);
+    cs->frame[0] = zis_smallint_to_ptr(0);
     zis_objmem_add_gc_root(z, cs, callstack_gc_visitor);
     zis_debug_log(
         INFO, "Stack", "new stack @%p: size=%zu,n_slots=%zu",
@@ -117,32 +118,47 @@ void zis_callstack_destroy(struct zis_callstack *cs, struct zis_context *z) {
     zis_mem_free(cs);
 }
 
-bool zis_callstack_enter(struct zis_callstack *cs, size_t frame_size, void *return_ip) {
+void zis_callstack_enter(struct zis_callstack *cs, size_t frame_size, void *return_ip) {
     struct zis_object **const old_sp = cs->top, **const old_fp = cs->frame;
     struct zis_object **const new_sp = old_sp + frame_size, **const new_fp = old_sp + 1;
-    if (zis_unlikely(new_sp >= cs->_data_end)) {
-        zis_debug_log(
-            ERROR, "Stack", "stack@%p overflow: %ti+%zu>%ti",
-            (void *)cs, old_sp - cs->_data, frame_size, cs->_data_end - cs->_data - 1
-        );
-        return false;
-    }
+    if (zis_unlikely((size_t)(cs->_data_end - old_sp) < frame_size))
+        callstack_error_overflow(cs);
     struct zis_callstack_frame_info *const fi = fi_list_push(&cs->_fi_list);
+    fi->frame_top = new_sp;
     fi->prev_frame = old_fp;
     fi->return_ip = return_ip;
     cs->top = new_sp, cs->frame = new_fp;
-    callstack_clear_range(new_fp, new_sp);
+    callstack_clear_range(new_fp, frame_size);
     zis_debug_log(TRACE, "Stack", "enter frame @%ti~+%zu", new_fp - cs->_data, frame_size);
-    return true;
 }
 
 void zis_callstack_leave(struct zis_callstack *cs) {
     const struct zis_callstack_frame_info *const fi = zis_callstack_frame_info(cs);
     struct zis_object **const old_fp = cs->frame;
     struct zis_object **const new_sp = old_fp - 1, **const new_fp = fi->prev_frame;
+    assert(cs->top >= fi->frame_top);
     fi_list_pop(&cs->_fi_list); // Drop `fi`.
     cs->top = new_sp, cs->frame = new_fp;
     zis_debug_log(TRACE, "Stack", "leave frame @%ti", old_fp - cs->_data);
+}
+
+struct zis_object **zis_callstack_frame_alloc_temp(struct zis_context *z, size_t n) {
+    struct zis_callstack *const cs = z->callstack;
+    struct zis_object **const old_sp = cs->top;
+    if (zis_unlikely((size_t)(cs->_data_end - old_sp) < n))
+        callstack_error_overflow(cs);
+    cs->top = old_sp + n;
+    return callstack_clear_range(old_sp + 1, n);
+}
+
+void zis_callstack_frame_free_temp(struct zis_context *z, size_t n) {
+    struct zis_callstack *const cs = z->callstack;
+    struct zis_object **const old_sp = cs->top;
+    if (zis_unlikely((size_t)(old_sp - zis_callstack_frame_info(cs)->frame_top) < n)) {
+        zis_debug_log(FATAL, "Stack", "free_temp(%zu)", n);
+        abort();
+    }
+    cs->top = old_sp - n;
 }
 
 int zis_callstack_foreach_frame(

@@ -23,10 +23,10 @@ struct zis_array_slots_obj *zis_array_slots_obj_new(
     struct zis_context *z, struct zis_object *v[], size_t n
 );
 
-/// Create slots and initialize with `v[0 ... n-1]`.
+/// Create slots and initialize with another.
 struct zis_array_slots_obj *zis_array_slots_obj_new2(
     struct zis_context *z, size_t len,
-    struct zis_object *v[], size_t n
+    struct zis_array_slots_obj *other_slots
 );
 
 struct zis_array_slots_obj *_zis_array_slots_obj_new_empty(struct zis_context *z);
@@ -72,14 +72,14 @@ struct zis_array_obj {
 };
 
 /// Create an `Array` object. Initialize data `v` can be NULL.
-void zis_array_obj_new(
-    struct zis_context *z, struct zis_object **ret,
+struct zis_array_obj *zis_array_obj_new(
+    struct zis_context *z,
     struct zis_object *v[], size_t n
 );
 
 /// Create an `Array` object. Initialize data `v` can be NULL.
-void zis_array_obj_new2(
-    struct zis_context *z, struct zis_object **ret,
+struct zis_array_obj *zis_array_obj_new2(
+    struct zis_context *z,
     size_t reserve, struct zis_object *v[], size_t n
 );
 

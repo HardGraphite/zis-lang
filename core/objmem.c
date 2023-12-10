@@ -1403,6 +1403,7 @@ static void new_space_realloc_survivors(
             new_mem = old_space_pre_alloc(
                 old_space, old_space_realloc_iter, obj_size
             );
+            assert(new_mem);
         }
 
         zis_object_meta_assert_ptr_fits(new_mem);
@@ -1560,6 +1561,7 @@ struct zis_object *zis_objmem_alloc(
 
     assert(!zis_object_is_smallint(obj));
     assert(zis_object_type(obj) == obj_type);
+    assert(zis_object_size(obj) == obj_size);
     return obj;
 }
 
@@ -1996,8 +1998,7 @@ zis_static_force_inline void _zis_objmem_mark_object_rec_o2y(struct zis_object *
 
     if (zis_object_meta_young_is_new(obj->_meta))
         zis_object_meta_set_gc_state(obj->_meta, ZIS_OBJMEM_OBJ_MID); // TODO: meta_word &= 1
-    else
-        _zis_objmem_mark_object_slots_rec_o2y(obj);
+    _zis_objmem_mark_object_slots_rec_o2y(obj);
 }
 
 #undef MARK_OBJ_IMPL__RET_IF_MARKED
