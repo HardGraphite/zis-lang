@@ -425,7 +425,7 @@ zis_test_define(test_store_element, z) {
         for (int j = 1; j <= 5; j++) {
             status = zis_make_int(z, 0, j); // index
             zis_test_assert_eq(status, ZIS_OK);
-            status = zis_make_float(z, 3, in[j - 1]);
+            status = zis_make_float(z, 3, in[j > 3 ? 0 : j - 1]);
             zis_test_assert_eq(status, ZIS_OK);
             status = zis_store_element(z, i, 0, 3);
             zis_test_assert_eq(status, i == 1 ? ZIS_E_TYPE : j > 3 ? ZIS_E_ARG : ZIS_OK);
