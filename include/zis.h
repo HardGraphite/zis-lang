@@ -128,7 +128,7 @@ struct zis_native_type_def {
  * @param arg argument to pass to `fn`
  * @return Return the return value from function `fn`.
  */
-ZIS_API int zis_native_block(zis_t z, size_t reg_max, int(*fn)(zis_t, void *), void *arg);
+ZIS_API int zis_native_block(zis_t z, size_t reg_max, int(*fn)(zis_t, void *), void *arg) ZIS_NOEXCEPT;
 
 /** @} */
 
@@ -145,7 +145,7 @@ ZIS_API int zis_native_block(zis_t z, size_t reg_max, int(*fn)(zis_t, void *), v
  *
  * @warning If `n` is too big, it is going to be adjusted automatically.
  */
-ZIS_API int zis_load_nil(zis_t z, unsigned int reg, size_t n);
+ZIS_API int zis_load_nil(zis_t z, unsigned int reg, size_t n) ZIS_NOEXCEPT;
 
 /**
  * Check whether a variable is `nil`.
@@ -154,7 +154,7 @@ ZIS_API int zis_load_nil(zis_t z, unsigned int reg, size_t n);
  * @param reg register index
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_TYPE` (`reg` is not `nil`).
  */
-ZIS_API int zis_read_nil(zis_t z, unsigned int reg);
+ZIS_API int zis_read_nil(zis_t z, unsigned int reg) ZIS_NOEXCEPT;
 
 /**
  * Load a `Bool` object.
@@ -164,7 +164,7 @@ ZIS_API int zis_read_nil(zis_t z, unsigned int reg);
  * @param val the boolean value
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`).
  */
-ZIS_API int zis_load_bool(zis_t z, unsigned int reg, bool val);
+ZIS_API int zis_load_bool(zis_t z, unsigned int reg, bool val) ZIS_NOEXCEPT;
 
 /**
  * Read value of a `Bool` object.
@@ -174,7 +174,7 @@ ZIS_API int zis_load_bool(zis_t z, unsigned int reg, bool val);
  * @param val pointer to a variable where the value will be stored
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_TYPE` (wrong type of `reg`).
  */
-ZIS_API int zis_read_bool(zis_t z, unsigned int reg, bool *val);
+ZIS_API int zis_read_bool(zis_t z, unsigned int reg, bool *val) ZIS_NOEXCEPT;
 
 /**
  * Create an `Int` object.
@@ -184,7 +184,7 @@ ZIS_API int zis_read_bool(zis_t z, unsigned int reg, bool *val);
  * @param val the value of the integer
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`).
  */
-ZIS_API int zis_make_int(zis_t z, unsigned int reg, int64_t val);
+ZIS_API int zis_make_int(zis_t z, unsigned int reg, int64_t val) ZIS_NOEXCEPT;
 
 /**
  * Read value of an `Int` object.
@@ -195,7 +195,7 @@ ZIS_API int zis_make_int(zis_t z, unsigned int reg, int64_t val);
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_TYPE` (wrong type of `reg`),
  * `ZIS_E_BUF` (`int64_t` is not big enough to hold the value).
  */
-ZIS_API int zis_read_int(zis_t z, unsigned int reg, int64_t *val);
+ZIS_API int zis_read_int(zis_t z, unsigned int reg, int64_t *val) ZIS_NOEXCEPT;
 
 /**
  * Create an `Float` object.
@@ -205,7 +205,7 @@ ZIS_API int zis_read_int(zis_t z, unsigned int reg, int64_t *val);
  * @param val the value of the floating-point number
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`).
  */
-ZIS_API int zis_make_float(zis_t z, unsigned int reg, double val);
+ZIS_API int zis_make_float(zis_t z, unsigned int reg, double val) ZIS_NOEXCEPT;
 
 /**
  * Read value of a `Float` object.
@@ -215,7 +215,7 @@ ZIS_API int zis_make_float(zis_t z, unsigned int reg, double val);
  * @param val pointer to a variable where the value will be stored
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_TYPE` (wrong type of `reg`).
  */
-ZIS_API int zis_read_float(zis_t z, unsigned int reg, double *val);
+ZIS_API int zis_read_float(zis_t z, unsigned int reg, double *val) ZIS_NOEXCEPT;
 
 /**
  * Create an `String` object.
@@ -226,7 +226,7 @@ ZIS_API int zis_read_float(zis_t z, unsigned int reg, double *val);
  * @param sz size in bytes of the string `str`, or `-1` to take `str` as a NUL-terminated string
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_ARG` (illegal UTF-8 string `str`).
  */
-ZIS_API int zis_make_string(zis_t z, unsigned int reg, const char *str, size_t sz);
+ZIS_API int zis_make_string(zis_t z, unsigned int reg, const char *str, size_t sz) ZIS_NOEXCEPT;
 
 /**
  * Get content of a `String` object as a UTF-8 string.
@@ -238,7 +238,7 @@ ZIS_API int zis_make_string(zis_t z, unsigned int reg, const char *str, size_t s
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_TYPE` (wrong type of `reg`),
 * `ZIS_E_BUF` (`buf` is not big enough).
  */
-ZIS_API int zis_read_string(zis_t z, unsigned int reg, char *buf, size_t *sz);
+ZIS_API int zis_read_string(zis_t z, unsigned int reg, char *buf, size_t *sz) ZIS_NOEXCEPT;
 
 /**
  * Create values and store them to `REG[reg_begin ...]`.
@@ -271,7 +271,7 @@ ZIS_API int zis_read_string(zis_t z, unsigned int reg, char *buf, size_t *sz);
  *
  * @warning REG-0 may be used by this function. The value in it can be modified.
  */
-ZIS_API int zis_make_values(zis_t z, unsigned int reg_begin, const char *fmt, ...);
+ZIS_API int zis_make_values(zis_t z, unsigned int reg_begin, const char *fmt, ...) ZIS_NOEXCEPT;
 
 /**
  * Read values from `REG[reg_begin ...]`.
@@ -302,7 +302,7 @@ ZIS_API int zis_make_values(zis_t z, unsigned int reg_begin, const char *fmt, ..
  *
  * @warning REG-0 may be used by this function. The value in it can be modified.
  */
-ZIS_API int zis_read_values(zis_t z, unsigned int reg_begin, const char *fmt, ...);
+ZIS_API int zis_read_values(zis_t z, unsigned int reg_begin, const char *fmt, ...) ZIS_NOEXCEPT;
 
 /** @} */
 
@@ -319,7 +319,7 @@ ZIS_API int zis_read_values(zis_t z, unsigned int reg_begin, const char *fmt, ..
  * @param src source register index
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `dst` or `src`).
  */
-ZIS_API int zis_move_local(zis_t z, unsigned int dst, unsigned int src);
+ZIS_API int zis_move_local(zis_t z, unsigned int dst, unsigned int src) ZIS_NOEXCEPT;
 
 /**
  * Get element from an object.
@@ -333,7 +333,7 @@ ZIS_API int zis_move_local(zis_t z, unsigned int dst, unsigned int src);
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index); `ZIS_E_ARG` (key does not exist);
  * `ZIS_E_TYPE` (`reg_obj` does not allow elements).
  */
-ZIS_API int zis_load_element(zis_t z, unsigned int reg_obj, unsigned int reg_key, unsigned int reg_val);
+ZIS_API int zis_load_element(zis_t z, unsigned int reg_obj, unsigned int reg_key, unsigned int reg_val) ZIS_NOEXCEPT;
 
 /**
  * Set object element.
@@ -347,7 +347,7 @@ ZIS_API int zis_load_element(zis_t z, unsigned int reg_obj, unsigned int reg_key
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index); `ZIS_E_ARG` (key does not exist);
  * `ZIS_E_TYPE` (`reg_obj` does not allow elements).
  */
-ZIS_API int zis_store_element(zis_t z, unsigned int reg_obj, unsigned int reg_key, unsigned int reg_val);
+ZIS_API int zis_store_element(zis_t z, unsigned int reg_obj, unsigned int reg_key, unsigned int reg_val) ZIS_NOEXCEPT;
 
 /**
  * Insert value to an object as a new element.
@@ -361,7 +361,7 @@ ZIS_API int zis_store_element(zis_t z, unsigned int reg_obj, unsigned int reg_ke
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index); `ZIS_E_ARG` (key not valid);
  * `ZIS_E_TYPE` (`reg_obj` does not allow elements).
  */
-ZIS_API int zis_insert_element(zis_t z, unsigned int reg_obj, unsigned int reg_key, unsigned int reg_val);
+ZIS_API int zis_insert_element(zis_t z, unsigned int reg_obj, unsigned int reg_key, unsigned int reg_val) ZIS_NOEXCEPT;
 
 /**
  * Remove an element from an object.
@@ -374,7 +374,7 @@ ZIS_API int zis_insert_element(zis_t z, unsigned int reg_obj, unsigned int reg_k
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index); `ZIS_E_ARG` (key not valid);
  * `ZIS_E_TYPE` (`reg_obj` does not allow elements).
  */
-ZIS_API int zis_remove_element(zis_t z, unsigned int reg_obj, unsigned int reg_key);
+ZIS_API int zis_remove_element(zis_t z, unsigned int reg_obj, unsigned int reg_key) ZIS_NOEXCEPT;
 
 /** @} */
 

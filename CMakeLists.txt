@@ -8,7 +8,7 @@ project(
     zis-lang
     VERSION ${ZIS_VERSION_STRING}
     DESCRIPTION "The ZIS programming language"
-    LANGUAGES C
+    LANGUAGES C CXX
 )
 
 option(ZIS_BUILD_IPO     "Enable inter-procedural optimization."             ON)
@@ -29,6 +29,10 @@ set(CMAKE_C_STANDARD                  11)
 set(CMAKE_C_EXTENSIONS                ON)
 set(CMAKE_C_STANDARD_REQUIRED         ON)
 set(CMAKE_C_VISIBILITY_PRESET     hidden)
+set(CMAKE_CXX_STANDARD                17)
+set(CMAKE_CXX_EXTENSIONS             OFF)
+set(CMAKE_CXX_STANDARD_REQUIRED       ON)
+set(CMAKE_CXX_VISIBILITY_PRESET   hidden)
 
 if(NOT CMAKE_BUILD_TYPE AND NOT DEFINED CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE "Release")
