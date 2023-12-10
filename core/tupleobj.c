@@ -8,34 +8,31 @@
 #include "objmem.h"
 
 /// Allocate.
-struct zis_tuple_obj *tuple_obj_alloc(
-    struct zis_context *z, struct zis_object **ret, size_t n
-) {
+struct zis_tuple_obj *tuple_obj_alloc(struct zis_context *z, size_t n) {
     struct zis_object *const obj = zis_objmem_alloc_ex(
         z, ZIS_OBJMEM_ALLOC_AUTO, z->globals->type_Tuple, 1 + n, 0
     );
-    *ret = obj;
     struct zis_tuple_obj *const self = zis_object_cast(obj, struct zis_tuple_obj);
     assert(zis_tuple_obj_length(self) == n);
     return self;
 }
 
-void zis_tuple_obj_new(
-    struct zis_context *z, struct zis_object **ret,
+struct zis_tuple_obj *zis_tuple_obj_new(
+    struct zis_context *z,
     struct zis_object *v[], size_t n
 ) {
-    struct zis_tuple_obj *const self = tuple_obj_alloc(z, ret, n);
+    struct zis_tuple_obj *const self = tuple_obj_alloc(z, n);
     if (zis_likely(v)) {
-        memcpy(self->_data, v, n * sizeof(struct zis_object *));
+        zis_object_vec_copy(self->_data, v, n);
         zis_object_assert_no_write_barrier(self);
     } else {
-        memset(self->_data, 0xff, n * sizeof(void *));
+        zis_object_vec_zero(self->_data, n);
     }
+    return self;
 }
 
 struct zis_tuple_obj *_zis_tuple_obj_new_empty(struct zis_context *z) {
-    struct zis_object *o;
-    return tuple_obj_alloc(z, &o, 0);
+    return tuple_obj_alloc(z, 0U);
 }
 
 struct zis_object *zis_tuple_obj_Mx_get_element(

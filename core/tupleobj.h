@@ -16,8 +16,8 @@ struct zis_tuple_obj {
 };
 
 /// Create a `Tuple` object.
-void zis_tuple_obj_new(
-    struct zis_context *z, struct zis_object **ret,
+struct zis_tuple_obj *zis_tuple_obj_new(
+    struct zis_context *z,
     struct zis_object *v[], size_t n
 );
 

@@ -17,19 +17,17 @@ struct zis_string_obj;
 
 /// Create a `String` object from UTF-8 string.
 /// Set size `n` to `-1` to take char NUL as the end of the string.
-/// If `s` is not a valid UTF-8 string, return the offset where error occurs;
-/// otherwise return -1.
-zis_nodiscard size_t zis_string_obj_new(
-    struct zis_context *z, struct zis_object **ret,
+/// Return NULL if `s` is not a valid UTF-8 string.
+struct zis_string_obj *zis_string_obj_new(
+    struct zis_context *z,
     const char *s, size_t n /* = -1 */
 );
 
 struct zis_string_obj *_zis_string_obj_new_empty(struct zis_context *z);
 
 /// Create a `String` object from a character (Unicode code point).
-void zis_string_obj_from_char(
-    struct zis_context *z, struct zis_object **ret,
-    zis_string_obj_wchar_t ch
+struct zis_string_obj *zis_string_obj_from_char(
+    struct zis_context *z, zis_string_obj_wchar_t ch
 );
 
 /// Return the number of characters in the string.

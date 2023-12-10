@@ -114,7 +114,7 @@ ZIS_API int zis_make_int(zis_t z, unsigned int reg, int64_t val) {
     struct zis_object **obj_ref = api_ref_local(z, reg);
     if (zis_unlikely(!obj_ref))
         return ZIS_E_IDX;
-    zis_smallint_or_int_obj(z, obj_ref, val);
+    *obj_ref = zis_smallint_or_int_obj(z, val);
     return ZIS_OK;
 }
 
@@ -141,7 +141,7 @@ ZIS_API int zis_make_float(zis_t z, unsigned int reg, double val) {
     struct zis_object **obj_ref = api_ref_local(z, reg);
     if (zis_unlikely(!obj_ref))
         return ZIS_E_IDX;
-    zis_float_obj_new(z, obj_ref, val);
+    *obj_ref = zis_object_from(zis_float_obj_new(z, val));
     return ZIS_OK;
 }
 
@@ -159,8 +159,11 @@ ZIS_API int zis_make_string(zis_t z, unsigned int reg, const char *str, size_t s
     struct zis_object **obj_ref = api_ref_local(z, reg);
     if (zis_unlikely(!obj_ref))
         return ZIS_E_IDX;
-    const size_t err_pos = zis_string_obj_new(z, obj_ref, str, sz);
-    return err_pos == (size_t)-1 ? ZIS_OK : ZIS_E_ARG;
+    struct zis_string_obj *const str_obj = zis_string_obj_new(z, str, sz);
+    if (zis_unlikely(!str_obj))
+        return ZIS_E_ARG;
+    *obj_ref = zis_object_from(str_obj);
+    return ZIS_OK;
 }
 
 ZIS_API int zis_read_string(zis_t z, unsigned int reg, char *buf, size_t *sz) {
@@ -237,20 +240,22 @@ static int api_make_values_impl(
         }
 
         case 'i':
-            zis_smallint_or_int_obj(z, ret_p, va_arg(x->ap, int64_t));
+            *ret_p = zis_smallint_or_int_obj(z, va_arg(x->ap, int64_t));
             break;
 
         case 'f':
-            zis_float_obj_new(z, ret_p, va_arg(x->ap, double));
+            *ret_p = zis_object_from(zis_float_obj_new(z, va_arg(x->ap, double)));
             break;
 
         case 's': {
             const char *s = va_arg(x->ap, const char *);
             const size_t n = va_arg(x->ap, size_t);
-            if (zis_string_obj_new(z, ret_p, s, n) != (size_t)-1) {
+            struct zis_string_obj *const str_obj = zis_string_obj_new(z, s, n);
+            if (zis_unlikely(!str_obj)) {
                 status = ZIS_E_ARG;
                 goto do_return;
             }
+            *ret_p = zis_object_from(str_obj);
             break;
         }
 
@@ -277,14 +282,14 @@ static int api_make_values_impl(
                 );
                 PULL_STATE();
                 if (rv == ZIS_OK) {
-                    zis_tuple_obj_new(z, ret_p, tmp_regs, elem_count);
+                    *ret_p = zis_object_from(zis_tuple_obj_new(z, tmp_regs, elem_count));
                     zis_callstack_frame_free_temp(z, elem_count);
                 } else {
                     zis_callstack_frame_free_temp(z, elem_count);
                     return rv;
                 }
             } else {
-                zis_tuple_obj_new(z, ret_p, NULL, 0U);
+                *ret_p = zis_object_from(zis_tuple_obj_new(z, NULL, 0U));
             }
             assert(*fmt_p == ')');
             break;

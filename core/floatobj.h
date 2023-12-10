@@ -16,7 +16,7 @@ struct zis_float_obj {
 };
 
 /// Create a new Float object.
-void zis_float_obj_new(struct zis_context *z, struct zis_object **ret, double val);
+struct zis_float_obj *zis_float_obj_new(struct zis_context *z, double val);
 
 /// Get floating-point value.
 zis_static_force_inline double zis_float_obj_value(const struct zis_float_obj *self) {

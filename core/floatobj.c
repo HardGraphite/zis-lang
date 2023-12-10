@@ -5,11 +5,13 @@
 #include "ndefutil.h"
 #include "objmem.h"
 
-void zis_float_obj_new(struct zis_context *z, struct zis_object **ret, double val) {
-    struct zis_object *const obj = zis_objmem_alloc(z, z->globals->type_Float);
-    *ret = obj;
-    struct zis_float_obj *const self = zis_object_cast(obj, struct zis_float_obj);
+struct zis_float_obj *zis_float_obj_new(struct zis_context *z, double val) {
+    struct zis_float_obj *const self = zis_object_cast(
+        zis_objmem_alloc(z, z->globals->type_Float),
+        struct zis_float_obj
+    );
     self->_value = val;
+    return self;
 }
 
 ZIS_NATIVE_TYPE_DEF(

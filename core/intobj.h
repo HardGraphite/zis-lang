@@ -13,17 +13,16 @@ struct zis_context;
 struct zis_int_obj;
 
 /// Create an `Int` object explicitly. Prefer `zis_smallint_or_int_obj()`.
-void _zis_int_obj_new(struct zis_context *z, struct zis_object **ret, int64_t val);
+struct zis_int_obj *_zis_int_obj_new(struct zis_context *z, int64_t val);
 
 /// Make a small int or an `Int` object.
-zis_static_force_inline void zis_smallint_or_int_obj(
-    struct zis_context *z, struct zis_object **ret, zis_smallint_t val
+zis_static_force_inline struct zis_object *zis_smallint_or_int_obj(
+    struct zis_context *z, zis_smallint_t val
 ) {
     struct zis_object *obj = zis_smallint_try_to_ptr(val);
     if (zis_likely(obj))
-        *ret = obj;
-    else
-        _zis_int_obj_new(z, ret, val);
+        return obj;
+    return (struct zis_object *)_zis_int_obj_new(z, val);
 }
 
 /// Get value as `int`. If the value falls out of range of type `int`,

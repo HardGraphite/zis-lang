@@ -60,14 +60,13 @@ zis_static_force_inline void *string_obj_data(struct zis_string_obj *self) {
 
 /// Allocate but do not initialize the data.
 static struct zis_string_obj *string_obj_alloc(
-    struct zis_context *z, struct zis_object **ret,
+    struct zis_context *z,
     enum string_obj_char_type ct, size_t len
 ) {
     struct zis_object *const obj = zis_objmem_alloc_ex(
         z, ZIS_OBJMEM_ALLOC_AUTO, z->globals->type_String,
         0, STR_OBJ_BYTES_FIXED_SIZE + len * string_obj_char_size(ct)
     );
-    *ret = obj;
     struct zis_string_obj *const self = zis_object_cast(obj, struct zis_string_obj);
     assert(!(len & ~(SIZE_MAX >> 2)));
     self->_type_and_length = (len << 2) | (size_t)ct;
@@ -76,17 +75,15 @@ static struct zis_string_obj *string_obj_alloc(
 
 /* ----- public functions --------------------------------------------------- */
 
-size_t zis_string_obj_new(
-    struct zis_context *z, struct zis_object **ret,
+struct zis_string_obj *zis_string_obj_new(
+    struct zis_context *z,
     const char *s, size_t n /* = -1 */
 ) {
     if (zis_unlikely(n == (size_t)-1))
         n = strlen(s);
 
-    if (zis_unlikely(!n)) {
-        *ret = zis_object_from(z->globals->val_empty_string);
-        return (size_t)-1;
-    }
+    if (zis_unlikely(!n))
+        return z->globals->val_empty_string;
 
     zis_wchar_t codepoint_max = 0;
     size_t      char_count    = 0;
@@ -95,23 +92,23 @@ size_t zis_string_obj_new(
         while (src_p < src_end) {
             zis_wchar_t  codepoint;
             const size_t char_len = zis_u8char_to_code(&codepoint, src_p);
-            if (zis_unlikely(!char_len))
-                return (size_t)((const char *)src_p - s);
+            if (zis_unlikely(!char_len)) // error at (src_p - s)
+                return NULL;
             if (codepoint > codepoint_max)
                 codepoint_max = codepoint;
             src_p += char_len;
             char_count++;
         }
-        if (src_p != src_end)
-            return (size_t)((const char *)src_end - 1 - s);
+        if (src_p != src_end) // error at (src_end - 1 - s)
+            return NULL;
     } else {
         // `n` is unknown
         const zis_char8_t *src_p = (const zis_char8_t *)s;
         while (true) {
             zis_wchar_t  codepoint;
             const size_t char_len = zis_u8char_to_code(&codepoint, src_p);
-            if (zis_unlikely(!char_len))
-                return (size_t)((const char *)src_p - s);
+            if (zis_unlikely(!char_len)) // error at (src_p - s)
+                return NULL;
             if (codepoint > codepoint_max)
                 codepoint_max = codepoint;
             else if (zis_unlikely(codepoint == 0))
@@ -135,47 +132,45 @@ size_t zis_string_obj_new(
 
     struct zis_string_obj *self;
     if (codepoint_max <= STR_OBJ_C1_CODE_MAX) {
-        self = string_obj_alloc(z, ret, STR_OBJ_C1, char_count);
+        self = string_obj_alloc(z, STR_OBJ_C1, char_count);
         if (codepoint_max < 0x80)
             memcpy(string_obj_data(self), s, char_count);
         else
             COPY_STR_DATA(1);
     } else if (codepoint_max <= STR_OBJ_C2_CODE_MAX) {
-        self = string_obj_alloc(z, ret, STR_OBJ_C2, char_count);
+        self = string_obj_alloc(z, STR_OBJ_C2, char_count);
         COPY_STR_DATA(2);
     } else {
-        self = string_obj_alloc(z, ret, STR_OBJ_C4, char_count);
+        self = string_obj_alloc(z, STR_OBJ_C4, char_count);
         COPY_STR_DATA(4);
     }
+    return self;
 
 #undef COPY_STR_DATA
-
-    return (size_t)-1;
 }
 
 struct zis_string_obj *_zis_string_obj_new_empty(struct zis_context *z) {
-    struct zis_object *obj = NULL;
-    return string_obj_alloc(z, &obj, STR_OBJ_C1, 0);
+    return string_obj_alloc(z, STR_OBJ_C1, 0U);
 }
 
-void zis_string_obj_from_char(
-    struct zis_context *z, struct zis_object **ret,
-    zis_string_obj_wchar_t ch
+struct zis_string_obj *zis_string_obj_from_char(
+    struct zis_context *z, zis_string_obj_wchar_t ch
 ) {
     struct zis_string_obj *self;
     if (ch <= STR_OBJ_C1_CODE_MAX) {
-        self = string_obj_alloc(z, ret, STR_OBJ_C1, 1);
+        self = string_obj_alloc(z, STR_OBJ_C1, 1);
         string_obj_c1_t *const data = string_obj_data(self);
         data[0] = (string_obj_c1_t)ch;
     } else if (ch <= STR_OBJ_C2_CODE_MAX) {
-        self = string_obj_alloc(z, ret, STR_OBJ_C2, 1);
+        self = string_obj_alloc(z, STR_OBJ_C2, 1);
         string_obj_c2_t *const data = string_obj_data(self);
         data[0] = (string_obj_c2_t)ch;
     } else {
-        self = string_obj_alloc(z, ret, STR_OBJ_C4, 1);
+        self = string_obj_alloc(z, STR_OBJ_C4, 1);
         string_obj_c4_t *const data = string_obj_data(self);
         data[0] = (string_obj_c4_t)ch;
     }
+    return self;
 }
 
 size_t zis_string_obj_length(const struct zis_string_obj *self) {

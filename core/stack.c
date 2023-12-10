@@ -6,6 +6,7 @@
 #include "context.h"
 #include "debug.h"
 #include "memory.h"
+#include "ndefutil.h"
 #include "objmem.h"
 
 /* ----- configuration ------------------------------------------------------ */
@@ -82,7 +83,7 @@ static void callstack_gc_visitor(void *_cs, enum zis_objmem_obj_visit_op op) {
 /// Fill slots with known objects.
 zis_static_force_inline struct zis_object **
 callstack_clear_range(struct zis_object **begin, size_t count) {
-    return memset(begin, 0xff, count * sizeof(struct zis_object *));
+    return zis_object_vec_zero(begin, count);
 }
 
 /* ----- public functions --------------------------------------------------- */

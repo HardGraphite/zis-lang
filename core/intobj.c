@@ -25,17 +25,13 @@ struct zis_int_obj {
     ZIS_NATIVE_TYPE_STRUCT_XB_FIXED_SIZE(struct zis_int_obj, _bytes_size)
 
 /// Allocate but do not initialize.
-struct zis_int_obj *int_obj_alloc(
-    struct zis_context *z, struct zis_object **ret,
-    size_t cell_count
-) {
+struct zis_int_obj *int_obj_alloc(struct zis_context *z, size_t cell_count) {
     assert(cell_count > 0);
     assert(cell_count <= INT_OBJ_CELL_COUNT_MAX);
     struct zis_object *const obj = zis_objmem_alloc_ex(
         z, ZIS_OBJMEM_ALLOC_AUTO, z->globals->type_Int,
         0, INT_OBJ_BYTES_FIXED_SIZE + cell_count * sizeof(uint64_t)
     );
-    *ret = obj;
     struct zis_int_obj *const self = zis_object_cast(obj, struct zis_int_obj);
     self->cell_count = (uint16_t)cell_count;
     return self;
@@ -47,8 +43,8 @@ zis_unused_fn static size_t int_obj_cells_capacity(const struct zis_int_obj *sel
     return (self->_bytes_size - INT_OBJ_BYTES_FIXED_SIZE) / sizeof(uint64_t);
 }
 
-void _zis_int_obj_new(struct zis_context *z, struct zis_object **ret, int64_t val) {
-    struct zis_int_obj *const self = int_obj_alloc(z, ret, 1);
+struct zis_int_obj *_zis_int_obj_new(struct zis_context *z, int64_t val) {
+    struct zis_int_obj *const self = int_obj_alloc(z, 1);
     if (val >= 0) {
         self->negative = false;
         self->cells[0] = (uint64_t)val;
@@ -56,6 +52,7 @@ void _zis_int_obj_new(struct zis_context *z, struct zis_object **ret, int64_t va
         self->negative = true;
         self->cells[0] = (uint64_t)-val;
     }
+    return self;
 }
 
 int zis_int_obj_value_i(const struct zis_int_obj *self) {
