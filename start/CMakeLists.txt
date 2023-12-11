@@ -15,6 +15,10 @@ file(CONFIGURE OUTPUT "${zis_start_conf_header_dir}/zis_config.h" @ONLY CONTENT 
 
 set(zis_start_src "start.c" "clopts.c")
 
+if(WIN32)
+    list(APPEND zis_start_src "winutil.c")
+endif()
+
 ################################
 ##### Define build targets #####
 ################################
@@ -31,6 +35,23 @@ else()
 endif()
 set_target_properties(${zis_start_tgt} PROPERTIES OUTPUT_NAME "${ZIS_OUTPUT_NAME}")
 target_include_directories(${zis_start_tgt} PRIVATE ${zis_start_conf_header_dir})
+
+if(WIN32)
+    include(winutil)
+    if(ZIS_BUILD_SHARED)
+        set(desc "${ZIS_DISPLAY_NAME} programming language executable")
+        set(prod "${ZIS_DISPLAY_NAME}LangStart")
+    else()
+        set(desc "${ZIS_DISPLAY_NAME} programming language executable with runtime core")
+        set(prod "${ZIS_DISPLAY_NAME}Lang")
+    endif()
+    zis_win_target_add_rc(
+        ${zis_start_tgt} "${desc}" "${prod}"
+        "${CMAKE_SOURCE_DIR}/misc/icon_win.ico"
+    )
+    unset(desc)
+    unset(prod)
+endif()
 
 #######################################
 ##### Installation configurations #####

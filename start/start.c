@@ -66,6 +66,25 @@ static int zis_main(int argc, char *argv[]) {
     return EXIT_SUCCESS;
 }
 
+#ifdef _WIN32
+
+#include "winutil.h"
+
+static char **u8_argv = NULL;
+
+int wmain(int argc, wchar_t *wargv[]) {
+    assert(!u8_argv);
+    assert(argc >= 0);
+    u8_argv = win_wstrv_to_utf8(wargv, (size_t)(argc + 1));
+    win_utf8_init();
+    win_term_init();
+    return zis_main(argc, u8_argv);
+}
+
+#else // !_WIN32
+
 int main(int argc, char *argv[]) {
     return zis_main(argc, argv);
 }
+
+#endif // _WIN32

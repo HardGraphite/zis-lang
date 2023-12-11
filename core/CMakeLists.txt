@@ -66,6 +66,16 @@ target_include_directories(
     PRIVATE "${zis_core_conf_header_dir}"
 )
 
+if (WIN32 AND ZIS_BUILD_SHARED)
+    include(winutil)
+    zis_win_target_add_rc(
+        ${zis_core_tgt}
+        "${ZIS_DISPLAY_NAME} programming language runtime core"
+        "${ZIS_DISPLAY_NAME}LangCore"
+        OFF
+    )
+endif()
+
 #######################################
 ##### Installation configurations #####
 #######################################
