@@ -65,6 +65,7 @@ struct zis_callstack {
     struct zis_object **frame;     ///< Base of top frame (FP).
     struct zis_object **_data_end; ///< End of `_data[]` (max of SP+1).
     struct _zis_callstack_fi_list _fi_list;
+    struct zis_context *z; // just for panic
     struct zis_object  *_data[];   ///< Base of the stack (BP).
 };
 

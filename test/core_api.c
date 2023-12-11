@@ -2,12 +2,36 @@
 
 #include <float.h>
 #include <inttypes.h>
+#include <setjmp.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "../core/smallint.h" // ZIS_SMALLINT_MIN, ZIS_SMALLINT_MAX
 
 #define REG_MAX 100
+
+// zis-api-context //
+
+static jmp_buf test_at_panic_jb;
+
+static void panic_sov_handler(zis_t z, int c) {
+    (void)z;
+    zis_test_log(ZIS_TEST_LOG_TRACE, "panic code=%i", c);
+    longjmp(test_at_panic_jb, 1);
+}
+
+zis_test_define(test_at_panic, z) {
+    bool panicked = false;
+    zis_at_panic(z, panic_sov_handler);
+    if (!setjmp(test_at_panic_jb)) {
+        zis_native_block(z, SIZE_MAX - 1, NULL, NULL); // triggers stack overflow
+        zis_test_assert(false);
+    } else {
+        panicked = true;
+        zis_at_panic(z, NULL);
+    }
+    zis_test_assert(panicked);
+}
 
 // zis-api-natives //
 
@@ -535,6 +559,8 @@ zis_test_define(test_remove_element, z) {
 
 zis_test_list(
     REG_MAX,
+    // zis-api-context //
+    test_at_panic,
     // zis-api-native //
     test_native_block,
     // zis-api-values //

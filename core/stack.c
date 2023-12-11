@@ -1,7 +1,5 @@
 #include "stack.h"
 
-#include <string.h>
-
 #include "attributes.h"
 #include "context.h"
 #include "debug.h"
@@ -88,10 +86,10 @@ callstack_clear_range(struct zis_object **begin, size_t count) {
 
 /* ----- public functions --------------------------------------------------- */
 
-zis_noinline zis_noreturn static void callstack_error_overflow(struct zis_callstack *cs) {
-    zis_unused_var(cs);
+zis_noinline zis_noreturn static void
+callstack_error_overflow(struct zis_callstack *cs) {
     zis_debug_log(FATAL, "Stack", "stack@%p overflow", (void *)cs);
-    abort(); // TODO: configurable error handling
+    zis_context_panic(cs->z, ZIS_CONTEXT_PANIC_SOV);
 }
 
 struct zis_callstack *zis_callstack_create(struct zis_context *z) {
@@ -101,6 +99,7 @@ struct zis_callstack *zis_callstack_create(struct zis_context *z) {
     cs->top = cs->_data;
     cs->frame = cs->_data;
     fi_list_init(&cs->_fi_list);
+    cs->z = z;
     cs->_data_end = cs->_data + (cs_size - sizeof(struct zis_callstack)) / sizeof(void *);
     cs->frame[0] = zis_smallint_to_ptr(0);
     zis_objmem_add_gc_root(z, cs, callstack_gc_visitor);
@@ -116,6 +115,7 @@ void zis_callstack_destroy(struct zis_callstack *cs, struct zis_context *z) {
     const bool ok = zis_objmem_remove_gc_root(z, cs);
     assert(ok); zis_unused_var(ok);
     fi_list_fini(&cs->_fi_list);
+    assert(cs->z == z);
     zis_mem_free(cs);
 }
 
@@ -157,7 +157,7 @@ void zis_callstack_frame_free_temp(struct zis_context *z, size_t n) {
     struct zis_object **const old_sp = cs->top;
     if (zis_unlikely((size_t)(old_sp - zis_callstack_frame_info(cs)->frame_top) < n)) {
         zis_debug_log(FATAL, "Stack", "free_temp(%zu)", n);
-        abort();
+        zis_context_panic(z, ZIS_CONTEXT_PANIC_ABORT);
     }
     cs->top = old_sp - n;
 }

@@ -10,6 +10,7 @@
 #include "bits.h"
 #include "compat.h"
 #include "context.h"
+#include "debug.h"
 #include "memory.h"
 #include "object.h"
 #include "typeobj.h"
@@ -18,7 +19,6 @@
 
 #if ZIS_DEBUG_MEMORY
 #    include <stdio.h>
-#    include "debug.h"
 #endif // ZIS_DEBUG_MEMORY
 
 /* ----- Configurations ----------------------------------------------------- */
@@ -1534,6 +1534,17 @@ void zis_objmem_context_destroy(struct zis_objmem_context *ctx) {
     zis_mem_free(ctx);
 }
 
+zis_noreturn zis_noinline static void objmem_error_oom(struct zis_context *z) {
+    struct zis_objmem_context *const ctx = z->objmem_context;
+    zis_unused_var(ctx);
+    zis_debug_log(FATAL, "ObjMem", "objmem@%p: out of memory", (void *)ctx);
+    zis_debug_log_with(
+        INFO, "ObjMem", "zis_objmem_print_usage()",
+        (zis_debug_log_with_func_t)zis_objmem_print_usage, ctx
+    );
+    zis_context_panic(z, ZIS_CONTEXT_PANIC_OOM);
+}
+
 struct zis_object *zis_objmem_alloc(
     struct zis_context *z, struct zis_type_obj *obj_type
 ) {
@@ -1543,10 +1554,13 @@ struct zis_object *zis_objmem_alloc(
     const size_t obj_size = obj_type->_obj_size;
     assert(obj_size); // `obj_size == 0` => extendable
 
+    unsigned int retry_count = 0;
     if (zis_likely(obj_size <= NON_BIG_SPACE_MAX_ALLOC_SIZE)) {
     alloc_small:
         obj = new_space_alloc(&ctx->new_space, obj_type, obj_size);
         if (zis_unlikely(!obj)) {
+            if (retry_count++ > 2)
+                objmem_error_oom(z);
             zis_objmem_gc(z, ZIS_OBJMEM_GC_FAST);
             goto alloc_small;
         }
@@ -1554,6 +1568,8 @@ struct zis_object *zis_objmem_alloc(
     alloc_large:
         obj = big_space_alloc(&ctx->big_space, obj_type, obj_size);
         if (zis_unlikely(!obj)) {
+            if (retry_count++ > 1)
+                objmem_error_oom(z);
             zis_objmem_gc(z, ZIS_OBJMEM_GC_FULL);
             goto alloc_large;
         }
@@ -1592,6 +1608,7 @@ struct zis_object *zis_objmem_alloc_ex(
         }
     }
 
+    unsigned int retry_count = 0;
     if (zis_likely(alloc_type == ZIS_OBJMEM_ALLOC_AUTO)) {
     alloc_type_auto:
         if (zis_unlikely(obj_size > NON_BIG_SPACE_MAX_ALLOC_SIZE))
@@ -1599,6 +1616,8 @@ struct zis_object *zis_objmem_alloc_ex(
     alloc_small:
         obj = new_space_alloc(&ctx->new_space, obj_type, obj_size);
         if (zis_unlikely(!obj)) {
+            if (retry_count++ > 2)
+                objmem_error_oom(z);
             zis_objmem_gc(z, ZIS_OBJMEM_GC_FAST);
             goto alloc_small;
         }
@@ -1608,23 +1627,21 @@ struct zis_object *zis_objmem_alloc_ex(
     alloc_type_surv:
         obj = old_space_alloc(&ctx->old_space, obj_type, obj_size);
         if (zis_unlikely(!obj)) {
+            if (retry_count++ > 1)
+                objmem_error_oom(z);
             zis_objmem_gc(z, ZIS_OBJMEM_GC_FULL);
             goto alloc_type_surv;
         }
     } else if (zis_likely(alloc_type == ZIS_OBJMEM_ALLOC_HUGE)) {
-    alloc_type_huge:;
-        int retry_count = 0;
-    alloc_huge_retry:
+    alloc_type_huge:
         obj = big_space_alloc(&ctx->big_space, obj_type, obj_size);
         if (zis_unlikely(!obj)) {
-            assert(retry_count == 0 || retry_count == 1);
-            if (retry_count)
+            if (retry_count++)
                 ctx->big_space.threshold_size =
                     ctx->big_space.allocated_size + obj_size; // TODO: check heap limit.
             else
                 zis_objmem_gc(z, ZIS_OBJMEM_GC_FULL);
-            retry_count++;
-            goto alloc_huge_retry;
+            goto alloc_type_huge;
         }
     } else {
         goto alloc_type_auto;

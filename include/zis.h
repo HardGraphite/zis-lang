@@ -39,7 +39,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 /** @defgroup zis-api-status API: status code */
-/**  @{ */
+/** @{ */
 
 #define ZIS_OK          0      ///< Succeeded.
 
@@ -53,7 +53,7 @@ extern "C" {
 /** @} */
 
 /** @defgroup zis-api-context API: runtime instance */
-/**  @{ */
+/** @{ */
 
 /**
  * Runtime instance.
@@ -76,10 +76,33 @@ ZIS_API zis_t zis_create(void) ZIS_NOEXCEPT;
  */
 ZIS_API void zis_destroy(zis_t z) ZIS_NOEXCEPT;
 
+/** @name Panic cause */
+/** @{ */
+#define ZIS_PANIC_OOM   1  ///< Panic cause: out of memory (object memory)
+#define ZIS_PANIC_SOV   2  ///< Panic cause: stack overflow (runtime callstack)
+/** @} */
+
+/**
+ * Panic handler function type. See `zis_at_panic()`.
+ *
+ * The first parameter is a zis instance; the second parameter is the cause
+ * of panic (one of the `ZIS_PANIC_*` macros).
+ */
+typedef void (*zis_panic_handler_t)(zis_t, int) ZIS_NOEXCEPT;
+
+/**
+ * Install a panic handler.
+ *
+ * @param z zis instance
+ * @param h the panic handler function, or `NULL` to use the default handler
+ * @return Returns the previous installed handler or `NULL`.
+ */
+ZIS_API zis_panic_handler_t zis_at_panic(zis_t z, zis_panic_handler_t h) ZIS_NOEXCEPT;
+
 /** @} */
 
 /** @defgroup zis-api-natives API: native functions, types, and modules */
-/**  @{ */
+/** @{ */
 
 /**
  * Implementation of a native function.
@@ -133,7 +156,7 @@ ZIS_API int zis_native_block(zis_t z, size_t reg_max, int(*fn)(zis_t, void *), v
 /** @} */
 
 /** @defgroup zis-api-values API: build and read values */
-/**  @{ */
+/** @{ */
 
 /**
  * Load `nil` to registers from `reg`-th to (`reg+n-1`)-th.
@@ -307,7 +330,7 @@ ZIS_API int zis_read_values(zis_t z, unsigned int reg_begin, const char *fmt, ..
 /** @} */
 
 /** @defgroup zis-api-variables API: access and manipulate variables */
-/**  @{ */
+/** @{ */
 
 /**
  * Copy object between registers (local variables).

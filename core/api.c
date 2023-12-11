@@ -54,10 +54,19 @@ ZIS_API void zis_destroy(zis_t z) {
     zis_context_destroy(z);
 }
 
+ZIS_API zis_panic_handler_t zis_at_panic(zis_t z, zis_panic_handler_t h) {
+    zis_panic_handler_t old_h = z->panic_handler;
+    z->panic_handler = h;
+    return old_h;
+}
+
 /* ----- zis-api-natives ---------------------------------------------------- */
 
 ZIS_API int zis_native_block(zis_t z, size_t reg_max, int(*fn)(zis_t, void *), void *arg) {
-    zis_callstack_enter(z->callstack, reg_max + 1U, NULL);
+    const size_t frame_size = reg_max + 1U;
+    if (zis_unlikely(!frame_size))
+        zis_context_panic(z, ZIS_CONTEXT_PANIC_SOV);
+    zis_callstack_enter(z->callstack, frame_size, NULL);
     z->callstack->frame[0] = zis_callstack_frame_info(z->callstack)->prev_frame[0];
     const int ret_val = fn(z, arg);
     zis_callstack_frame_info(z->callstack)->prev_frame[0] = z->callstack->frame[0];
