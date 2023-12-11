@@ -1,8 +1,8 @@
-# The ZIS programming language
+# The ZiS programming language
 
-![](doc/logo.svg)
+![](misc/logo.svg)
 
-This is the **ZIS** programming language.
+This is the **ZiS** programming language.
 
 ## File Organization
 
@@ -13,7 +13,9 @@ This is the **ZIS** programming language.
 | `core`    | source code for the core runtime     |
 | `start`   | source code for the executable entry |
 | `test`    | test code                            |
+| `tools`   | programs that help develop           |
 | `doc`     | documentations                       |
+| `misc`    | extra files                          |
 
 ## More
 

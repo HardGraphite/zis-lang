@@ -1,3 +1,14 @@
+##########################
+##### Generate files #####
+##########################
+
+set(zis_start_conf_header_dir "${CMAKE_CURRENT_BINARY_DIR}")
+
+file(CONFIGURE OUTPUT "${zis_start_conf_header_dir}/zis_config.h" @ONLY CONTENT [==[
+#pragma once
+#cmakedefine    ZIS_DISPLAY_NAME    "@ZIS_DISPLAY_NAME@"
+]==])
+
 ################################
 ##### Collect source files #####
 ################################
@@ -18,7 +29,8 @@ else()
     target_link_libraries(zis_start_static PRIVATE zis_core_static)
     set(zis_start_tgt zis_start_static)
 endif()
-set_target_properties(${zis_start_tgt} PROPERTIES OUTPUT_NAME "${ZIS_NAME}")
+set_target_properties(${zis_start_tgt} PROPERTIES OUTPUT_NAME "${ZIS_OUTPUT_NAME}")
+target_include_directories(${zis_start_tgt} PRIVATE ${zis_start_conf_header_dir})
 
 #######################################
 ##### Installation configurations #####

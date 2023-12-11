@@ -38,7 +38,7 @@ typedef void (*zis_debug_log_with_func_t)(void *arg, void *file);
 /// Print logging messages with a function.
 /// The function `func` takes `func_arg` and a FILE pointer as the arguments.
 #define zis_debug_log_with(level, group, prompt, func, func_arg) \
-    (_zis_debug_log_with(ZIS_DEBUG_LOG_##level, group, prompt, func, func_arg))
+    (_zis_debug_log_with(ZIS_DEBUG_LOG_##level, group, prompt " ===", func, func_arg))
 
 void _zis_debug_log(
     enum zis_debug_log_level, const char *,

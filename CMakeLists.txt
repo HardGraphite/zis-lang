@@ -7,7 +7,7 @@ include(version)
 project(
     zis-lang
     VERSION ${ZIS_VERSION_STRING}
-    DESCRIPTION "The ZIS programming language"
+    DESCRIPTION "The ZiS programming language"
     LANGUAGES C CXX
 )
 
@@ -23,7 +23,8 @@ option(ZIS_PACK          "Configure for cpack command."                     OFF)
 option(ZIS_PACK_HEADER   "Include header files when installing."            OFF)
 option(ZIS_PACK_RELA_RPATH "Use relative RPTAH."                             ON)
 
-set(ZIS_NAME "zis" CACHE STRING "Output name.")
+set(ZIS_DISPLAY_NAME   "ZiS" CACHE STRING "Display name.")
+set(ZIS_OUTPUT_NAME    "zis" CACHE STRING "Output name.")
 
 set(CMAKE_C_STANDARD                  11)
 set(CMAKE_C_EXTENSIONS                ON)

@@ -13,10 +13,14 @@ set(ZIS_MALLOC_LINK "" CACHE FILEPATH
 ##### Generate files #####
 ##########################
 
-set(zis_conf_header_dir "${CMAKE_CURRENT_BINARY_DIR}")
+set(zis_core_conf_header_dir "${CMAKE_CURRENT_BINARY_DIR}")
 
-file(CONFIGURE OUTPUT "${zis_conf_header_dir}/zis_config.h" @ONLY CONTENT [==[
+file(CONFIGURE OUTPUT "${zis_core_conf_header_dir}/zis_config.h" @ONLY CONTENT [==[
 #pragma once
+#define         ZIS_VERSION_MAJOR   @ZIS_VERSION_MAJOR@
+#define         ZIS_VERSION_MINOR   @ZIS_VERSION_MINOR@
+#define         ZIS_VERSION_PATCH   @ZIS_VERSION_PATCH@
+#cmakedefine    ZIS_DISPLAY_NAME    "@ZIS_DISPLAY_NAME@"
 #cmakedefine    ZIS_MALLOC_INCLUDE  "@ZIS_MALLOC_INCLUDE@"
 #cmakedefine01  ZIS_DEBUG
 #cmakedefine01  ZIS_DEBUG_LOGGING
@@ -53,7 +57,7 @@ else()
 endif()
 set(zis_core_tgt ${zis_core_tgt} PARENT_SCOPE)
 # Output name and prefix.
-set_target_properties(${zis_core_tgt} PROPERTIES OUTPUT_NAME "${ZIS_NAME}")
+set_target_properties(${zis_core_tgt} PROPERTIES OUTPUT_NAME "${ZIS_OUTPUT_NAME}")
 get_target_property(prefix ${zis_core_tgt} PREFIX)
 if(NOT prefix)
     set_target_properties(${zis_core_tgt} PROPERTIES PREFIX "lib")
@@ -62,7 +66,7 @@ endif()
 target_include_directories(
     ${zis_core_tgt}
     PUBLIC "${CMAKE_SOURCE_DIR}/include"
-    PRIVATE "${zis_conf_header_dir}"
+    PRIVATE "${zis_core_conf_header_dir}"
 )
 
 #######################################

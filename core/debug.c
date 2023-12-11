@@ -112,6 +112,17 @@ static uintmax_t logging_timestamp(void) {
     return t / (CLOCKS_PER_SEC / 1000);
 }
 
+zis_noinline static void logging_print(
+    uintmax_t timestamp, enum zis_debug_log_level level,
+    const char *group, const char *message, int msg_len
+) {
+    fprintf(
+        logging_stream, "[T%.03ju.%.03u|" ZIS_DISPLAY_NAME "|%-5s|%-6s] %.*s\n",
+        timestamp / 1000, (unsigned int)(timestamp % 1000),
+        logging_level_name[(size_t)level], group, msg_len, message
+    );
+}
+
 void _zis_debug_log(
     enum zis_debug_log_level level, const char *group,
     zis_printf_fn_arg_fmtstr const char *fmt, ...
@@ -119,16 +130,12 @@ void _zis_debug_log(
     if (!logging_check(level, group))
         return;
     const uintmax_t time = logging_timestamp();
-    const char *const level_name = logging_level_name[(unsigned)level];
     va_list ap;
     va_start(ap, fmt);
     char buffer[256];
     const int n = vsnprintf(buffer, sizeof buffer, fmt, ap);
     va_end(ap);
-    fprintf(
-        logging_stream, "[%ju] (Zis|%s|%s) %.*s\n",
-        time, level_name, group, n >= 0 ? n : 0, buffer
-    );
+    logging_print(time, level, group, n > 0 ? buffer : "", n);
 }
 
 void _zis_debug_log_with(
@@ -138,10 +145,9 @@ void _zis_debug_log_with(
     if (!logging_check(level, group))
         return;
     const uintmax_t time = logging_timestamp();
-    const char *const level_name = logging_level_name[(unsigned)level];
-    fprintf(logging_stream, "[%ju] (Zis|%s|%s) %s %s\n", time, level_name, group, prompt, "...");
+    logging_print(time, level, group, prompt, -1);
     func(func_arg, logging_stream);
-    fprintf(logging_stream, "[%ju] (Zis|%s|%s) %s %s\n", time, level_name, group, prompt, "^^^");
+    logging_print(time, level, group, prompt, -1);
 }
 
 #endif // ZIS_DEBUG_LOGGING

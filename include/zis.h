@@ -18,7 +18,7 @@
 #    endif
 #elif (__GNUC__ + 0 >= 4) || defined(__clang__)
 #    if ZIS_EXPORT_API
-#        define ZIS_API __attribute__((used, visibility("default")))
+#        define ZIS_API __attribute__((visibility("default")))
 #    else
 #        define ZIS_API
 #    endif
@@ -38,7 +38,10 @@
 extern "C" {
 #endif /* __cplusplus */
 
-/** @defgroup zis-api-status API: status code */
+/** @defgroup zis-api-general API: general */
+/** @{ */
+
+/** @name Status code */
 /** @{ */
 
 #define ZIS_OK          0      ///< Succeeded.
@@ -49,6 +52,13 @@ extern "C" {
 #define ZIS_E_IDX       (-12)  ///< Index out of range.
 #define ZIS_E_TYPE      (-13)  ///< Type mismatched.
 #define ZIS_E_BUF       (-14)  ///< Buffer is not big enough.
+
+/** @} */
+
+/**
+ * Version number: { major, minor, patch }.
+ */
+ZIS_API extern const uint_least16_t zis_version[3];
 
 /** @} */
 
@@ -405,6 +415,7 @@ ZIS_API int zis_remove_element(zis_t z, unsigned int reg_obj, unsigned int reg_k
 }
 #endif /* __cplusplus */
 
+#undef ZIS_API
 #undef ZIS_NOEXCEPT
 
 #endif /* ZIS_H */

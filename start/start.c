@@ -1,10 +1,12 @@
 #include <zis.h>
 
 #include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
 #include "clopts.h"
+#include "zis_config.h"
 
 static const struct clopts_program program;
 
@@ -13,9 +15,17 @@ struct command_line_args {
 };
 
 static void oh_help(struct clopts_context *ctx, const char *arg, void *_data) {
-    assert(!arg);
-    (void)_data;
+    assert(!arg), (void)arg, (void)_data;
     clopts_help(&program, stdout, ctx);
+    clopts_handler_break(ctx);
+}
+
+static void oh_version(struct clopts_context *ctx, const char *arg, void *_data) {
+    assert(!arg), (void)arg, (void)_data;
+    fprintf(
+        stdout, ZIS_DISPLAY_NAME " %u.%u.%u\n",
+        zis_version[0], zis_version[1], zis_version[2]
+    );
     clopts_handler_break(ctx);
 }
 
@@ -26,7 +36,8 @@ static void rest_args_handler(
 }
 
 static const struct clopts_option program_options[] = {
-    {'h', 0, oh_help, "print help message and exit"},
+    {'h', NULL, oh_help, "print help message and exit"},
+    {'v', NULL, oh_version, "print version and exit"},
     {0, 0, 0, 0},
 };
 

@@ -18,7 +18,15 @@
 #include "stringobj.h"
 #include "tupleobj.h"
 
+#include "zis_config.h"
+
 /* ----- common utilities --------------------------------------------------- */
+
+#if (__GNUC__ + 0 >= 4) || defined(__clang__)
+#    define ZIS_API __attribute__((used, visibility("default")))
+#else
+#    define ZIS_API
+#endif
 
 static struct zis_object **api_ref_local(zis_t z, unsigned int i) {
     struct zis_callstack *const cs = z->callstack;
@@ -43,6 +51,14 @@ static struct zis_object *api_get_local(zis_t z, unsigned int i) {
         return NULL;
     return *ref;
 }
+
+/* ----- zis-api-general ---------------------------------------------------- */
+
+ZIS_API const uint_least16_t zis_version[3] = {
+    ZIS_VERSION_MAJOR,
+    ZIS_VERSION_MINOR,
+    ZIS_VERSION_PATCH,
+};
 
 /* ----- zis-api-context ---------------------------------------------------- */
 
