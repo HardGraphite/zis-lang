@@ -93,7 +93,7 @@ ZIS_API int zis_native_block(zis_t z, size_t reg_max, int(*fn)(zis_t, void *), v
 
 /* ----- zis-api-values ----------------------------------------------------- */
 
-ZIS_API int zis_load_nil(zis_t z, unsigned int reg, size_t n) {
+ZIS_API int zis_load_nil(zis_t z, unsigned int reg, unsigned int n) {
     struct zis_object **reg_begin = api_ref_local(z, reg);
     if (zis_unlikely(!reg_begin))
         return ZIS_E_IDX;

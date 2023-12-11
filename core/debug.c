@@ -12,7 +12,7 @@ void zis_debug_time(struct timespec *tp) {
 #if ZIS_SYSTEM_POSIX
     clock_gettime(CLOCK_MONOTONIC, tp);
 #else
-    timespec_get(ts, TIME_UTC);
+    timespec_get(tp, TIME_UTC);
 #endif
 }
 

@@ -19,6 +19,7 @@
 
 #if ZIS_DEBUG
 #    include <stdio.h>
+#    include <time.h>
 #endif // ZIS_DEBUG
 
 /* ----- Configurations ----------------------------------------------------- */
@@ -1597,6 +1598,11 @@ struct zis_object *zis_objmem_alloc_ex(
     size_t obj_size = obj_type->_obj_size;
     const bool has_ext = obj_size == 0;
     bool has_ext_slots, has_ext_bytes;
+#ifdef _MSC_VER
+    // Don't know why, but MSVC always complains that
+    // "Warning C4701: potentially uninitialized local variable 'has_ext_*' used"
+    has_ext_slots = false, has_ext_bytes = false;
+#endif // _MSC_VER
     assert(has_ext || (ext_slots == 0 && ext_bytes == 0));
     if (has_ext) {
         has_ext_slots = obj_type->_slots_num == (size_t)-1;

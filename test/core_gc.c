@@ -152,7 +152,7 @@ zis_test_define(test_massive_survivors, z) {
     for (int64_t j = 0; j < M; j++) {
         zis_test_log(ZIS_TEST_LOG_TRACE, "j=%" PRIi64, j);
         make_random_data(z, j);
-        zis_move_local(z, TMP_REG_MAX + 1 + j, 0);
+        zis_move_local(z, TMP_REG_MAX + 1 + (unsigned int)j, 0);
         check_random_data(z, j);
     }
 
@@ -164,7 +164,7 @@ zis_test_define(test_massive_survivors, z) {
 
     for (int64_t j = 0; j < M; j++) {
         zis_test_log(ZIS_TEST_LOG_TRACE, "j=%" PRIi64, j);
-        zis_move_local(z, 0, TMP_REG_MAX + 1 + j);
+        zis_move_local(z, 0, TMP_REG_MAX + 1 + (unsigned int)j);
         check_random_data(z, j);
     }
 

@@ -15,6 +15,8 @@
 #        define ZIS_API __declspec(dllexport)
 #    elif ZIS_IMPORT_API
 #        define ZIS_API __declspec(dllimport)
+#    else
+#        define ZIS_API
 #    endif
 #elif (__GNUC__ + 0 >= 4) || defined(__clang__)
 #    if ZIS_EXPORT_API
@@ -178,7 +180,7 @@ ZIS_API int zis_native_block(zis_t z, size_t reg_max, int(*fn)(zis_t, void *), v
  *
  * @warning If `n` is too big, it is going to be adjusted automatically.
  */
-ZIS_API int zis_load_nil(zis_t z, unsigned int reg, size_t n) ZIS_NOEXCEPT;
+ZIS_API int zis_load_nil(zis_t z, unsigned int reg, unsigned int n) ZIS_NOEXCEPT;
 
 /**
  * Check whether a variable is `nil`.

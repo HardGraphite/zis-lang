@@ -230,8 +230,6 @@ size_t zis_string_obj_value(const struct zis_string_obj *self, char *buf, size_t
 #undef COPY_STR_DATA
 
     }
-
-    zis_unreachable();
 }
 
 /* ----- type definition ---------------------------------------------------- */

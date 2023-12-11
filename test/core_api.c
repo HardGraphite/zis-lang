@@ -346,7 +346,7 @@ static void do_test_read_values__basic(zis_t z) {
     zis_load_bool(z, 1, in_bool);
     zis_make_int(z, 2, in_i64);
     zis_make_float(z, 3, in_double);
-    zis_make_string(z, 4, in_str, -1);
+    zis_make_string(z, 4, in_str, (size_t)- 1);
 
     v_size = sizeof v_str;
     status = zis_read_values(z, 1, "xifs", &v_bool, &v_i64, &v_double, &v_str, &v_size);

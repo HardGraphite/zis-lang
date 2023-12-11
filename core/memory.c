@@ -53,10 +53,11 @@ bool zis_vmem_free(void *ptr, size_t size) {
 #if ZIS_SYSTEM_POSIX
     ok = munmap(ptr, size) == 0;
 #elif ZIS_SYSTEM_WINDOWS
+    zis_unused_var(size);
     ok = VirtualFree(ptr, 0, MEM_RELEASE);
 #else
     zis_unused_var(size);
-    zis_mem_free(size);
+    zis_mem_free(ptr);
     ok = true;
 #endif
     return ok;
