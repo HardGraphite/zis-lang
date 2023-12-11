@@ -123,7 +123,7 @@ struct zis_objmem_context *zis_objmem_context_create(void);
 void zis_objmem_context_destroy(struct zis_objmem_context *ctx);
 
 /// Print object memory usage to a file or to stderr (`NULL`).
-/// Only available when compile with `ZIS_DEBUG_MEMORY` being true.
+/// Only available when compile with `ZIS_DEBUG` being true.
 void zis_objmem_print_usage(struct zis_objmem_context *ctx, void *FILE_ptr);
 
 /* ----- object allocation -------------------------------------------------- */

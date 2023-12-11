@@ -17,9 +17,9 @@
 
 #include "zis_config.h"
 
-#if ZIS_DEBUG_MEMORY
+#if ZIS_DEBUG
 #    include <stdio.h>
-#endif // ZIS_DEBUG_MEMORY
+#endif // ZIS_DEBUG
 
 /* ----- Configurations ----------------------------------------------------- */
 
@@ -480,8 +480,9 @@ static void big_space_fini(struct big_space *space) {
     });
 }
 
-#if ZIS_DEBUG_MEMORY
+#if ZIS_DEBUG
 
+zis_unused_fn
 static void big_space_print_usage(struct big_space *space, FILE *stream) {
     fprintf(
         stream, "<BigSpc threshold_size=\"%zu\" allocated_size=\"%zu\">\n",
@@ -498,7 +499,7 @@ static void big_space_print_usage(struct big_space *space, FILE *stream) {
     fputs("</BigSpc>\n", stream);
 }
 
-#endif // ZIS_DEBUG_MEMORY
+#endif // ZIS_DEBUG
 
 /// Allocate storage for an object. On failure, returns `NULL`.
 zis_force_inline static struct zis_object *
@@ -624,8 +625,9 @@ static void big_space_update_references(struct big_space *space) {
     });
 }
 
-#if ZIS_DEBUG_MEMORY
+#if ZIS_DEBUG
 
+zis_unused_fn
 static int big_space_post_gc_check(struct big_space *space) {
     big_space_foreach(space, obj, has_young, {
         if (has_young)
@@ -638,7 +640,7 @@ static int big_space_post_gc_check(struct big_space *space) {
     return 0;
 }
 
-#endif // ZIS_DEBUG_MEMORY
+#endif // ZIS_DEBUG
 
 /* ----- Old space (old generation) ----------------------------------------- */
 
@@ -888,8 +890,9 @@ static void old_space_remove_chunks_after(
     mem_chunk_list_destroy_after(&space->_chunks, after_chunk);
 }
 
-#if ZIS_DEBUG_MEMORY
+#if ZIS_DEBUG
 
+zis_unused_fn
 static void old_space_print_usage(struct old_space *space, FILE *stream) {
     fputs("<OldSpc>\n", stream);
     size_t chunk_index = 0;
@@ -914,7 +917,7 @@ static void old_space_print_usage(struct old_space *space, FILE *stream) {
     fputs("</OldSpc>\n", stream);
 }
 
-#endif // ZIS_DEBUG_MEMORY
+#endif // ZIS_DEBUG
 
 /// Allocate storage for an object. On failure, returns `NULL`.
 zis_force_inline static struct zis_object *
@@ -1228,8 +1231,9 @@ static void old_space_move_reallocated_objects(
     });
 }
 
-#if ZIS_DEBUG_MEMORY
+#if ZIS_DEBUG
 
+zis_unused_fn
 static int old_space_post_gc_check(struct old_space *space) {
     mem_chunk_list_foreach(&space->_chunks, chunk, {
         struct old_space_chunk_meta *const chunk_meta = old_space_chunk_meta_addr(chunk);
@@ -1252,7 +1256,7 @@ static int old_space_post_gc_check(struct old_space *space) {
     return 0;
 }
 
-#endif // ZIS_DEBUG_MEMORY
+#endif // ZIS_DEBUG
 
 /* ----- New space (young generation) --------------------------------------- */
 
@@ -1287,8 +1291,9 @@ static void new_space_fini(struct new_space *space) {
     mem_chunk_destroy(space->_free_chunk);
 }
 
-#if ZIS_DEBUG_MEMORY
+#if ZIS_DEBUG
 
+zis_unused_fn
 static void new_space_print_usage(struct new_space *space, FILE *stream) {
     fputs("<NewSpc>\n", stream);
     struct mem_chunk *const chunks[2] = {space->_working_chunk, space->_free_chunk};
@@ -1307,7 +1312,7 @@ static void new_space_print_usage(struct new_space *space, FILE *stream) {
     fputs("</NewSpc>\n", stream);
 }
 
-#endif // ZIS_DEBUG_MEMORY
+#endif // ZIS_DEBUG
 
 /// Allocate storage for an object. On failure, returns `NULL`.
 zis_force_inline static struct zis_object *
@@ -1474,8 +1479,9 @@ static void new_space_move_marked_objects(
     });
 }
 
-#if ZIS_DEBUG_MEMORY
+#if ZIS_DEBUG
 
+zis_unused_fn
 static int new_space_post_gc_check(struct new_space *space) {
     mem_chunk_foreach_allocated_object(
         space->_working_chunk, 0, obj, obj_type, obj_size,
@@ -1489,7 +1495,7 @@ static int new_space_post_gc_check(struct new_space *space) {
     return 0;
 }
 
-#endif // ZIS_DEBUG_MEMORY
+#endif // ZIS_DEBUG
 
 /* ----- Public functions --------------------------------------------------- */
 
@@ -1884,14 +1890,14 @@ int zis_objmem_gc(struct zis_context *z, enum zis_objmem_gc_type type) {
     }
     ctx->current_gc_type = (int8_t)type;
 
-#if ZIS_DEBUG_MEMORY
+#if ZIS_DEBUG
     zis_debug_log(
         INFO, "ObjMem", "%s GC starts",
         type == ZIS_OBJMEM_GC_FAST ? "fast" : "full"
     );
     struct timespec tp0;
     zis_debug_time(&tp0);
-#endif // ZIS_DEBUG_MEMORY
+#endif // ZIS_DEBUG
 
     if (type == ZIS_OBJMEM_GC_FAST)
         gc_fast(ctx);
@@ -1900,7 +1906,7 @@ int zis_objmem_gc(struct zis_context *z, enum zis_objmem_gc_type type) {
     else
         type = ZIS_OBJMEM_GC_NONE; // Illegal type.
 
-#if ZIS_DEBUG_MEMORY
+#if ZIS_DEBUG
     struct timespec tp1;
     zis_debug_time(&tp1);
     double dt_ms =
@@ -1917,7 +1923,7 @@ int zis_objmem_gc(struct zis_context *z, enum zis_objmem_gc_type type) {
     assert(!new_space_post_gc_check(&ctx->new_space));
     assert(!old_space_post_gc_check(&ctx->old_space));
     assert(!big_space_post_gc_check(&ctx->big_space));
-#endif // ZIS_DEBUG_MEMORY
+#endif // ZIS_DEBUG
 
     ctx->current_gc_type = (int8_t)ZIS_OBJMEM_GC_NONE;
 
@@ -1938,7 +1944,7 @@ zis_noinline void zis_objmem_record_o2y_ref(struct zis_object *obj) {
 }
 
 void zis_objmem_print_usage(struct zis_objmem_context *ctx, void *FILE_ptr) {
-#if ZIS_DEBUG_MEMORY
+#if ZIS_DEBUG
 
     FILE *stream = FILE_ptr ? FILE_ptr : stderr;
 
@@ -1951,7 +1957,7 @@ void zis_objmem_print_usage(struct zis_objmem_context *ctx, void *FILE_ptr) {
     big_space_print_usage(&ctx->big_space, stream);
     fputs("</ObjMem>\n", stream);
 
-#else // !ZIS_DEBUG_MEMORY
+#else // !ZIS_DEBUG
 
     zis_unused_var(ctx);
     zis_unused_var(FILE_ptr);
