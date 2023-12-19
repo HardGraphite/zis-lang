@@ -48,7 +48,7 @@ extern "C" {
 
 #define ZIS_OK          0      ///< Succeeded.
 
-#define ZIS_E_EXC       (-1)   ///< Exception raised.
+#define ZIS_THR         (-1)   ///< An object (maybe an exception) was thrown.
 
 #define ZIS_E_ARG       (-11)  ///< Illegal argument.
 #define ZIS_E_IDX       (-12)  ///< Index out of range.

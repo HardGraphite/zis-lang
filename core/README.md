@@ -24,6 +24,7 @@ Source code for the runtime core.
 + built-in types (`*obj.*`)
   - [`arrayobj.h`](arrayobj.h), [`arrayobj.c`](arrayobj.c)
   - [`boolobj.h`](boolobj.h), [`boolobj.c`](boolobj.c)
+  - [`exceptobj.h`](exceptobj.h), [`exceptobj.c`](exceptobj.c)
   - [`floatobj.h`](floatobj.h), [`floatobj.c`](floatobj.c)
   - [`intobj.h`](intobj.h), [`intobj.c`](intobj.c)
   - [`nilobj.h`](nilobj.h), [`nilobj.c`](nilobj.c)

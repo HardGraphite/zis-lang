@@ -19,6 +19,7 @@ struct zis_type_obj;
     E(Array)                   \
     E(Array_Slots)             \
     E(Bool)                    \
+    E(Exception)               \
     E(Float)                   \
     E(Int)                     \
     E(Nil)                     \
