@@ -297,6 +297,7 @@ ZIS_API int zis_read_string(zis_t z, unsigned int reg, char *buf, size_t *sz) ZI
  *   However, **nested collections are not allowed**.
  *   - `(` [`<spec>`...] `)`: `Tuple` value.
  *   - `[` [`*`] [`<spec>`...] `]`: `Array` value.
+ *   - `{` [`*`] [`<key_spec><val_spec>`...] `}`: `Map` value.
  * + Others.
  *   - `-`: skip one value; no argument.
  *   - `*`: reserve storage for collection types; the argument is `size_t n`.
@@ -330,6 +331,7 @@ ZIS_API int zis_make_values(zis_t z, unsigned int reg_begin, const char *fmt, ..
  *   However, **nested collections are not allowed**.
  *   - `(` [`*`] [`<spec>`...] `)`: read `Tuple`.
  *   - `[` [`*`] [`<spec>`...] `]`: read `Array`.
+ *   - `{` [`*`] `}`: read `Map` elements.
  * + Others.
  *   - `-`: skip one value; no argument.
  *   - `*`: get length of a collection type value; the argument is `size_t *n`.

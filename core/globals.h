@@ -22,6 +22,8 @@ struct zis_type_obj;
     E(Exception)               \
     E(Float)                   \
     E(Int)                     \
+    E(Map)                     \
+    E(Map_Node)                \
     E(Nil)                     \
     E(String)                  \
     E(Tuple)                   \

@@ -219,15 +219,16 @@ static void do_test_make_values__basic(zis_t z) {
 
     zis_make_int(z, 20, rand_num);
     status = zis_make_values(
-        z, 1, "%nxifs(ifs)[ifs][*i]",
-        // CNT 1234567890 1234 5 6
-        // REG 1234567    8    9
+        z, 1, "%nxifs(ifs)[ifs][*i]{isis}",
+        // CNT 1234567890 1234 5 6 78901
+        // REG 1234567    8    9   0
         20, in_bool, in_i64, in_double, in_str, (size_t)-1,
         in_i64, in_double, in_str, (size_t)-1,
         in_i64, in_double, in_str, (size_t)-1,
-        (size_t)100, in_i64
+        (size_t)100, in_i64,
+        1, "1", 1, 2, "2", 1
     );
-    zis_test_assert_eq(status, 16);
+    zis_test_assert_eq(status, 21);
 
     status = zis_read_int(z, 1, &v_i64);
     zis_test_assert_eq(status, ZIS_OK);
@@ -297,6 +298,25 @@ static void do_test_make_values__basic(zis_t z) {
         status = zis_load_element(z, reg, 0, 0);
         zis_test_assert_eq(status, ZIS_E_ARG); // out of range
     }
+
+    {
+        const unsigned int reg = 10;
+
+        for (int i = 1; i <= 2; i++) {
+            zis_make_int(z, 0, i);
+            status = zis_load_element(z, reg, 0, 0);
+            zis_test_assert_eq(status, ZIS_OK);
+            v_size   = sizeof v_str;
+            status = zis_read_string(z, 0, v_str, &v_size);
+            zis_test_assert_eq(status, ZIS_OK);
+            zis_test_assert_eq(v_size, 1);
+            zis_test_assert_eq(v_str[0], '0' + i);
+        }
+
+        zis_make_int(z, 0, -1);
+        status = zis_load_element(z, reg, 0, 0);
+        zis_test_assert_eq(status, ZIS_E_ARG); // key not found
+    }
 }
 
 static void do_test_make_values__insufficient_regs(zis_t z) {
@@ -322,6 +342,9 @@ static void do_test_make_values__nested_collections(zis_t z) {
     zis_test_assert_eq(status, ZIS_E_ARG);
 
     status = zis_make_values(z, 1, "[[]]");
+    zis_test_assert_eq(status, ZIS_E_ARG);
+
+    status = zis_make_values(z, 1, "{{}}");
     zis_test_assert_eq(status, ZIS_E_ARG);
 }
 
@@ -405,7 +428,7 @@ zis_test_define(test_read_values, z) {
 
 // zis-api-variables //
 
-zis_test_define(test_load_element, z) {
+static void do_test_load_element__array_and_tuple(zis_t z) {
     int status;
 
     const double in[] = { 0.618, 2.71, 3.14 };
@@ -413,6 +436,7 @@ zis_test_define(test_load_element, z) {
 
     status = zis_make_values(z, 1, "(fff)[fff]", in[0], in[1], in[2], in[0], in[1], in[2]);
     zis_test_assert_eq(status, 8);
+
     for (unsigned int i = 1; i <= 2; i++) {
         for (int j = -5; j <= 5; j++) {
             const int jx = j >= 0 ? j : (3 + 1) + j;
@@ -429,6 +453,34 @@ zis_test_define(test_load_element, z) {
             }
         }
     }
+}
+
+static void do_test_load_element__map(zis_t z) {
+    int status;
+
+    const double in[] = { 0.618, 2.71, 3.14 };
+    double v_double;
+
+    status = zis_make_values(z, 1, "{ififif}", 0LL, in[0], 1LL, in[1], 2LL, in[2]);
+    zis_test_assert_eq(status, 7);
+
+    for (int i = 0; i < 5; i++) {
+        status = zis_make_int(z, 0, i);
+        zis_test_assert_eq(status, ZIS_OK);
+        status = zis_load_element(z, 1, 0, 0);
+        if (i < 3) {
+            zis_test_assert_eq(status, ZIS_OK);
+            status = zis_read_float(z, 0, &v_double);
+            zis_test_assert_eq(status, ZIS_OK);
+            zis_test_assert_eq(v_double, in[i]);
+        } else {
+            zis_test_assert_eq(status, ZIS_E_ARG);
+        }
+    }
+}
+
+static void do_test_load_element__bad_type(zis_t z) {
+    int status;
 
     status = zis_load_nil(z, 1, 1);
     zis_test_assert_eq(status, ZIS_OK);
@@ -438,7 +490,13 @@ zis_test_define(test_load_element, z) {
     zis_test_assert_eq(status, ZIS_E_TYPE);
 }
 
-zis_test_define(test_store_element, z) {
+zis_test_define(test_load_element, z) {
+    do_test_load_element__array_and_tuple(z);
+    do_test_load_element__map(z);
+    do_test_load_element__bad_type(z);
+}
+
+static void do_test_store_element__array_and_tuple(zis_t z) {
     int status;
 
     const double in[] = { 0.618, 2.71, 3.14 };
@@ -462,13 +520,58 @@ zis_test_define(test_store_element, z) {
         for (int i = 0; i < 3; i++)
             zis_test_assert_eq(in[i], v[i]);
     }
+}
 
+static void do_test_store_element__map(zis_t z) {
+    int status;
+
+    const double in[] = { 0.618, 2.71, 3.14 };
+
+    status = zis_make_values(z, 1, "{}");
+    zis_test_assert_eq(status, 1);
+
+    for (int i = 0; i < 3; i++) {
+        status = zis_make_int(z, 0, i);
+        zis_test_assert_eq(status, ZIS_OK);
+        status = zis_store_element(z, 1, 0, 0);
+        zis_test_assert_eq(status, ZIS_OK);
+    }
+
+    for (int i = 0; i < 3; i++) {
+        status = zis_make_int(z, 0, i);
+        zis_test_assert_eq(status, ZIS_OK);
+        status = zis_make_float(z, 2, in[i]);
+        zis_test_assert_eq(status, ZIS_OK);
+        status = zis_store_element(z, 1, 0, 2);
+        zis_test_assert_eq(status, ZIS_OK);
+    }
+
+    for (int i = 0; i < 3; i++) {
+        double v;
+        status = zis_make_int(z, 0, i);
+        zis_test_assert_eq(status, ZIS_OK);
+        status = zis_load_element(z, 1, 0, 0);
+        zis_test_assert_eq(status, ZIS_OK);
+        status = zis_read_float(z, 0, &v);
+        zis_test_assert_eq(status, ZIS_OK);
+        zis_test_assert_eq(v, in[i]);
+    }
+}
+
+static void do_test_store_element__bad_type(zis_t z) {
+    int status;
     status = zis_load_nil(z, 1, 1);
     zis_test_assert_eq(status, ZIS_OK);
     status = zis_make_int(z, 0, 1);
     zis_test_assert_eq(status, ZIS_OK);
     status = zis_store_element(z, 1, 0, 0);
     zis_test_assert_eq(status, ZIS_E_TYPE);
+}
+
+zis_test_define(test_store_element, z) {
+    do_test_store_element__array_and_tuple(z);
+    do_test_store_element__map(z);
+    do_test_store_element__bad_type(z);
 }
 
 static void do_test_insert_element__array(zis_t z) {
@@ -551,8 +654,48 @@ static void do_test_remove_element__array(zis_t z) {
     }
 }
 
+static void do_test_remove_element__map(zis_t z) {
+    const int N = 200;
+    int status;
+
+    status = zis_make_values(z, 1, "{}");
+    zis_test_assert_eq(status, 1);
+
+    for (int i = 0; i < N; i++) {
+        status = zis_make_int(z, 2, i);
+        zis_test_assert_eq(status, ZIS_OK);
+        status = zis_make_int(z, 3, -i);
+        zis_test_assert_eq(status, ZIS_OK);
+        status = zis_store_element(z, 1, 2, 3);
+        zis_test_assert_eq(status, ZIS_OK);
+    }
+
+    for (int i = 0; i < N; i += 2) {
+        status = zis_make_int(z, 2, i);
+        zis_test_assert_eq(status, ZIS_OK);
+        status = zis_remove_element(z, 1, 2);
+        zis_test_assert_eq(status, ZIS_OK);
+    }
+
+    for (int i = 0; i < N; i++) {
+        status = zis_make_int(z, 2, i);
+        zis_test_assert_eq(status, ZIS_OK);
+        status = zis_load_element(z, 1, 2, 0);
+        if (i & 1) {
+            int64_t v;
+            zis_test_assert_eq(status, ZIS_OK);
+            status = zis_read_int(z, 0, &v);
+            zis_test_assert_eq(status, ZIS_OK);
+            zis_test_assert_eq(v, -i);
+        } else {
+            zis_test_assert_eq(status, ZIS_E_ARG);
+        }
+    }
+}
+
 zis_test_define(test_remove_element, z) {
     do_test_remove_element__array(z);
+    do_test_remove_element__map(z);
 }
 
 // main

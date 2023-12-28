@@ -42,3 +42,10 @@ zis_static_force_inline struct zis_object *zis_smallint_try_to_ptr(zis_smallint_
         return ptr;
     return NULL;
 }
+
+zis_static_force_inline size_t zis_smallint_hash(zis_smallint_t val) {
+    static_assert(sizeof val == sizeof(size_t), "");
+    union { zis_smallint_t i; size_t z; } x;
+    x.i = val;
+    return x.z;
+}

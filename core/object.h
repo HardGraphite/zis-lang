@@ -192,3 +192,38 @@ do {                                           \
 /// Access BYTES.
 #define zis_object_ref_bytes(obj, slot_cnt) \
     (assert(!zis_object_is_smallint(obj)), (obj)->_body + sizeof(void *) * (slot_cnt))
+
+/* ----- object common methods ---------------------------------------------- */
+
+struct zis_context;
+
+/// Calculate the hash code of an object.
+/// On success, stores the hash code to `*hash_code` and returns true.
+/// On failure, stores the thrown object to REG-0 and returns false.
+bool zis_object_hash(
+    size_t *restrict hash_code,
+    struct zis_context *z, struct zis_object *obj
+);
+
+/// Object comparison result.
+enum zis_object_ordering {
+    ZIS_OBJECT_IC = -2, ///< incomparable
+    ZIS_OBJECT_LT = -1, ///< less than
+    ZIS_OBJECT_EQ =  0, ///< equal to
+    ZIS_OBJECT_GT =  1, ///< greater than
+};
+
+/// Compare two objects.
+/// On success, returns `ZIS_OBJECT_LT`, `ZIS_OBJECT_EQ`, or `ZIS_OBJECT_GT`.
+/// On failure, stores the thrown object to REG-0 and returns `ZIS_OBJECT_IC`.
+enum zis_object_ordering zis_object_compare(
+    struct zis_context *z,
+    struct zis_object *lhs, struct zis_object *rhs
+);
+
+/// Check whether two objects equal.
+/// This operation never fails.
+bool zis_object_equals(
+    struct zis_context *z,
+    struct zis_object *obj1, struct zis_object *obj2
+);

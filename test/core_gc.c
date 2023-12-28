@@ -9,7 +9,7 @@
 #define TMP_REG_MAX 4
 
 static void clear_stack(zis_t z) {
-    zis_load_nil(z, TMP_REG_MAX + 1, (size_t)-1);
+    zis_load_nil(z, TMP_REG_MAX + 1, (unsigned)-1);
 }
 
 static void clear_stack_tmp(zis_t z) {
@@ -22,13 +22,15 @@ static void make_random_data(zis_t z, int64_t seed) {
 
     zis_make_values(z, 1, "[*]", (size_t)N);
     for (int i = 0; i < N; i++) {
+        status = zis_make_values(z, 3, "{ifin}", seed + i, (double)(seed + i), seed + i - 1);
+        zis_test_assert_eq(status, 5);
         char buffer[64];
         snprintf(buffer, sizeof buffer, "<<<<<<<< No. %" PRIi64 "-%i >>>>>>>>", seed, i);
         status = zis_make_values(
-            z, 2, "(nxifs)",
-            (bool)(i & 1), seed + i, (double)(seed + i), buffer, (size_t)-1
+            z, 2, "(nxifs%)",
+            (bool)(i & 1), seed + i, (double)(seed + i), buffer, (size_t)-1, 3
         );
-        zis_test_assert_eq(status, 6);
+        zis_test_assert_eq(status, 7);
         status = zis_make_int(z, 0, -1);
         zis_test_assert_eq(status, ZIS_OK);
         status = zis_insert_element(z, 1, 0, 2);
@@ -62,19 +64,36 @@ static void check_random_data(zis_t z, int64_t seed) {
         char v_strbuf[64] = { 0 };
         size_t v_strlen = sizeof v_strbuf;
         status = zis_read_values(
-            z, 2, "(*nxifs)",
-            &v_size, &v_bool, &v_i64, &v_double, &v_strbuf, &v_strlen
+            z, 2, "(*nxifs%)",
+            &v_size, &v_bool, &v_i64, &v_double, &v_strbuf, &v_strlen, 3
         );
-        zis_test_assert_eq(status, 6);
+        zis_test_assert_eq(status, 7);
 
         char buffer[64];
         snprintf(buffer, sizeof buffer, "<<<<<<<< No. %" PRIi64 "-%i >>>>>>>>", seed, i);
-        zis_test_assert_eq(v_size, 5);
+        zis_test_assert_eq(v_size, 6);
         zis_test_assert_eq(v_bool, (bool)(i & 1));
         zis_test_assert_eq(v_i64, seed + i);
         zis_test_assert_eq(v_double, (double)(seed + i));
         zis_test_assert_eq(v_strlen, strlen(buffer));
         zis_test_assert_eq(memcmp(v_strbuf, buffer, v_strlen), 0);
+
+        status = zis_read_values(z, 3, "{*}", &v_size);
+        zis_test_assert_eq(status, 1);
+        zis_test_assert_eq(v_size, 2);
+        status = zis_make_int(z, 0, v_i64); // #1
+        zis_test_assert_eq(status, ZIS_OK);
+        status = zis_load_element(z, 3, 0, 0);
+        zis_test_assert_eq(status, ZIS_OK);
+        status = zis_read_float(z, 0, &v_double);
+        zis_test_assert_eq(status, ZIS_OK);
+        zis_test_assert_eq(v_double, (double)(seed + i));
+        status = zis_make_int(z, 0, v_i64 - 1); // #2
+        zis_test_assert_eq(status, ZIS_OK);
+        status = zis_load_element(z, 3, 0, 0);
+        zis_test_assert_eq(status, ZIS_OK);
+        status = zis_read_nil(z, 0);
+        zis_test_assert_eq(status, ZIS_OK);
     }
 
     clear_stack_tmp(z);

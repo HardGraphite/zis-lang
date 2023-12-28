@@ -15,6 +15,7 @@
 #include "boolobj.h"
 #include "floatobj.h"
 #include "intobj.h"
+#include "mapobj.h"
 #include "stringobj.h"
 #include "tupleobj.h"
 
@@ -363,6 +364,64 @@ static int api_make_values_impl(
             break;
         }
 
+        case '{': {
+            if (nested) {
+                zis_debug_log(ERROR, "API", "zis_make_values(): nested \"{...}\"");
+                status = ZIS_E_ARG;
+                goto do_return;
+            }
+            size_t reserve = 0U;
+            if (fmt_p[1] == '*') {
+                fmt_p++;
+                reserve = va_arg(x->ap, size_t);
+            }
+            fmt_p++;
+            const char *const s_end = strchr(fmt_p, '}');
+            if (!s_end){
+                zis_debug_log(ERROR, "API", "zis_make_values(): unmatched \"{...}\"");
+                status = ZIS_E_ARG;
+                goto do_return;
+            }
+            const size_t elem_count_x2 = (size_t)(s_end - fmt_p);
+            if (elem_count_x2 & 1u) {
+                status = ZIS_E_ARG;
+                goto do_return;
+            }
+            const size_t elem_count = elem_count_x2 / 2;
+            zis_map_obj_new_r(z, ret_p, 0.0f, reserve < elem_count ? elem_count : reserve);
+            if (elem_count) {
+                const size_t tmp_regs_n = elem_count_x2 + 4;
+                struct zis_object **tmp_regs =
+                    zis_callstack_frame_alloc_temp(z, tmp_regs_n);
+                struct zis_object **tmp_regs_set_regs = tmp_regs + elem_count_x2;
+                PUSH_STATE();
+                const int rv = api_make_values_impl(
+                    x, tmp_regs, tmp_regs + elem_count_x2, s_end, true
+                );
+                PULL_STATE();
+                if (rv != ZIS_OK) {
+                    zis_callstack_frame_free_temp(z, tmp_regs_n);
+                    return rv;
+                }
+                for (size_t i = 0; i < elem_count_x2; i += 2) {
+                    tmp_regs_set_regs[0] = *ret_p,
+                    tmp_regs_set_regs[1] = tmp_regs[i],
+                    tmp_regs_set_regs[2] = tmp_regs[i + 1];
+                    status = zis_map_obj_set_r(z, tmp_regs_set_regs);
+                    if (status != ZIS_OK) {
+                        zis_callstack_frame_free_temp(z, tmp_regs_n);
+                        assert(status == ZIS_THR);
+                        return status;
+                    }
+                }
+                zis_callstack_frame_free_temp(z, tmp_regs_n);
+                assert(zis_object_type(*ret_p) == z->globals->type_Map);
+                assert(zis_map_obj_length(zis_object_cast(*ret_p, struct zis_map_obj)) == elem_count);
+            }
+            assert(*fmt_p == '}');
+            break;
+        }
+
         case '-':
             break;
 
@@ -589,6 +648,37 @@ do {                  \
             break;
         }
 
+        case '{': {
+            CHECK_TYPE(Map);
+            struct zis_map_obj *const map_obj =
+                zis_object_cast(in_obj, struct zis_map_obj);
+            if (nested) {
+                zis_debug_log(ERROR, "API", "zis_read_values(): nested \"{...}\"");
+                status = ZIS_E_ARG;
+                goto do_return;
+            }
+            if (fmt_p[1] == '*') {
+                fmt_p++;
+                count++;
+                *va_arg(x->ap, size_t *) = zis_map_obj_length(map_obj);
+            }
+            fmt_p++;
+            const char *const s_end = strchr(fmt_p, '}');
+            if (!s_end){
+                zis_debug_log(ERROR, "API", "zis_read_values(): unmatched \"{...}\"");
+                status = ZIS_E_ARG;
+                goto do_return;
+            }
+            const size_t elem_count = (size_t)(s_end - fmt_p);
+            if (elem_count != 0) { // Does not support getting elements.
+                status = ZIS_E_ARG;
+                goto do_return;
+            }
+            count--;
+            assert(*fmt_p == '}');
+            break;
+        }
+
         case '-':
             break;
 
@@ -689,6 +779,16 @@ ZIS_API int zis_load_element(
         *val_ref = val;
         return ZIS_OK;
     }
+    if (obj_type == g->type_Map) {
+        struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 2);
+        tmp_regs[0] = obj, tmp_regs[1] = key;
+        const int status = zis_map_obj_get_r(z, tmp_regs);
+        *val_ref = tmp_regs[0];
+        zis_callstack_frame_free_temp(z, 2);
+        if (status != ZIS_OK)
+            *val_ref = zis_object_from(g->val_nil);
+        return status;
+    }
     return ZIS_E_TYPE;
 }
 
@@ -712,6 +812,13 @@ ZIS_API int zis_store_element(
         struct zis_array_obj *const array = zis_object_cast(obj, struct zis_array_obj);
         const bool ok = zis_array_obj_Mx_set_element(z, array, key, val);
         return ok ? ZIS_OK : ZIS_E_ARG;
+    }
+    if (obj_type == g->type_Map) {
+        struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 4);
+        tmp_regs[0] = obj, tmp_regs[1] = key, tmp_regs[2] = val;
+        const int status = zis_map_obj_set_r(z, tmp_regs);
+        zis_callstack_frame_free_temp(z, 4);
+        return status;
     }
     return ZIS_E_TYPE;
 }
@@ -755,6 +862,13 @@ ZIS_API int zis_remove_element(zis_t z, unsigned int reg_obj, unsigned int reg_k
         struct zis_array_obj *const array = zis_object_cast(obj, struct zis_array_obj);
         const bool ok = zis_array_obj_Mx_remove_element(z, array, key);
         return ok ? ZIS_OK : ZIS_E_ARG;
+    }
+    if (obj_type == g->type_Map) {
+        struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 3);
+        tmp_regs[0] = obj, tmp_regs[1] = key;
+        const int status = zis_map_obj_unset_r(z, tmp_regs);
+        zis_callstack_frame_free_temp(z, 3);
+        return status;
     }
     return ZIS_E_TYPE;
 }

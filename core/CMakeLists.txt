@@ -65,6 +65,16 @@ target_include_directories(
     PUBLIC "${CMAKE_SOURCE_DIR}/include"
     PRIVATE "${zis_core_conf_header_dir}"
 )
+# Link libraries.
+if(UNIX)
+    if(ZIS_BUILD_SHARED)
+        set(scope PRIVATE)
+    else()
+        set(scope INTERFACE)
+    endif()
+    target_link_libraries(${zis_core_tgt} ${scope} "m")
+    unset(scope)
+endif()
 
 if (WIN32 AND ZIS_BUILD_SHARED)
     include(winutil)
