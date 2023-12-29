@@ -1,3 +1,7 @@
+###
+### ZiS: install directories
+###
+
 include_guard(DIRECTORY)
 
 if(WIN32)

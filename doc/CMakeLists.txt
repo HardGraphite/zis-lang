@@ -1,3 +1,28 @@
+##############################################
+##### Documentations written in Markdown #####
+##############################################
+
+option(ZIS_DOC_DOCS           "Doc: docs in doc/"                           OFF)
+
+if(ZIS_DOC_DOCS)
+    include(Pandoc) # cmake/Pandoc.cmake
+
+    if (NOT pandoc_executable)
+        message(FATAL_ERROR "Cannot find pandoc.")
+    endif()
+
+    file(GLOB markdown_files "${CMAKE_CURRENT_SOURCE_DIR}/*.md")
+    foreach(file IN LISTS markdown_files)
+        get_filename_component(filename_stem ${file} NAME_WLE)
+        pandoc_add_doc(
+            "zis_doc_${filename_stem}" ${file} ALL
+            OUTPUT_FORMAT "html"
+            STANDALONE
+            OPTION "--number-sections" "--shift-heading-level-by=-1" "--toc" "--variable=maxwidth:64em"
+        )
+    endforeach()
+endif()
+
 ########################################
 ##### C source code documentations #####
 ########################################

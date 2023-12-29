@@ -37,7 +37,7 @@ set_target_properties(${zis_start_tgt} PROPERTIES OUTPUT_NAME "${ZIS_OUTPUT_NAME
 target_include_directories(${zis_start_tgt} PRIVATE ${zis_start_conf_header_dir})
 
 if(WIN32)
-    include(winutil)
+    include(ZisWinUtil)
     if(ZIS_BUILD_SHARED)
         set(desc "${ZIS_DISPLAY_NAME} programming language executable")
         set(prod "${ZIS_DISPLAY_NAME}LangStart")
@@ -57,7 +57,7 @@ endif()
 ##### Installation configurations #####
 #######################################
 
-include(installdir)
+include(ZisInstallDirs)
 
 ### RPATH.
 if(DEFINED zis_start_shared AND ZIS_PACK_RELA_RPATH AND UNIX)

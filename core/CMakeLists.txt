@@ -77,7 +77,7 @@ if(UNIX)
 endif()
 
 if (WIN32 AND ZIS_BUILD_SHARED)
-    include(winutil)
+    include(ZisWinUtil)
     zis_win_target_add_rc(
         ${zis_core_tgt}
         "${ZIS_DISPLAY_NAME} programming language runtime core"
@@ -90,7 +90,7 @@ endif()
 ##### Installation configurations #####
 #######################################
 
-include(installdir)
+include(ZisInstallDirs)
 
 ### Install rules.
 install(TARGETS ${zis_core_tgt} DESTINATION ${zis_install_lib_dir})

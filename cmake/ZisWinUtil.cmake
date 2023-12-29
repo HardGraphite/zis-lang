@@ -1,4 +1,6 @@
-include_guard(DIRECTORY)
+###
+### ZiS: MS Windows build utilities
+###
 
 ## Add resource script file to target.
 function(zis_win_target_add_rc target_name description product_name icon_file)
