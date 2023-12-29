@@ -30,5 +30,6 @@ Source code for the runtime core.
   - [`mapobj.h`](mapobj.h), [`mapobj.c`](mapobj.c)
   - [`nilobj.h`](nilobj.h), [`nilobj.c`](nilobj.c)
   - [`stringobj.h`](stringobj.h), [`stringobj.c`](stringobj.c)
+  - [`symbolobj.h`](symbolobj.h), [`symbolobj.c`](symbolobj.c)
   - [`tupleobj.h`](tupleobj.h), [`tupleobj.c`](tupleobj.c)
   - [`typeobj.h`](typeobj.h), [`typeobj.c`](typeobj.c)

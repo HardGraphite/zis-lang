@@ -204,6 +204,27 @@ zis_test_define(test_string, z) {
     do_test_bad_string(z, u8"你好", 4); // U+4F60 U+597D => [e4 bd a0] [e5 a5 bd]
 }
 
+static void do_test_symbol(zis_t z, const char *str_in) {
+    int status;
+    const size_t str_in_sz = strlen(str_in);
+    char buffer[64];
+    size_t out_sz;
+
+    status = zis_make_symbol(z, 1, str_in, str_in_sz);
+    zis_test_assert_eq(status, ZIS_OK);
+    out_sz = sizeof buffer;
+    status = zis_read_symbol(z, 1, buffer, &out_sz);
+    zis_test_assert_eq(status, ZIS_OK);
+    zis_test_assert_eq(out_sz, str_in_sz);
+    zis_test_assert_eq(memcmp(str_in, buffer, str_in_sz), 0);
+}
+
+zis_test_define(test_symbol, z) {
+    do_test_symbol(z, "Hello, World!");
+    do_test_symbol(z, "12345678");
+    do_test_symbol(z, "");
+}
+
 static void do_test_make_values__basic(zis_t z) {
     int status;
     const int64_t rand_num = 13579;
@@ -219,16 +240,17 @@ static void do_test_make_values__basic(zis_t z) {
 
     zis_make_int(z, 20, rand_num);
     status = zis_make_values(
-        z, 1, "%nxifs(ifs)[ifs][*i]{isis}",
-        // CNT 1234567890 1234 5 6 78901
-        // REG 1234567    8    9   0
+        z, 1, "%nxifs(ifs)[ifs][*i]{isis}y",
+        // CNT 1234567890 1234 5 6 78901 2
+        // REG 1234567    8    9   0     1
         20, in_bool, in_i64, in_double, in_str, (size_t)-1,
         in_i64, in_double, in_str, (size_t)-1,
         in_i64, in_double, in_str, (size_t)-1,
         (size_t)100, in_i64,
-        1, "1", 1, 2, "2", 1
+        1, "1", 1, 2, "2", 1,
+        in_str, (size_t)-1
     );
-    zis_test_assert_eq(status, 21);
+    zis_test_assert_eq(status, 22);
 
     status = zis_read_int(z, 1, &v_i64);
     zis_test_assert_eq(status, ZIS_OK);
@@ -317,6 +339,12 @@ static void do_test_make_values__basic(zis_t z) {
         status = zis_load_element(z, reg, 0, 0);
         zis_test_assert_eq(status, ZIS_E_ARG); // key not found
     }
+
+    v_size = sizeof v_str;
+    status = zis_read_symbol(z, 11, v_str, &v_size);
+    zis_test_assert_eq(status, ZIS_OK);
+    zis_test_assert_eq(v_size, strlen(in_str));
+    zis_test_assert_eq(memcmp(v_str, in_str, v_size), 0);
 }
 
 static void do_test_make_values__insufficient_regs(zis_t z) {
@@ -712,6 +740,7 @@ zis_test_list(
     test_int,
     test_float,
     test_string,
+    test_symbol,
     test_make_values,
     test_read_values,
     // zis-api-variables //

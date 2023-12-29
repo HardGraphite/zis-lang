@@ -17,6 +17,7 @@
 #include "intobj.h"
 #include "mapobj.h"
 #include "stringobj.h"
+#include "symbolobj.h"
 #include "tupleobj.h"
 
 #include "zis_config.h"
@@ -205,6 +206,33 @@ ZIS_API int zis_read_string(zis_t z, unsigned int reg, char *buf, size_t *sz) {
     return ZIS_OK;
 }
 
+ZIS_API int zis_make_symbol(zis_t z, unsigned int reg, const char *str, size_t sz) {
+    struct zis_object **obj_ref = api_ref_local(z, reg);
+    if (zis_unlikely(!obj_ref))
+        return ZIS_E_IDX;
+    struct zis_symbol_obj *sym_obj = zis_symbol_registry_get(z, str, sz);
+    assert(sym_obj);
+    *obj_ref = zis_object_from(sym_obj);
+    return ZIS_OK;
+}
+
+ZIS_API int zis_read_symbol(zis_t z, unsigned int reg, char *buf, size_t *sz) {
+    struct zis_object *obj = api_get_local(z, reg);
+    if (zis_unlikely(!obj))
+        return ZIS_E_IDX;
+    if (zis_unlikely(zis_object_is_smallint(obj) || zis_object_type(obj) != z->globals->type_Symbol))
+        return ZIS_E_TYPE;
+    struct zis_symbol_obj *const sym_obj = zis_object_cast(obj, struct zis_symbol_obj);
+    const size_t sym_sz = zis_symbol_obj_data_size(sym_obj);
+    if (buf) {
+        if (zis_unlikely(*sz < sym_sz))
+            return ZIS_E_BUF;
+        memcpy(buf, sym_obj->data, sym_sz);
+    }
+    *sz = sym_sz;
+    return ZIS_OK;
+}
+
 struct api_make_values_state {
     struct zis_context *z;
     va_list ap;
@@ -282,6 +310,15 @@ static int api_make_values_impl(
                 goto do_return;
             }
             *ret_p = zis_object_from(str_obj);
+            break;
+        }
+
+        case 'y': {
+            const char *s = va_arg(x->ap, const char *);
+            const size_t n = va_arg(x->ap, size_t);
+            struct zis_symbol_obj *sym_obj = zis_symbol_registry_get(z, s, n);
+            assert(sym_obj);
+            *ret_p = zis_object_from(sym_obj);
             break;
         }
 
@@ -579,6 +616,24 @@ do {                  \
                 goto do_return;
             }
             *sz = n;
+            break;
+        }
+
+        case 'y': {
+            CHECK_TYPE(Symbol);
+            char *buf = va_arg(x->ap, char *);
+            size_t *sz = va_arg(x->ap, size_t *);
+            struct zis_symbol_obj *const sym_obj =
+                zis_object_cast(in_obj, struct zis_symbol_obj);
+            const size_t sym_sz = zis_symbol_obj_data_size(sym_obj);
+            if (buf) {
+                if (zis_unlikely(*sz < sym_sz)) {
+                    status = ZIS_E_BUF;
+                    goto do_return;
+                }
+                memcpy(buf, sym_obj->data, sym_sz);
+            }
+            *sz = sym_sz;
             break;
         }
 

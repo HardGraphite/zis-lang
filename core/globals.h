@@ -26,6 +26,7 @@ struct zis_type_obj;
     E(Map_Node)                \
     E(Nil)                     \
     E(String)                  \
+    E(Symbol)                  \
     E(Tuple)                   \
 // ^^^ _ZIS_BUILTIN_TYPE_LIST ^^^
 

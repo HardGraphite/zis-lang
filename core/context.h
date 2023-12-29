@@ -8,6 +8,7 @@ struct zis_callstack;
 struct zis_context;
 struct zis_context_globals;
 struct zis_objmem_context;
+struct zis_symbol_registry;
 
 typedef void(*zis_context_panic_handler_t)(struct zis_context *, int);
 
@@ -16,6 +17,7 @@ struct zis_context {
     struct zis_objmem_context  *objmem_context;
     struct zis_callstack       *callstack;
     struct zis_context_globals *globals;
+    struct zis_symbol_registry *symbol_registry;
     zis_context_panic_handler_t panic_handler;
 };
 

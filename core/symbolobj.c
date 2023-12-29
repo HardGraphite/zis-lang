@@ -1,0 +1,222 @@
+#include "symbolobj.h"
+
+#include <assert.h>
+#include <math.h>
+#include <stddef.h>
+#include <string.h>
+
+#include "algorithm.h"
+#include "context.h"
+#include "debug.h"
+#include "globals.h"
+#include "memory.h"
+#include "ndefutil.h"
+#include "objmem.h"
+#include "platform.h"
+
+/* ----- symbol ------------------------------------------------------------- */
+
+#define SYM_OBJ_BYTES_FIXED_SIZE \
+    (ZIS_NATIVE_TYPE_STRUCT_XB_FIXED_SIZE(struct zis_symbol_obj, _bytes_size))
+
+/// Create a `String` object from UTF-8 string `s`.
+static struct zis_symbol_obj *zis_symbol_obj_new(
+    struct zis_context *z,
+    const char *s, size_t n
+) {
+    struct zis_symbol_obj *const self = zis_object_cast(
+        zis_objmem_alloc_ex(
+            z, ZIS_OBJMEM_ALLOC_SURV, z->globals->type_Symbol,
+            0U, SYM_OBJ_BYTES_FIXED_SIZE + n
+        ),
+        struct zis_symbol_obj
+    );
+
+    self->_registry_next = NULL;
+    self->hash = zis_hash_bytes(s, n);
+
+    assert(self->_bytes_size >= SYM_OBJ_BYTES_FIXED_SIZE + n);
+#if ZIS_WORDSIZE == 64
+    *(uint64_t *)(self->data + (self->_bytes_size - SYM_OBJ_BYTES_FIXED_SIZE - 8)) = 0U;
+#else
+    static_assert(ZIS_WORDSIZE <= 32);
+    *(uint32_t *)(self->data + (self->_bytes_size - SYM_OBJ_BYTES_FIXED_SIZE - 4)) = 0U;
+#endif
+    memcpy(self->data, s, n);
+    assert(zis_symbol_obj_data_size(self) == n);
+
+    return self;
+}
+
+size_t zis_symbol_obj_data_size(const struct zis_symbol_obj *self) {
+    size_t n = self->_bytes_size - SYM_OBJ_BYTES_FIXED_SIZE;
+    if (zis_unlikely(!n))
+        return 0;
+    assert(n >= ZIS_WORDSIZE / 8);
+    const char *p =
+#if ZIS_WORDSIZE == 64
+    memchr(self->data + (n - 8), 0, 8);
+#else
+    static_assert(ZIS_WORDSIZE <= 32);
+    memchr(self->data + (n - 4), 0, 4);
+#endif
+    return p ? (size_t)(p - self->data) : n;
+}
+
+ZIS_NATIVE_TYPE_DEF_XB(
+    Symbol,
+    struct zis_symbol_obj, _bytes_size,
+    NULL, NULL, NULL
+);
+
+/* ----- symbol registry ---------------------------------------------------- */
+
+struct zis_symbol_registry {
+    // NOTE: Due to the limitations of object memory design, it is not possible
+    // to use a Map object here. Instead, a stand-alone hash set is implemented.
+
+    struct zis_symbol_obj **buckets;
+    size_t bucket_count;
+    size_t symbol_count, symbol_count_threshold;
+};
+
+#define SYM_REG_LOAD_FACTOR    0.9
+#define SYM_REG_INIT_CAPACITY  500
+
+static void zis_symbol_registry_resize(struct zis_symbol_registry *sr, size_t new_sym_cnt_max) {
+    const size_t new_bkt_cnt = (size_t)ceil((double)new_sym_cnt_max / SYM_REG_LOAD_FACTOR);
+    const size_t new_bkts_sz = sizeof(void *) * new_bkt_cnt;
+    struct zis_symbol_obj **const new_buckets = zis_mem_alloc(new_bkts_sz);
+    memset(new_buckets, 0, new_bkts_sz);
+
+    struct zis_symbol_obj **const old_buckets = sr->buckets;
+    const size_t old_bkt_cnt = sr->bucket_count;
+    for (size_t i = 0; i < old_bkt_cnt; i++) {
+        struct zis_symbol_obj *node = old_buckets[i];
+        while (node) {
+            struct zis_symbol_obj *const next_node = node->_registry_next;
+            const size_t node_new_bkt_idx = node->hash % new_bkt_cnt;
+            node->_registry_next = new_buckets[node_new_bkt_idx];
+            new_buckets[node_new_bkt_idx] = node;
+            node = next_node;
+        }
+    }
+    zis_mem_free(old_buckets);
+
+    sr->buckets = new_buckets;
+    sr->bucket_count = new_bkt_cnt;
+    sr->symbol_count_threshold = new_sym_cnt_max;
+
+    zis_debug_log(INFO, "Symbol", "symbol registry hash set resized (max=%zu)", new_sym_cnt_max);
+}
+
+static void zis_symbol_registry_add(struct zis_symbol_registry *sr, struct zis_symbol_obj *sym) {
+    assert(zis_object_meta_is_not_young(sym->_meta));
+    assert(sr->bucket_count);
+    size_t bkt_idx = sym->hash % sr->bucket_count;
+
+    const size_t orig_sym_cnt = sr->symbol_count;
+    if (zis_unlikely(orig_sym_cnt >= sr->symbol_count_threshold && sr->buckets[bkt_idx])) {
+        zis_symbol_registry_resize(sr, sr->symbol_count_threshold * 2);
+        bkt_idx = sym->hash % sr->bucket_count; // Re-calculate index.
+    }
+
+    assert(!sym->_registry_next);
+    sym->_registry_next = sr->buckets[bkt_idx];
+    sr->buckets[bkt_idx] = sym;
+    sr->symbol_count = orig_sym_cnt + 1;
+
+    zis_debug_log(
+        TRACE, "Symbol", "new symbol: `%.*s`",
+        (int)zis_symbol_obj_data_size(sym), zis_symbol_obj_data(sym)
+    );
+}
+
+static struct zis_symbol_obj *
+zis_symbol_registry_find(struct zis_symbol_registry *sr, const char *str, size_t str_len) {
+    assert(sr->bucket_count);
+    const size_t str_hash = zis_hash_bytes(str, str_len);
+    size_t bkt_idx = str_hash % sr->bucket_count;
+    for (struct zis_symbol_obj *sym = sr->buckets[bkt_idx]; sym; sym = sym->_registry_next) {
+        if (
+            sym->hash == str_hash &&
+            zis_symbol_obj_data_size(sym) == str_len &&
+            memcmp(sym->data, str, str_len) == 0
+        ) {
+            return sym;
+        }
+    }
+    return NULL;
+}
+
+static void symbol_registry_wr_visitor(void *_sr, enum zis_objmem_weak_ref_visit_op op) {
+    if (op == ZIS_OBJMEM_WEAK_REF_VISIT_FINI_Y)
+        return; // Symbol objects are always old.
+
+    struct zis_symbol_registry *const sr = _sr;
+    size_t delete_count = 0;
+
+    struct zis_symbol_obj **const buckets = sr->buckets;
+    const size_t bucket_count = sr->bucket_count;
+    for (size_t bucket_i = 0; bucket_i < bucket_count; bucket_i++) {
+        struct zis_symbol_obj *this_node = buckets[bucket_i];
+        struct zis_symbol_obj *prev_node =
+            (void *)((char *)(buckets + bucket_i) - offsetof(struct zis_symbol_obj, _registry_next));
+        assert(&prev_node->_registry_next == &buckets[bucket_i]);
+        while (this_node) {
+            bool delete_this_node = false;
+#define WEAK_REF_FINI(the_obj)  (delete_this_node = true)
+            zis_objmem_visit_weak_ref(prev_node->_registry_next, op);
+#undef WEAK_REF_FINI
+
+            if (zis_unlikely(delete_this_node)) {
+                zis_debug_log(
+                    TRACE, "Symbol", "free symbol: `%.*s`",
+                    (int)zis_symbol_obj_data_size(this_node), zis_symbol_obj_data(this_node)
+                );
+                delete_count++;
+                this_node = this_node->_registry_next;
+                prev_node->_registry_next = this_node;
+            } else {
+                prev_node = this_node;
+                this_node = this_node->_registry_next;
+            }
+        }
+    }
+
+    if (delete_count) {
+        assert(sr->symbol_count >= delete_count);
+        sr->symbol_count -= delete_count;
+        zis_debug_log(INFO, "Symbol", "%zu freed, %zu left", delete_count, sr->symbol_count);
+    }
+}
+
+struct zis_symbol_registry *zis_symbol_registry_create(struct zis_context *z) {
+    struct zis_symbol_registry *const sr =
+        zis_mem_alloc(sizeof(struct zis_symbol_registry));
+    sr->buckets = NULL;
+    sr->bucket_count = 0, sr->symbol_count = 0, sr->symbol_count_threshold = 0;
+    zis_symbol_registry_resize(sr, SYM_REG_INIT_CAPACITY);
+    zis_objmem_register_weak_ref_collection(z, sr, symbol_registry_wr_visitor);
+    return sr;
+}
+
+void zis_symbol_registry_destroy(struct zis_symbol_registry *sr, struct zis_context *z) {
+    zis_objmem_unregister_weak_ref_collection(z, sr);
+    zis_mem_free(sr->buckets);
+    zis_mem_free(sr);
+}
+
+struct zis_symbol_obj *zis_symbol_registry_get(
+    struct zis_context *z, const char *s, size_t n
+) {
+    struct zis_symbol_registry *const sr = z->symbol_registry;
+    if (zis_unlikely(n == (size_t)-1))
+        n = strlen(s);
+    struct zis_symbol_obj *sym = zis_symbol_registry_find(sr, s, n);
+    if (zis_unlikely(!sym)) {
+        sym = zis_symbol_obj_new(z, s, n);
+        zis_symbol_registry_add(sr, sym);
+    }
+    return sym;
+}

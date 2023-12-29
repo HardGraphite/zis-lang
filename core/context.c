@@ -8,6 +8,7 @@
 #include "memory.h"
 #include "objmem.h"
 #include "stack.h"
+#include "symbolobj.h"
 #include "zis.h" // ZIS_PANIC_*
 
 zis_nodiscard struct zis_context *zis_context_create(void) {
@@ -16,6 +17,7 @@ zis_nodiscard struct zis_context *zis_context_create(void) {
     z->objmem_context = zis_objmem_context_create();
     z->callstack = zis_callstack_create(z);
     z->globals = zis_context_globals_create(z);
+    z->symbol_registry = zis_symbol_registry_create(z);
     z->panic_handler = NULL;
     zis_debug_log(INFO, "Context", "new context @%p", (void *)z);
     return z;
@@ -23,6 +25,7 @@ zis_nodiscard struct zis_context *zis_context_create(void) {
 
 void zis_context_destroy(struct zis_context *z) {
     zis_debug_log(INFO, "Context", "deleting context @%p", (void *)z);
+    zis_symbol_registry_destroy(z->symbol_registry, z);
     zis_context_globals_destroy(z->globals, z);
     zis_callstack_destroy(z->callstack, z);
     zis_objmem_context_destroy(z->objmem_context);

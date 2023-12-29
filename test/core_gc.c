@@ -9,11 +9,13 @@
 #define TMP_REG_MAX 4
 
 static void clear_stack(zis_t z) {
-    zis_load_nil(z, TMP_REG_MAX + 1, (unsigned)-1);
+    const int status = zis_load_nil(z, 0, (unsigned)-1);
+    zis_test_assert_eq(status, ZIS_OK);
 }
 
 static void clear_stack_tmp(zis_t z) {
-    zis_load_nil(z, 1, TMP_REG_MAX);
+    const int status = zis_load_nil(z, 1, TMP_REG_MAX);
+    zis_test_assert_eq(status, ZIS_OK);
 }
 
 static void make_random_data(zis_t z, int64_t seed) {
@@ -27,10 +29,10 @@ static void make_random_data(zis_t z, int64_t seed) {
         char buffer[64];
         snprintf(buffer, sizeof buffer, "<<<<<<<< No. %" PRIi64 "-%i >>>>>>>>", seed, i);
         status = zis_make_values(
-            z, 2, "(nxifs%)",
-            (bool)(i & 1), seed + i, (double)(seed + i), buffer, (size_t)-1, 3
+            z, 2, "(nxifsy%)",
+            (bool)(i & 1), seed + i, (double)(seed + i), buffer, (size_t)-1, buffer, (size_t)-1, 3
         );
-        zis_test_assert_eq(status, 7);
+        zis_test_assert_eq(status, 8);
         status = zis_make_int(z, 0, -1);
         zis_test_assert_eq(status, ZIS_OK);
         status = zis_insert_element(z, 1, 0, 2);
@@ -63,20 +65,24 @@ static void check_random_data(zis_t z, int64_t seed) {
         double v_double = 0.0;
         char v_strbuf[64] = { 0 };
         size_t v_strlen = sizeof v_strbuf;
+        char v_symbuf[64] = { 0 };
+        size_t v_symlen = sizeof v_symbuf;
         status = zis_read_values(
-            z, 2, "(*nxifs%)",
-            &v_size, &v_bool, &v_i64, &v_double, &v_strbuf, &v_strlen, 3
+            z, 2, "(*nxifsy%)",
+            &v_size, &v_bool, &v_i64, &v_double, &v_strbuf, &v_strlen, &v_symbuf, &v_symlen, 3
         );
-        zis_test_assert_eq(status, 7);
+        zis_test_assert_eq(status, 8);
 
         char buffer[64];
         snprintf(buffer, sizeof buffer, "<<<<<<<< No. %" PRIi64 "-%i >>>>>>>>", seed, i);
-        zis_test_assert_eq(v_size, 6);
+        zis_test_assert_eq(v_size, 7);
         zis_test_assert_eq(v_bool, (bool)(i & 1));
         zis_test_assert_eq(v_i64, seed + i);
         zis_test_assert_eq(v_double, (double)(seed + i));
         zis_test_assert_eq(v_strlen, strlen(buffer));
         zis_test_assert_eq(memcmp(v_strbuf, buffer, v_strlen), 0);
+        zis_test_assert_eq(v_symlen, strlen(buffer));
+        zis_test_assert_eq(memcmp(v_symbuf, buffer, v_symlen), 0);
 
         status = zis_read_values(z, 3, "{*}", &v_size);
         zis_test_assert_eq(status, 1);
@@ -130,7 +136,6 @@ zis_test_define(test_self_check, z) {
     check_random_data(z, 0);
     make_random_large_object(z, 0);
     check_random_large_object(z, 0);
-    clear_stack_tmp(z);
     clear_stack(z);
 }
 
@@ -142,7 +147,7 @@ zis_test_define(test_all_garbage, z) {
         zis_test_assert_eq(status, ZIS_OK);
     }
 
-    clear_stack_tmp(z);
+    clear_stack(z);
 }
 
 zis_test_define(test_massive_garbage, z) {
@@ -161,7 +166,6 @@ zis_test_define(test_massive_garbage, z) {
     zis_move_local(z, 0, TMP_REG_MAX + 1);
     check_random_data(z, N);
 
-    clear_stack_tmp(z);
     clear_stack(z);
 }
 
@@ -187,7 +191,6 @@ zis_test_define(test_massive_survivors, z) {
         check_random_data(z, j);
     }
 
-    clear_stack_tmp(z);
     clear_stack(z);
 }
 
@@ -214,7 +217,6 @@ zis_test_define(test_large_object, z) {
     zis_move_local(z, 0, TMP_REG_MAX + 1);
     check_random_data(z, N);
 
-    clear_stack_tmp(z);
     clear_stack(z);
 }
 

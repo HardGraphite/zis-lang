@@ -253,7 +253,7 @@ ZIS_API int zis_make_float(zis_t z, unsigned int reg, double val) ZIS_NOEXCEPT;
 ZIS_API int zis_read_float(zis_t z, unsigned int reg, double *val) ZIS_NOEXCEPT;
 
 /**
- * Create an `String` object.
+ * Create a `String` object.
  *
  * @param z zis instance
  * @param reg register index
@@ -276,6 +276,29 @@ ZIS_API int zis_make_string(zis_t z, unsigned int reg, const char *str, size_t s
 ZIS_API int zis_read_string(zis_t z, unsigned int reg, char *buf, size_t *sz) ZIS_NOEXCEPT;
 
 /**
+ * Create or retrieve a `Symbol` object from a string.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param str pointer to a UTF-8 string
+ * @param sz size in bytes of the string `str`, or `-1` to take `str` as a NUL-terminated string
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`).
+ */
+ZIS_API int zis_make_symbol(zis_t z, unsigned int reg, const char *str, size_t sz) ZIS_NOEXCEPT;
+
+/**
+ * Get string representation of a `Symbol` object.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param buf pointer to a buffer to store UTF-8 string, or `NULL` to get expected buffer size
+ * @param sz pointer to a `size_t` value that tells the buffer size and receives written size
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_TYPE` (wrong type of `reg`),
+* `ZIS_E_BUF` (`buf` is not big enough).
+ */
+ZIS_API int zis_read_symbol(zis_t z, unsigned int reg, char *buf, size_t *sz) ZIS_NOEXCEPT;
+
+/**
  * Create values and store them to `REG[reg_begin ...]`.
  *
  * @param z zis instance
@@ -293,6 +316,7 @@ ZIS_API int zis_read_string(zis_t z, unsigned int reg, char *buf, size_t *sz) ZI
  *   - `i`: `Int` value; see `zis_make_int()`.
  *   - `f`: `Float` value; see `zis_make_float()`.
  *   - `s`: `String` value; see `zis_make_string()`.
+ *   - `y`: `Symbol` value; see `zis_make_symbol()`.
  * + A collection of other values, inside which other specifiers can be used.
  *   However, **nested collections are not allowed**.
  *   - `(` [`<spec>`...] `)`: `Tuple` value.
@@ -327,6 +351,7 @@ ZIS_API int zis_make_values(zis_t z, unsigned int reg_begin, const char *fmt, ..
  *   - `i`: `Int` value; see `zis_read_int()`.
  *   - `f`: `Float` value; see `zis_read_float()`.
  *   - `s`: `String` value; see `zis_read_string()`.
+ *   - `y`: `Symbol` value; see `zis_read_symbol()`.
  * + A collection of other values, inside which other specifiers can be used.
  *   However, **nested collections are not allowed**.
  *   - `(` [`*`] [`<spec>`...] `)`: read `Tuple`.
