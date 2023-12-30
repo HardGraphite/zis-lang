@@ -55,20 +55,19 @@ zis_static_force_inline size_t zis_object_size(const struct zis_object *obj) {
     const size_t obj_size = type->_obj_size;
     if (zis_likely(obj_size))
         return obj_size;
-    size_t slots_size, bytes_size;
+    size_t slot_count, bytes_size;
     // SLOTS size. See `zis_object_slot_count()`.
-    slots_size = type->_slots_num;
-    if (slots_size == (size_t)-1) {
+    slot_count = type->_slots_num;
+    if (slot_count == (size_t)-1) {
         struct zis_object *const vn = zis_object_get_slot(obj, 0);
         assert(zis_object_is_smallint(vn));
-        slots_size = (size_t)zis_smallint_from_ptr(vn);
+        slot_count = (size_t)zis_smallint_from_ptr(vn);
     }
-    slots_size *= sizeof(struct zis_object *);
     // BYTES size. See `zis_object_bytes_size()`.
     bytes_size = type->_bytes_len;
     if (bytes_size == (size_t)-1) {
-        bytes_size = *(size_t *)zis_object_ref_bytes(obj, slots_size);
+        bytes_size = *(size_t *)zis_object_ref_bytes(obj, slot_count);
     }
     // HEAD + SLOTS + BYTES
-    return ZIS_OBJECT_HEAD_SIZE + slots_size + bytes_size;
+    return ZIS_OBJECT_HEAD_SIZE + (slot_count * sizeof(struct zis_object *)) + bytes_size;
 }
