@@ -225,6 +225,43 @@ zis_test_define(test_symbol, z) {
     do_test_symbol(z, "");
 }
 
+zis_test_define(test_exception, z) {
+    int status;
+    const char *type = "test";
+    const char *what = "Hello!";
+    char buffer[16];
+    size_t size;
+    bool v_bool;
+
+    zis_load_bool(z, 0, true);
+    status = zis_make_exception(z, 0, type, 0, "%s", what);
+    zis_test_assert_eq(status, ZIS_OK);
+
+    status = zis_read_exception(z, 0, 1, 2, 3);
+    zis_test_assert_eq(status, ZIS_OK);
+
+    size = sizeof buffer;
+    status = zis_read_symbol(z, 1, buffer, &size);
+    zis_test_assert_eq(status, ZIS_OK);
+    const size_t type_strlen = strlen(type);
+    zis_test_assert_eq(size, type_strlen);
+    zis_test_assert_eq(memcmp(buffer, type, type_strlen), 0);
+
+    v_bool = false;
+    status = zis_read_bool(z, 2, &v_bool);
+    zis_test_assert_eq(status, ZIS_OK);
+    zis_test_assert_eq(v_bool, true);
+
+    size = sizeof buffer;
+    status = zis_read_string(z, 3, buffer, &size);
+    zis_test_assert_eq(status, ZIS_OK);
+    const size_t what_strlen = strlen(what);
+    zis_test_assert_eq(size, what_strlen);
+    zis_test_assert_eq(memcmp(buffer, what, what_strlen), 0);
+
+    zis_load_nil(z, REG_MAX - 2, 3);
+}
+
 static void do_test_make_values__basic(zis_t z) {
     int status;
     const int64_t rand_num = 13579;
@@ -452,6 +489,105 @@ static void do_test_read_values__ignore_type_err(zis_t z) {
 zis_test_define(test_read_values, z) {
     do_test_read_values__basic(z);
     do_test_read_values__ignore_type_err(z);
+}
+
+// zis-api-code //
+
+static int F_add_int(zis_t z) {
+    int64_t lhs, rhs;
+    if (zis_read_values(z, 1, "ii", &lhs, &rhs) != 2) {
+        zis_make_exception(z, 0, "type", (unsigned int)-1, "wrong argument types");
+        return ZIS_THR;
+    }
+    zis_make_int(z, 0, lhs + rhs);
+    return ZIS_OK;
+}
+
+static void do_test_function__check_exception(zis_t z, unsigned reg, const char *type) {
+    int status;
+    char buffer[128];
+    size_t size;
+
+    status = zis_read_exception(z, reg, REG_MAX - 3, REG_MAX - 2, REG_MAX - 1);
+    zis_test_assert_eq(status, ZIS_OK);
+
+    size = sizeof buffer;
+    status = zis_read_symbol(z, REG_MAX - 3, buffer, &size);
+    zis_test_assert_eq(status, ZIS_OK);
+    const size_t type_strlen = strlen(type);
+    zis_test_assert_eq(size, type_strlen);
+    zis_test_assert_eq(memcmp(buffer, type, type_strlen), 0);
+
+    size = sizeof buffer;
+    status = zis_read_string(z, REG_MAX - 1, buffer, &size);
+    zis_test_assert_eq(status, ZIS_OK);
+    zis_test_log(ZIS_TEST_LOG_TRACE, "exception (%s): %.*s", type, (int)size, buffer);
+
+    zis_load_nil(z, REG_MAX - 2, 3);
+}
+
+static void do_test_function__F_add_int(zis_t z) {
+    int status;
+    int64_t v_i64;
+    struct zis_native_func_def func_def;
+
+    // make function
+    func_def.name = NULL;
+    func_def.meta = (struct zis_native_func_meta){ 2, 0, 3 };
+    func_def.code = F_add_int;
+    status = zis_make_function(z, 1, &func_def);
+    zis_test_assert_eq(status, ZIS_OK);
+
+    // call
+    for (int64_t i = -10; i <= 10; i++) {
+        for (int64_t j = -10; j <= 10; j++) {
+            const int64_t k = i + j;
+            zis_make_values(z, 2, "ii", i, j);
+            // #1
+            status = zis_invoke(z, (unsigned[]){0, 1, 2, 3}, 2);
+            zis_test_assert_eq(status, ZIS_OK);
+            status = zis_read_int(z, 0, &v_i64);
+            zis_test_assert_eq(status, ZIS_OK);
+            zis_test_assert_eq(v_i64, k);
+            // #2
+            status = zis_invoke(z, (unsigned[]){0, 1, 2, (unsigned)-1}, 2);
+            zis_test_assert_eq(status, ZIS_OK);
+            status = zis_read_int(z, 0, &v_i64);
+            zis_test_assert_eq(status, ZIS_OK);
+            zis_test_assert_eq(v_i64, k);
+            // #3
+            zis_make_values(z, 4, "(%%)", 2, 3);
+            status = zis_invoke(z, (unsigned[]){0, 1, 4}, (size_t)-1);
+            zis_test_assert_eq(status, ZIS_OK);
+            status = zis_read_int(z, 0, &v_i64);
+            zis_test_assert_eq(status, ZIS_OK);
+            zis_test_assert_eq(v_i64, k);
+        }
+    }
+
+    // wrong argc
+    zis_make_values(z, 2, "iii", 0, 0, 0);
+    status = zis_invoke(z, (unsigned[]){0, 1, 2, (unsigned)-1}, 3);
+    zis_test_assert_eq(status, ZIS_THR);
+    do_test_function__check_exception(z, 0, "type");
+
+    // throws exception
+    zis_make_values(z, 2, "if", INT64_C(1), 2.0);
+    status = zis_invoke(z, (unsigned[]){0, 1, 2, 3}, 2);
+    zis_test_assert_eq(status, ZIS_THR);
+    do_test_function__check_exception(z, 0, "type");
+}
+
+static void do_test_function__not_callable(zis_t z) {
+    int status;
+    zis_load_nil(z, 1, 1);
+    status = zis_invoke(z, (unsigned[]){0, 1}, 0);
+    zis_test_assert_eq(status, ZIS_THR);
+}
+
+zis_test_define(test_function, z) {
+    do_test_function__F_add_int(z);
+    do_test_function__not_callable(z);
 }
 
 // zis-api-variables //
@@ -741,8 +877,11 @@ zis_test_list(
     test_float,
     test_string,
     test_symbol,
+    test_exception,
     test_make_values,
     test_read_values,
+    // zis-api-code //
+    test_function,
     // zis-api-variables //
     test_load_element,
     test_store_element,

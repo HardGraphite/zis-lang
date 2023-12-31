@@ -21,6 +21,7 @@ struct zis_type_obj;
     E(Bool)                    \
     E(Exception)               \
     E(Float)                   \
+    E(Function)                \
     E(Int)                     \
     E(Map)                     \
     E(Map_Node)                \

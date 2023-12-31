@@ -119,7 +119,7 @@ ZIS_API zis_panic_handler_t zis_at_panic(zis_t z, zis_panic_handler_t h) ZIS_NOE
 /**
  * Implementation of a native function.
  */
-typedef int (*zis_native_func_t)(zis_t);
+typedef int (*zis_native_func_t)(zis_t) ZIS_NOEXCEPT;
 
 /**
  * Metadata of a native function.
@@ -127,7 +127,7 @@ typedef int (*zis_native_func_t)(zis_t);
 struct zis_native_func_meta {
     unsigned char  na; ///< Number of arguments.
     unsigned char  va; ///< Whether this is a variadic function (accepts any number of extra arguments).
-    unsigned short nl; ///< Number of local variables (excluding arguments).
+    unsigned short nr; ///< Number of registers (arguments and local variables, including REG-0).
 };
 
 /**
@@ -271,7 +271,7 @@ ZIS_API int zis_make_string(zis_t z, unsigned int reg, const char *str, size_t s
  * @param buf pointer to a buffer to store UTF-8 string, or `NULL` to get expected buffer size
  * @param sz pointer to a `size_t` value that tells the buffer size and receives written size
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_TYPE` (wrong type of `reg`),
-* `ZIS_E_BUF` (`buf` is not big enough).
+ * `ZIS_E_BUF` (`buf` is not big enough).
  */
 ZIS_API int zis_read_string(zis_t z, unsigned int reg, char *buf, size_t *sz) ZIS_NOEXCEPT;
 
@@ -294,7 +294,7 @@ ZIS_API int zis_make_symbol(zis_t z, unsigned int reg, const char *str, size_t s
  * @param buf pointer to a buffer to store UTF-8 string, or `NULL` to get expected buffer size
  * @param sz pointer to a `size_t` value that tells the buffer size and receives written size
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_TYPE` (wrong type of `reg`),
-* `ZIS_E_BUF` (`buf` is not big enough).
+ * `ZIS_E_BUF` (`buf` is not big enough).
  */
 ZIS_API int zis_read_symbol(zis_t z, unsigned int reg, char *buf, size_t *sz) ZIS_NOEXCEPT;
 
@@ -365,6 +365,87 @@ ZIS_API int zis_make_values(zis_t z, unsigned int reg_begin, const char *fmt, ..
  * @warning REG-0 may be used by this function. The value in it can be modified.
  */
 ZIS_API int zis_read_values(zis_t z, unsigned int reg_begin, const char *fmt, ...) ZIS_NOEXCEPT;
+
+#ifdef __GNUC__
+__attribute__((format(__printf__, 5, 6)))
+#endif /* __GNUC__ */
+/**
+ * Create an `Exception` object.
+ *
+ * @param z zis instance
+ * @param reg register index to store the result
+ * @param type exception type as symbol; optional
+ * @param reg_data register index where the exception data is; or `-1` for `nil`
+ * @param msg_fmt message format string; optional
+ * @param ... message data to be formatted according to parameter `msg_fmt`
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg` or `reg_data`).
+ */
+ZIS_API int zis_make_exception(
+    zis_t z, unsigned int reg,
+    const char *type, unsigned int reg_data, const char *msg_fmt, ...
+    ) ZIS_NOEXCEPT;
+
+/**
+ * Read contents of an `Exception` object.
+ *
+ * @param z zis instance
+ * @param reg register index where the exception is
+ * @param reg_type register to store the exception type
+ * @param reg_data register to store the exception data
+ * @param reg_what register to store the exception message
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index), `ZIS_E_TYPE` (wrong type of `reg`).
+ */
+ZIS_API int zis_read_exception(
+    zis_t z, unsigned int reg,
+    unsigned int reg_type, unsigned int reg_data, unsigned int reg_what
+);
+
+/** @} */
+
+/** @defgroup zis-api-code API: code (functions and modules) */
+/** @{ */
+
+/**
+ * Create a function.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param def native function definition; field `name` is ignored
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`).
+ */
+ZIS_API int zis_make_function(zis_t z, unsigned int reg, const struct zis_native_func_def *def) ZIS_NOEXCEPT;
+
+/**
+ * Invoke a callable object.
+ *
+ * @param z zis instance
+ * @param regs A vector of register indices. `regs[0]` = return value register,
+ * `regs[1]` = object to invoke, `regs[2]`...`regs[argc+1]` = arguments.
+ * Specially, `regs[2]` = first one of a vector of elements when `regs[3]` is `-1`;
+ * `regs[2]` = the packed arguments (`Array` or `Tuple`) when `argc` is `-1`.
+ * See @@details for special uses
+ * @param argc number of arguments; or `-1` to indicate that `regs[2]` is the
+ * packed arguments, which is an Array or a Tuple
+ * @return `ZIS_OK` or `ZIS_THR`; `ZIS_E_IDX` (invalid `regs`),
+ * `ZIS_E_ARG` (or wrong type of packed arguments).
+ *
+ * @details In summary, there are three forms to pass arguments.
+ * Here are examples to call function in `REG-0` with arguments in `REG-1` to `REG-3`:
+ * ```c
+ * // #1  enumerated arguments
+ * zis_invoke(z, (unsigned[]){0, 0, 1, 2, 3}, 3); // { 1, 2, 3 } are arguments.
+ * // #2  a vector of arguments (argc > 1 and regs[3] == -1)
+ * zis_invoke(z, (unsigned[]){0, 0, 1, (unsigned)-1}, 3); // { 1, -1 } means arguments starting from 1.
+ * // #3  packed arguments (argc == -1)
+ * zis_make_values(z, 1, "(%%%)", 1, 2, 3); // Pack arguments into a tuple.
+ * zis_invoke(z, (unsigned[]){0, 0, 1}, (size_t)-1); // { 1 } means packed arguments at 1.
+ * ```
+ *
+ * @note Normally, the minimum length of array `regs` is `(argc + 2)`: 1 ret + 1 obj + N args.
+ * When `regs[3]` is `-1`, the minimum length is `4`: 1 ret + 1 obj + 1 first_arg + (-1).
+ * When `argc` is `-1`, the minimum length is `3`: 1 ret + 1 obj + 1 packed_args.
+ */
+ZIS_API int zis_invoke(zis_t z, unsigned int regs[], size_t argc) ZIS_NOEXCEPT;
 
 /** @} */
 

@@ -8,12 +8,16 @@
 #include "context.h"
 #include "debug.h"
 #include "globals.h"
+#include "invoke.h"
+#include "ndefutil.h"
 #include "object.h"
 #include "stack.h"
 
 #include "arrayobj.h"
 #include "boolobj.h"
+#include "exceptobj.h"
 #include "floatobj.h"
+#include "funcobj.h"
 #include "intobj.h"
 #include "mapobj.h"
 #include "stringobj.h"
@@ -52,6 +56,12 @@ static struct zis_object *api_get_local(zis_t z, unsigned int i) {
     if (zis_unlikely(ref > cs->top))
         return NULL;
     return *ref;
+}
+
+static bool api_has_local(zis_t z, unsigned int i) {
+    struct zis_callstack *const cs = z->callstack;
+    struct zis_object **const ref = cs->frame + i;
+    return ref <= cs->top;
 }
 
 /* ----- zis-api-general ---------------------------------------------------- */
@@ -789,6 +799,136 @@ ZIS_API int zis_read_values(zis_t z, unsigned int reg_begin, const char *fmt, ..
     va_end(x.ap);
     assert(ret <= 0);
     return ret == 0 ? x.count : ret;
+}
+
+ZIS_API int zis_make_exception(
+    zis_t z, unsigned int reg,
+    const char *type, unsigned int reg_data, const char *msg_fmt, ...
+) {
+    struct zis_object **res_obj_ref = api_ref_local(z, reg);
+    if (zis_unlikely(!res_obj_ref))
+        return ZIS_E_IDX;
+    struct zis_object *obj_data = api_get_local(z, reg_data);
+    if (zis_unlikely(!obj_data && reg_data != (unsigned int)-1))
+        return ZIS_E_IDX;
+
+    va_list msg_args;
+    va_start(msg_args, msg_fmt);
+    struct zis_exception_obj *const exc_obj =
+        zis_exception_obj_vformat(z, type, obj_data, msg_fmt, msg_args);
+    va_end(msg_args);
+
+    *res_obj_ref = zis_object_from(exc_obj);
+    return ZIS_OK;
+}
+
+ZIS_API int zis_read_exception(
+    zis_t z, unsigned int reg,
+    unsigned int reg_type, unsigned int reg_data, unsigned int reg_what
+) {
+    struct zis_object *obj = api_get_local(z, reg);
+    if (zis_unlikely(!obj))
+        return ZIS_E_IDX;
+    if (zis_unlikely(zis_object_is_smallint(obj) || zis_object_type(obj) != z->globals->type_Exception))
+        return ZIS_E_TYPE;
+    struct zis_exception_obj *const exc_obj = zis_object_cast(obj, struct zis_exception_obj);
+
+    struct zis_object **type_obj_ref = api_ref_local(z, reg_type);
+    struct zis_object **data_obj_ref = api_ref_local(z, reg_data);
+    struct zis_object **what_obj_ref = api_ref_local(z, reg_what);
+    if (!(type_obj_ref && data_obj_ref && what_obj_ref))
+        return ZIS_E_IDX;
+
+    *type_obj_ref = exc_obj->type;
+    *data_obj_ref = exc_obj->data;
+    *what_obj_ref = exc_obj->what;
+    return ZIS_OK;
+}
+
+/* ----- zis-api-code ------------------------------------------------------- */
+
+ZIS_API int zis_make_function(zis_t z, unsigned int reg, const struct zis_native_func_def *def) {
+    struct zis_object **obj_ref = api_ref_local(z, reg);
+    if (zis_unlikely(!obj_ref))
+        return ZIS_E_IDX;
+    struct zis_func_obj *const func_obj =
+        zis_func_obj_new_native(z, def->meta, def->code, NULL);
+    *obj_ref = zis_object_from(func_obj);
+    // TODO: set function module in this API function.
+    return ZIS_OK;
+}
+
+ZIS_API int zis_invoke(zis_t z, unsigned int regs[], size_t argc) {
+    // Handles regs[0] and regs[1].
+    struct zis_object *const callable_obj = api_get_local(z, regs[1]);
+    struct zis_object **const ret_val_ref = api_ref_local(z, regs[0]);
+    if (zis_unlikely(!(callable_obj && ret_val_ref)))
+        return ZIS_E_IDX;
+
+    // Handles special uses.
+    struct zis_object *const *args_vec;
+    if (zis_unlikely(argc == (size_t)-1)) {
+        struct zis_object *const packed_args_obj = api_get_local(z, regs[2]);
+        if (zis_unlikely(!packed_args_obj))
+            return ZIS_E_IDX;
+        if (zis_unlikely(zis_object_is_smallint(packed_args_obj))) {
+        packed_args_obj_wrong_type:
+            z->callstack->frame[0] = zis_object_from(zis_exception_obj_format(
+                z, "type", packed_args_obj, "wrong type of packed arguments"
+            ));
+            return ZIS_THR;
+        } else {
+            struct zis_type_obj *const packed_args_obj_type = zis_object_type(packed_args_obj);
+            if (packed_args_obj_type == z->globals->type_Tuple) {
+                struct zis_tuple_obj *const tuple_obj =
+                    zis_object_cast(packed_args_obj, struct zis_tuple_obj);
+                argc = zis_tuple_obj_length(tuple_obj);
+                args_vec = zis_tuple_obj_data(tuple_obj);
+            } else if (packed_args_obj_type == z->globals->type_Array) {
+                struct zis_array_obj *const array_obj =
+                    zis_object_cast(packed_args_obj, struct zis_array_obj);
+                argc = zis_array_obj_length(array_obj);
+                args_vec = zis_array_obj_data(array_obj);
+            } else {
+                goto packed_args_obj_wrong_type;
+            }
+        }
+    } else if (argc > 1 && regs[3] == (unsigned int)-1) {
+        size_t index = regs[2];
+        args_vec = z->callstack->frame + index;
+        if (!(api_has_local(z, index) && api_has_local(z, index + argc - 1)))
+            return ZIS_E_IDX;
+    } else {
+        args_vec = NULL;
+    }
+
+    // Prepare invocation.
+    struct zis_func_obj *const func_obj = zis_invoke_prepare(z, callable_obj, argc);
+    if (zis_unlikely(!func_obj))
+        return ZIS_THR;
+
+    // Places arguments.
+    if (args_vec) {
+        zis_object_vec_copy(z->callstack->frame + 1, args_vec, argc);
+    } else {
+        // Cannot use `api_get_local()` because a new frame has been pushed.
+        struct zis_object **const orig_bp = zis_callstack_frame_info(z->callstack)->prev_frame;
+        struct zis_object **const orig_sp = z->callstack->frame - 1;
+        struct zis_object **const arg_tgt = z->callstack->frame + 1;
+        for (size_t i = 0; i < argc; i++) {
+            struct zis_object **const arg_ref = orig_bp + regs[2 + i];
+            if (zis_unlikely(arg_ref > orig_sp)) {
+                zis_invoke_cleanup(z);
+                return ZIS_E_IDX;
+            }
+            arg_tgt[i] = *arg_ref;
+        }
+    }
+
+    // Invokes and returns.
+    const int status = zis_invoke_func(z, func_obj);
+    *ret_val_ref = zis_invoke_cleanup(z);
+    return status;
 }
 
 /* ----- zis-api-variables --------------------------------------------------- */

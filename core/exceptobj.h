@@ -34,15 +34,16 @@ struct zis_exception_obj *zis_exception_obj_new_r(
 
 /// Create an `Exception` with formatted string as field `what`.
 /// Parameters `type`, `what_fmt`, and `data` are all optional.
+zis_printf_fn_attrs(4, 5)
 struct zis_exception_obj *zis_exception_obj_format(
     struct zis_context *z,
     const char *type, struct zis_object *data,
-    const char *what_fmt, ...
+    zis_printf_fn_arg_fmtstr const char *restrict what_fmt, ...
 );
 
 /// See `zis_exception_obj_format()`.
 struct zis_exception_obj *zis_exception_obj_vformat(
     struct zis_context *z,
     const char *type, struct zis_object *data,
-    const char *what_fmt, va_list what_args
+    const char *restrict what_fmt, va_list what_args
 );

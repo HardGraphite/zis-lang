@@ -94,13 +94,13 @@ const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( NAME ) = {  \
 
 /// Copy a vector of object pointers like `memcpy()`.
 zis_static_force_inline struct zis_object **
-zis_object_vec_copy(struct zis_object **restrict dst, struct zis_object **restrict src, size_t n) {
+zis_object_vec_copy(struct zis_object **restrict dst, struct zis_object *const *restrict src, size_t n) {
     return memcpy(dst, src, n * sizeof(struct zis_object *));
 }
 
 /// Copy a vector of object pointers like `memmove()`.
 zis_static_force_inline struct zis_object **
-zis_object_vec_move(struct zis_object **restrict dst, struct zis_object **restrict src, size_t n) {
+zis_object_vec_move(struct zis_object **restrict dst, struct zis_object *const *restrict src, size_t n) {
     return memmove(dst, src, n * sizeof(struct zis_object *));
 }
 

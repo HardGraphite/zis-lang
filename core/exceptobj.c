@@ -9,6 +9,7 @@
 #include "stack.h"
 
 #include "stringobj.h"
+#include "symbolobj.h"
 
 struct zis_exception_obj *zis_exception_obj_new(
     struct zis_context *z,
@@ -43,7 +44,7 @@ struct zis_exception_obj *zis_exception_obj_new_r(
 struct zis_exception_obj *zis_exception_obj_format(
     struct zis_context *z,
     const char *type, struct zis_object *data,
-    const char *what_fmt, ...
+    const char *restrict what_fmt, ...
 ) {
     va_list ap;
     va_start(ap, what_fmt);
@@ -56,7 +57,7 @@ struct zis_exception_obj *zis_exception_obj_format(
 struct zis_exception_obj *zis_exception_obj_vformat(
     struct zis_context *z,
     const char *type, struct zis_object *data,
-    const char *what_fmt, va_list what_args
+    const char *restrict what_fmt, va_list what_args
 ) {
     // See `zis_exception_obj_new()`.
 
@@ -67,10 +68,10 @@ struct zis_exception_obj *zis_exception_obj_vformat(
     tmp_regs[2] = data ? data : nil;
 
     if (type) {
-        struct zis_string_obj *const type_str_obj =
-            zis_string_obj_new(z, type, (size_t)-1);
-        assert(type_str_obj);
-        tmp_regs[0] = zis_object_from(type_str_obj);
+        struct zis_symbol_obj *const type_sym_obj =
+            zis_symbol_registry_get(z, type, (size_t)-1);
+        assert(type_sym_obj);
+        tmp_regs[0] = zis_object_from(type_sym_obj);
     }
 
     if (what_fmt) {
@@ -81,7 +82,7 @@ struct zis_exception_obj *zis_exception_obj_vformat(
         struct zis_string_obj *const what_str_obj =
             zis_string_obj_new(z, buffer, (size_t)n);
         assert(what_str_obj);
-        tmp_regs[0] = zis_object_from(what_str_obj);
+        tmp_regs[1] = zis_object_from(what_str_obj);
     }
 
     struct zis_exception_obj *const self = zis_exception_obj_new_r(z, tmp_regs);
