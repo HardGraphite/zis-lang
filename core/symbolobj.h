@@ -53,3 +53,10 @@ struct zis_symbol_obj *zis_symbol_registry_get(
     struct zis_context *z,
     const char *s, size_t n /* = -1 */
 );
+
+/// Retrieve a `Symbol` object like `zis_symbol_registry_get()`.
+/// Returns NULL if the symbol has not been registered.
+struct zis_symbol_obj *zis_symbol_registry_find(
+    struct zis_context *z,
+    const char *s, size_t n /* = -1 */
+);

@@ -20,6 +20,7 @@
 #include "funcobj.h"
 #include "intobj.h"
 #include "mapobj.h"
+#include "moduleobj.h"
 #include "stringobj.h"
 #include "symbolobj.h"
 #include "tupleobj.h"
@@ -858,6 +859,18 @@ ZIS_API int zis_make_function(zis_t z, unsigned int reg, const struct zis_native
     return ZIS_OK;
 }
 
+ZIS_API int zis_make_module(zis_t z, unsigned int reg, const struct zis_native_module_def *def) {
+    struct zis_object **obj_ref = api_ref_local(z, reg);
+    if (zis_unlikely(!obj_ref))
+        return ZIS_E_IDX;
+    struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 2);
+    struct zis_module_obj *const mod_obj = zis_module_obj_new_r(z, tmp_regs);
+    zis_callstack_frame_free_temp(z, 2);
+    *obj_ref = zis_object_from(mod_obj);
+    zis_module_obj_load_native_def(z, mod_obj, def);
+    return ZIS_OK;
+}
+
 ZIS_API int zis_invoke(zis_t z, unsigned int regs[], size_t argc) {
     // Handles regs[0] and regs[1].
     struct zis_object *const callable_obj = api_get_local(z, regs[1]);
@@ -940,6 +953,51 @@ ZIS_API int zis_move_local(zis_t z, unsigned int dst, unsigned int src) {
         return ZIS_E_IDX;
     *dst_ref = *src_ref;
     return ZIS_OK;
+}
+
+ZIS_API int zis_load_field(
+    zis_t z, unsigned int reg_obj,
+    const char *name, size_t name_len, unsigned int reg_val
+) {
+    struct zis_object *const obj = api_get_local(z, reg_obj);
+    if (zis_unlikely(!obj))
+        return ZIS_E_IDX;
+    struct zis_symbol_obj *const sym = zis_symbol_registry_find(z, name, name_len);
+    if (zis_unlikely(!sym))
+        return ZIS_E_ARG; // Not found.
+    struct zis_object **const val_ref = api_ref_local(z, reg_val);
+    if (zis_unlikely(!val_ref))
+        return ZIS_E_IDX;
+    struct zis_type_obj *const obj_type = zis_object_type(obj);
+    if (obj_type == z->globals->type_Module) {
+        struct zis_module_obj *const mod = zis_object_cast(obj, struct zis_module_obj);
+        struct zis_object *const val = zis_module_obj_get(mod, sym);
+        if (zis_unlikely(!val))
+            return ZIS_E_ARG;
+        *val_ref = val;
+        return ZIS_OK;
+    }
+    return ZIS_E_ARG;
+}
+
+ZIS_API int zis_store_field(
+    zis_t z, unsigned int reg_obj,
+    const char *name, size_t name_len, unsigned int reg_val
+) {
+    struct zis_symbol_obj *const sym = zis_symbol_registry_get(z, name, name_len);
+    struct zis_object *const obj = api_get_local(z, reg_obj);
+    if (zis_unlikely(!obj))
+        return ZIS_E_IDX;
+    struct zis_object *const val = api_get_local(z, reg_val);
+    if (zis_unlikely(!val))
+        return ZIS_E_IDX;
+    struct zis_type_obj *const obj_type = zis_object_type(obj);
+    if (obj_type == z->globals->type_Module) {
+        struct zis_module_obj *const mod = zis_object_cast(obj, struct zis_module_obj);
+        zis_module_obj_set(z, mod, sym, val);
+        return ZIS_OK;
+    }
+    return ZIS_E_ARG;
 }
 
 ZIS_API int zis_load_element(

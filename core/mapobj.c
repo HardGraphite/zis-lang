@@ -8,6 +8,8 @@
 #include "objmem.h"
 #include "stack.h"
 
+#include "symbolobj.h"
+
 /* ----- hashmap bucket node ------------------------------------------------ */
 
 struct zis_hashmap_bucket_node_obj *zis_hashmap_bucket_node_obj_new_r(
@@ -113,6 +115,28 @@ static bool zis_hashmap_buckets_get_node_r(
     }
 
     return false; // not found
+}
+
+/// Find a bucket node by a Symbol key. Returns NULL if not found.
+zis_static_force_inline struct zis_hashmap_bucket_node_obj *
+zis_hashmap_buckets_sym_get_node(
+    const zis_hashmap_buckets_obj_t *mb, struct zis_symbol_obj *key
+) {
+    // See `zis_hashmap_buckets_get_node_r()`.
+
+    const size_t key_hash = zis_symbol_obj_hash(key);
+
+    for (
+        struct zis_hashmap_bucket_node_obj *node
+            = zis_hashmap_buckets_get_bucket(mb, key_hash);
+        node;
+        node = zis_hashmap_bucket_node_obj_next_node(node)
+    ) {
+        if (key_hash == node->key_hash && zis_object_from(key) == node->_key)
+            return node;
+    }
+
+    return NULL; // Not found.
 }
 
 /// Add a bucket node without checking whether the key exists.
@@ -285,6 +309,7 @@ void zis_map_obj_reserve_r(
 
 void zis_map_obj_clear(struct zis_map_obj *self) {
     zis_hashmap_buckets_clear(self->_buckets);
+    self->node_count = 0;
 }
 
 int zis_map_obj_get_r(
@@ -334,7 +359,10 @@ int zis_map_obj_set_r(
 
     if (ok) { // Node exists. Do update.
         assert(zis_object_type(regs[0]) == z->globals->type_Map_Node);
-        zis_object_cast(regs[0], struct zis_hashmap_bucket_node_obj)->_value = regs[2];
+        struct zis_hashmap_bucket_node_obj *const node =
+            zis_object_cast(regs[0], struct zis_hashmap_bucket_node_obj);
+        node->_value = regs[2];
+        zis_object_write_barrier(node, regs[2]);
     } else { // Node does not exist. Insert a new one.
         assert(zis_object_type(regs[3]) == z->globals->type_Map);
         struct zis_map_obj *self = zis_object_cast(regs[3], struct zis_map_obj);
@@ -385,6 +413,39 @@ int zis_map_obj_unset_r(
     }
 
     return ZIS_E_ARG;
+}
+
+struct zis_object *zis_map_obj_sym_get(
+    struct zis_map_obj *self,
+    struct zis_symbol_obj *key
+) {
+    struct zis_hashmap_bucket_node_obj *const node =
+        zis_hashmap_buckets_sym_get_node(self->_buckets, key);
+    if (zis_likely(node))
+        return node->_value;
+    return NULL;
+}
+
+void zis_map_obj_sym_set(
+    struct zis_context *z, struct zis_map_obj *self,
+    struct zis_symbol_obj *key, struct zis_object *value
+) {
+    struct zis_hashmap_bucket_node_obj *const node =
+        zis_hashmap_buckets_sym_get_node(self->_buckets, key);
+    if (zis_likely(node)) {
+        node->_value = value;
+        zis_object_write_barrier(node, value);
+        return;
+    }
+
+    struct zis_object **const tmp_regs = zis_callstack_frame_alloc_temp(z, 4);
+    tmp_regs[0] = zis_object_from(self),
+    tmp_regs[1] = zis_object_from(key),
+    tmp_regs[2] = value;
+    const int status = zis_map_obj_set_r(z, tmp_regs);
+    zis_callstack_frame_free_temp(z, 4);
+    zis_unused_var(status);
+    assert(status == ZIS_OK);
 }
 
 ZIS_NATIVE_TYPE_DEF(

@@ -83,7 +83,7 @@ struct zis_symbol_registry {
 #define SYM_REG_LOAD_FACTOR    0.9
 #define SYM_REG_INIT_CAPACITY  500
 
-static void zis_symbol_registry_resize(struct zis_symbol_registry *sr, size_t new_sym_cnt_max) {
+static void symbol_registry_resize(struct zis_symbol_registry *sr, size_t new_sym_cnt_max) {
     const size_t new_bkt_cnt = (size_t)ceil((double)new_sym_cnt_max / SYM_REG_LOAD_FACTOR);
     const size_t new_bkts_sz = sizeof(void *) * new_bkt_cnt;
     struct zis_symbol_obj **const new_buckets = zis_mem_alloc(new_bkts_sz);
@@ -110,14 +110,14 @@ static void zis_symbol_registry_resize(struct zis_symbol_registry *sr, size_t ne
     zis_debug_log(INFO, "Symbol", "symbol registry hash set resized (max=%zu)", new_sym_cnt_max);
 }
 
-static void zis_symbol_registry_add(struct zis_symbol_registry *sr, struct zis_symbol_obj *sym) {
+static void symbol_registry_add(struct zis_symbol_registry *sr, struct zis_symbol_obj *sym) {
     assert(zis_object_meta_is_not_young(sym->_meta));
     assert(sr->bucket_count);
     size_t bkt_idx = sym->hash % sr->bucket_count;
 
     const size_t orig_sym_cnt = sr->symbol_count;
     if (zis_unlikely(orig_sym_cnt >= sr->symbol_count_threshold && sr->buckets[bkt_idx])) {
-        zis_symbol_registry_resize(sr, sr->symbol_count_threshold * 2);
+        symbol_registry_resize(sr, sr->symbol_count_threshold * 2);
         bkt_idx = sym->hash % sr->bucket_count; // Re-calculate index.
     }
 
@@ -133,7 +133,7 @@ static void zis_symbol_registry_add(struct zis_symbol_registry *sr, struct zis_s
 }
 
 static struct zis_symbol_obj *
-zis_symbol_registry_find(struct zis_symbol_registry *sr, const char *str, size_t str_len) {
+symbol_registry_find(struct zis_symbol_registry *sr, const char *str, size_t str_len) {
     assert(sr->bucket_count);
     const size_t str_hash = zis_hash_bytes(str, str_len);
     size_t bkt_idx = str_hash % sr->bucket_count;
@@ -196,7 +196,7 @@ struct zis_symbol_registry *zis_symbol_registry_create(struct zis_context *z) {
         zis_mem_alloc(sizeof(struct zis_symbol_registry));
     sr->buckets = NULL;
     sr->bucket_count = 0, sr->symbol_count = 0, sr->symbol_count_threshold = 0;
-    zis_symbol_registry_resize(sr, SYM_REG_INIT_CAPACITY);
+    symbol_registry_resize(sr, SYM_REG_INIT_CAPACITY);
     zis_objmem_register_weak_ref_collection(z, sr, symbol_registry_wr_visitor);
     return sr;
 }
@@ -213,10 +213,19 @@ struct zis_symbol_obj *zis_symbol_registry_get(
     struct zis_symbol_registry *const sr = z->symbol_registry;
     if (zis_unlikely(n == (size_t)-1))
         n = strlen(s);
-    struct zis_symbol_obj *sym = zis_symbol_registry_find(sr, s, n);
+    struct zis_symbol_obj *sym = symbol_registry_find(sr, s, n);
     if (zis_unlikely(!sym)) {
         sym = zis_symbol_obj_new(z, s, n);
-        zis_symbol_registry_add(sr, sym);
+        symbol_registry_add(sr, sym);
     }
     return sym;
+}
+
+struct zis_symbol_obj *zis_symbol_registry_find(
+    struct zis_context *z, const char *s, size_t n /* = -1 */
+) {
+    struct zis_symbol_registry *const sr = z->symbol_registry;
+    if (zis_unlikely(n == (size_t)-1))
+        n = strlen(s);
+    return symbol_registry_find(sr, s, n);
 }

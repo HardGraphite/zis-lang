@@ -152,6 +152,21 @@ struct zis_native_type_def {
 };
 
 /**
+ * Definition of a native module.
+ *
+ * When a module is created based on such a definition, the functions and types
+ * are created and stored as module variables (global variables), excepting
+ * those without names (`.name = NULL`).
+ * If the first function definition does not have a name, it is the module initializer
+ * and will be called automatically after the module created.
+ */
+struct zis_native_module_def {
+    const char                       *name;      ///< Module name.
+    const struct zis_native_func_def *functions; ///< A zero-terminated array of functions. Optional.
+    const struct zis_native_type_def *types;     ///< A zero-terminated array of types. Optional.
+};
+
+/**
  * Call a C function within an isolated zis frame.
  *
  * Enter a new frame with `reg_max + 1` registers and call C function `fn`.
@@ -416,6 +431,16 @@ ZIS_API int zis_read_exception(
 ZIS_API int zis_make_function(zis_t z, unsigned int reg, const struct zis_native_func_def *def) ZIS_NOEXCEPT;
 
 /**
+ * Create a module.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param def native module definition; field `name` is ignored
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`).
+ */
+ZIS_API int zis_make_module(zis_t z, unsigned int reg, const struct zis_native_module_def *def) ZIS_NOEXCEPT;
+
+/**
  * Invoke a callable object.
  *
  * @param z zis instance
@@ -463,6 +488,40 @@ ZIS_API int zis_invoke(zis_t z, unsigned int regs[], size_t argc) ZIS_NOEXCEPT;
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `dst` or `src`).
  */
 ZIS_API int zis_move_local(zis_t z, unsigned int dst, unsigned int src) ZIS_NOEXCEPT;
+
+/**
+ * Get field of an object.
+ *
+ * `REG[reg_fld] <- ( REG[reg_obj] ) . ( REG[reg_name] )`
+ *
+ * @param z zis instance
+ * @param reg_obj register where the object is
+ * @param name field name string; or `NULL` to get name from `REG-0`.
+ * @param name_len string length of parameter `name`; or `-1` to calculate length with `strlen()`
+ * @param reg_val register to load the field to
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (name does not exist).
+ */
+ZIS_API int zis_load_field(
+    zis_t z, unsigned int reg_obj,
+    const char *name, size_t name_len, unsigned int reg_val
+) ZIS_NOEXCEPT;
+
+/**
+ * Set field of an object.
+ *
+ * `( REG[reg_obj] ) . ( REG[reg_name] ) <- REG[reg_fld]`
+ *
+ * @param z zis instance
+ * @param reg_obj register where the object is
+ * @param name field name string; or `NULL` to get name from `REG-0`.
+ * @param name_len string length of parameter `name`; or `-1` to calculate length with `strlen()`
+ * @param reg_val register where the new field value is
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (name does not exist).
+ */
+ZIS_API int zis_store_field(
+    zis_t z, unsigned int reg_obj,
+    const char *name, size_t name_len, unsigned int reg_val
+) ZIS_NOEXCEPT;
 
 /**
  * Get element from an object.

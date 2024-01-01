@@ -10,6 +10,7 @@
 #include "arrayobj.h"
 
 struct zis_context;
+struct zis_symbol_obj;
 
 /* ----- hashmap bucket node ------------------------------------------------ */
 
@@ -135,4 +136,16 @@ int zis_map_obj_set_r(
 int zis_map_obj_unset_r(
     struct zis_context *z,
     struct zis_object *regs[ZIS_PARAMARRAY_STATIC 3]
+);
+
+/// Get value by a symbol key. Return NULL if not found.
+struct zis_object *zis_map_obj_sym_get(
+    struct zis_map_obj *self,
+    struct zis_symbol_obj *key
+);
+
+/// Set value by a symbol key.
+void zis_map_obj_sym_set(
+    struct zis_context *z, struct zis_map_obj *self,
+    struct zis_symbol_obj *key, struct zis_object *value
 );

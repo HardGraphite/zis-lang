@@ -590,6 +590,48 @@ zis_test_define(test_function, z) {
     do_test_function__not_callable(z);
 }
 
+zis_test_define(test_module, z) {
+    int status;
+
+    // Create a module.
+    const struct zis_native_func_def mod_funcs[] = {
+        { "add_int", { 2, 0, 3 }, F_add_int },
+        { NULL, {0}, NULL },
+    };
+    const struct zis_native_type_def mod_types[] = {
+        { "some_type", 0, 0, NULL, NULL, NULL },
+        { NULL, 0, 0, NULL, NULL, NULL },
+    };
+    const struct zis_native_module_def mod_def = {
+        .name = NULL,
+        .functions = mod_funcs,
+        .types = mod_types,
+    };
+    status = zis_make_module(z, 1, &mod_def);
+    zis_test_assert_eq(status, ZIS_OK);
+
+    // Read pre-defined variables.
+    status = zis_load_field(z, 1, "add_int", (size_t)-1, 0);
+    zis_test_assert_eq(status, ZIS_OK);
+    status = zis_load_field(z, 1, "some_type", (size_t)-1, 0);
+    zis_test_assert_eq(status, ZIS_OK);
+
+    // Set and get variables.
+    status = zis_load_field(z, 1, "num", -1, 0);
+    zis_test_assert_eq(status, ZIS_E_ARG);
+    for (int64_t i = 100; i < 110; i++) {
+        int64_t v_i64;
+        zis_make_int(z, 0, i);
+        status = zis_store_field(z, 1, "num", (size_t)-1, 0);
+        zis_test_assert_eq(status, ZIS_OK);
+        status = zis_load_field(z, 1, "num", (size_t)-1, 0);
+        zis_test_assert_eq(status, ZIS_OK);
+        status = zis_read_int(z, 0, &v_i64);
+        zis_test_assert_eq(status, ZIS_OK);
+        zis_test_assert_eq(i, v_i64);
+    }
+}
+
 // zis-api-variables //
 
 static void do_test_load_element__array_and_tuple(zis_t z) {
@@ -882,6 +924,7 @@ zis_test_list(
     test_read_values,
     // zis-api-code //
     test_function,
+    test_module,
     // zis-api-variables //
     test_load_element,
     test_store_element,

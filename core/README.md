@@ -30,6 +30,7 @@ Source code for the runtime core.
   - [`funcobj.h`](funcobj.h), [`funcobj.c`](funcobj.c)
   - [`intobj.h`](intobj.h), [`intobj.c`](intobj.c)
   - [`mapobj.h`](mapobj.h), [`mapobj.c`](mapobj.c)
+  - [`moduleobj.h`](moduleobj.h), [`moduleobj.c`](moduleobj.c)
   - [`nilobj.h`](nilobj.h), [`nilobj.c`](nilobj.c)
   - [`stringobj.h`](stringobj.h), [`stringobj.c`](stringobj.c)
   - [`symbolobj.h`](symbolobj.h), [`symbolobj.c`](symbolobj.c)

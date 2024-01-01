@@ -27,7 +27,7 @@ static struct zis_func_obj *func_obj_alloc(
     );
     self->_symbols = z->globals->val_empty_array_slots;
     self->_constants = z->globals->val_empty_array_slots;
-    self->_module = mod ? mod : zis_object_cast(zis_smallint_to_ptr(0), struct zis_module_obj);
+    self->_module = mod ? mod : z->globals->val_common_top_module;
     return self;
 }
 

@@ -9,6 +9,7 @@
 
 #include "arrayobj.h"
 #include "boolobj.h"
+#include "moduleobj.h"
 #include "nilobj.h"
 #include "stringobj.h"
 #include "tupleobj.h"
@@ -16,6 +17,9 @@
 
 /// Initialize values.
 static void globals_init_values(struct zis_context_globals *g, struct zis_context *z) {
+    // Use uninitialized part of `struct zis_context_globals` as `tmp_regs`.
+    g->val_common_top_module = zis_module_obj_new_r(z, (struct zis_object **)g);
+    // Initialize other members.
     g->val_nil = _zis_nil_obj_new(z);
     g->val_true = _zis_bool_obj_new(z, true);
     g->val_false = _zis_bool_obj_new(z, false);

@@ -6,12 +6,13 @@ struct zis_context;
 struct zis_type_obj;
 
 #define _ZIS_BUILTIN_VAL_LIST \
-    E(struct zis_nil_obj, nil)\
-    E(struct zis_bool_obj, true) \
-    E(struct zis_bool_obj, false)\
-    E(struct zis_string_obj, empty_string) \
-    E(struct zis_tuple_obj, empty_tuple)   \
-    E(struct zis_array_slots_obj, empty_array_slots) \
+    E(struct zis_nil_obj        , nil               ) \
+    E(struct zis_bool_obj       , true              ) \
+    E(struct zis_bool_obj       , false             ) \
+    E(struct zis_string_obj     , empty_string      ) \
+    E(struct zis_tuple_obj      , empty_tuple       ) \
+    E(struct zis_array_slots_obj, empty_array_slots ) \
+    E(struct zis_module_obj     , common_top_module ) \
 // ^^^ _ZIS_BUILTIN_VAL_LIST ^^^
 
 #define _ZIS_BUILTIN_TYPE_LIST \
@@ -25,6 +26,7 @@ struct zis_type_obj;
     E(Int)                     \
     E(Map)                     \
     E(Map_Node)                \
+    E(Module)                  \
     E(Nil)                     \
     E(String)                  \
     E(Symbol)                  \
