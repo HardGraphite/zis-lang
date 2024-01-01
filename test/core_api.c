@@ -523,7 +523,7 @@ static void do_test_function__check_exception(zis_t z, unsigned reg, const char 
     zis_test_assert_eq(status, ZIS_OK);
     zis_test_log(ZIS_TEST_LOG_TRACE, "exception (%s): %.*s", type, (int)size, buffer);
 
-    zis_load_nil(z, REG_MAX - 2, 3);
+    zis_load_nil(z, REG_MAX - 3, 3);
 }
 
 static void do_test_function__F_add_int(zis_t z) {
@@ -533,7 +533,7 @@ static void do_test_function__F_add_int(zis_t z) {
 
     // make function
     func_def.name = NULL;
-    func_def.meta = (struct zis_native_func_meta){ 2, 0, 3 };
+    func_def.meta = (struct zis_func_meta){ 2, 0, 3 };
     func_def.code = F_add_int;
     status = zis_make_function(z, 1, &func_def);
     zis_test_assert_eq(status, ZIS_OK);

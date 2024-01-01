@@ -93,7 +93,7 @@ do {                                                          \
     struct zis_object *const __wb_obj = zis_object_from((obj)); \
     if (zis_likely(zis_object_meta_is_young(__wb_obj->_meta)))\
         break;                                                \
-    _zis_object_write_barrier_n(__wb_obj, val_arr, var_arr_len) \
+    _zis_object_write_barrier_n(__wb_obj, val_arr, var_arr_len);\
 } while (0)                                                   \
 // ^^^ zis_object_write_barrier_n() ^^^
 void _zis_object_write_barrier_n(struct zis_object *, struct zis_object *[], size_t);

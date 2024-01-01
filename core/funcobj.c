@@ -8,7 +8,7 @@
 #include "ndefutil.h"
 #include "objmem.h"
 
-static_assert(sizeof(zis_func_obj_func_meta_t) <= sizeof(void *), "");
+static_assert(sizeof(struct zis_func_meta) <= sizeof(void *), "");
 
 #define FUN_OBJ_BYTES_FIXED_SIZE \
     (ZIS_NATIVE_TYPE_STRUCT_XB_FIXED_SIZE(struct zis_func_obj, _bytes_size))
@@ -33,7 +33,7 @@ static struct zis_func_obj *func_obj_alloc(
 
 struct zis_func_obj *zis_func_obj_new_native(
     struct zis_context *z,
-    struct zis_native_func_meta meta, zis_native_func_t code,
+    struct zis_func_meta meta, zis_native_func_t code,
     struct zis_module_obj *module
 ) {
     struct zis_func_obj *const self = func_obj_alloc(z, 0, module);
@@ -44,7 +44,7 @@ struct zis_func_obj *zis_func_obj_new_native(
 
 struct zis_func_obj *zis_func_obj_new_bytecode(
     struct zis_context *z,
-    zis_func_obj_func_meta_t meta,
+    struct zis_func_meta meta,
     const zis_func_obj_bytecode_word_t *code, size_t code_len,
     struct zis_module_obj *module
 ) {

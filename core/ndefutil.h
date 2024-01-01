@@ -109,3 +109,9 @@ zis_static_force_inline struct zis_object **
 zis_object_vec_zero(struct zis_object **restrict vec, size_t n) {
     return memset(vec, 0xff, n * sizeof(struct zis_object *));
 }
+
+/// Fill a vector of object pointers with a specific object.
+zis_static_force_inline void
+zis_object_vec_fill(struct zis_object **restrict vec, struct zis_object *val, size_t n) {
+    for (size_t i = 0; i < n; i++) vec[i] = val;
+}

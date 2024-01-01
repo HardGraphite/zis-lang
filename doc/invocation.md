@@ -37,6 +37,30 @@ int F_add_int(zis_t z) {
 In C++, a native function shall be marked
 `noexcept` (after C++11) or `throw()` (before C++17).
 
+## Arguments
+
+Arguments (parameters) are passed in order.
+The number of arguments shall match the declared number,
+excepting optional or variadic arguments are accepted.
+
+### Optional arguments
+
+A function like `func(a1, a2, a3, ?oa1, ?oa2)`
+accepts 3 required arguments and 2 optional arguments.
+Such a function can accept at least 3 and at most 5 actual parameters.
+Parameters not mentioned when calling
+will be automatically assigned a value of `nil`.
+
+### Variadic arguments
+
+Variadic arguments allow a function to accept any number of extra arguments.
+This mechanism cannot be used at the same time with optional arguments.
+
+A function like `func(a1, a2, a3, *va)`
+accepts 3 required arguments and any number of extra arguments.
+Such a function can accept at least 3 actual parameters.
+The rest are packed into a `Tuple` and placed as the last (4th) argument.
+
 ## Invocation context
 
 ### Callstack frame

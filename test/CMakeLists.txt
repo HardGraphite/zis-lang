@@ -20,7 +20,7 @@ foreach(zis_test_src IN LISTS zis_test_src_list)
         continue()
     endif()
     get_filename_component(zis_test_name "${zis_test_src}" NAME_WLE)
-    set(zis_test_name "test-${zis_test_name}")
+    set(zis_test_name "zis_test_${zis_test_name}")
     add_executable(${zis_test_name} ${zis_test_src})
     target_link_libraries(${zis_test_name} PRIVATE ${zis_test_link_lib})
     add_test(

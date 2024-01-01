@@ -122,11 +122,11 @@ ZIS_API zis_panic_handler_t zis_at_panic(zis_t z, zis_panic_handler_t h) ZIS_NOE
 typedef int (*zis_native_func_t)(zis_t) ZIS_NOEXCEPT;
 
 /**
- * Metadata of a native function.
+ * Metadata of a function.
  */
-struct zis_native_func_meta {
-    unsigned char  na; ///< Number of arguments.
-    unsigned char  va; ///< Whether this is a variadic function (accepts any number of extra arguments).
+struct zis_func_meta {
+    unsigned char  na; ///< Number of arguments (excluding optional ones).
+    unsigned char  no; ///< Number of optional arguments. Or `-1` to accept a `Tuple` holding the rest arguments (variadic).
     unsigned short nr; ///< Number of registers (arguments and local variables, including REG-0).
 };
 
@@ -134,9 +134,9 @@ struct zis_native_func_meta {
  * Definition of a native function.
  */
 struct zis_native_func_def {
-    const char                 *name;
-    struct zis_native_func_meta meta;
-    zis_native_func_t           code;
+    const char          *name;
+    struct zis_func_meta meta;
+    zis_native_func_t    code;
 };
 
 /**
@@ -470,7 +470,7 @@ ZIS_API int zis_make_module(zis_t z, unsigned int reg, const struct zis_native_m
  * When `regs[3]` is `-1`, the minimum length is `4`: 1 ret + 1 obj + 1 first_arg + (-1).
  * When `argc` is `-1`, the minimum length is `3`: 1 ret + 1 obj + 1 packed_args.
  */
-ZIS_API int zis_invoke(zis_t z, unsigned int regs[], size_t argc) ZIS_NOEXCEPT;
+ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) ZIS_NOEXCEPT;
 
 /** @} */
 

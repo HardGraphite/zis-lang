@@ -6,7 +6,7 @@
 
 #include "arrayobj.h"
 #include "object.h"
-#include "zis.h" // zis_native_func_t, struct zis_native_func_meta
+#include "zis.h" // zis_native_func_t, struct zis_func_meta
 
 struct zis_context;
 struct zis_module_obj;
@@ -14,9 +14,6 @@ struct zis_object;
 
 /// Bytecode word.
 typedef uint32_t zis_func_obj_bytecode_word_t;
-
-/// Function meta info.
-typedef struct zis_native_func_meta zis_func_obj_func_meta_t;
 
 /// The `Function` object. The basic callable object.
 struct zis_func_obj {
@@ -27,7 +24,7 @@ struct zis_func_obj {
     struct zis_module_obj      *_module; // Optional (= smallint 0). TODO: use a top level module if module is omitted.
     // --- BYTES ---
     size_t _bytes_size;
-    zis_func_obj_func_meta_t     meta;
+    struct zis_func_meta         meta;
     zis_native_func_t            native; // Optional.
     zis_func_obj_bytecode_word_t bytecode[]; // Optional.
 };
@@ -35,14 +32,14 @@ struct zis_func_obj {
 /// Create a `Function` from native function. `module` is optional.
 struct zis_func_obj *zis_func_obj_new_native(
     struct zis_context *z,
-    struct zis_native_func_meta meta, zis_native_func_t code,
+    struct zis_func_meta meta, zis_native_func_t code,
     struct zis_module_obj *module
 );
 
 /// Create a `Function` from bytecode. `module` is optional.
 struct zis_func_obj *zis_func_obj_new_bytecode(
     struct zis_context *z,
-    zis_func_obj_func_meta_t meta,
+    struct zis_func_meta meta,
     const zis_func_obj_bytecode_word_t *code, size_t code_len,
     struct zis_module_obj *module
 );
