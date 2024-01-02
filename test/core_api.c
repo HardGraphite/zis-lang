@@ -284,7 +284,7 @@ static void do_test_make_values__basic(zis_t z) {
         in_i64, in_double, in_str, (size_t)-1,
         in_i64, in_double, in_str, (size_t)-1,
         (size_t)100, in_i64,
-        1, "1", 1, 2, "2", 1,
+        INT64_C(1), "1", (size_t)1, INT64_C(2), "2", (size_t)1,
         in_str, (size_t)-1
     );
     zis_test_assert_eq(status, 22);
