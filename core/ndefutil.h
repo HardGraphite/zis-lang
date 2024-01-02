@@ -2,12 +2,25 @@
 
 #pragma once
 
+#include <assert.h>
 #include <stddef.h>
 #include <string.h>
 
 #include "attributes.h"
 #include "object.h"
 #include "zis.h" // zis_native_*
+
+/* ----- object structs ----------------------------------------------------- */
+
+/// Check whether a C struct may be an object struct
+#define zis_struct_maybe_object(struct_type) ( \
+    sizeof(struct_type) >= ZIS_OBJECT_HEAD_SIZE && \
+    offsetof(struct_type, _meta) == 0 &&       \
+    _Generic(((struct_type *)0)->_meta, struct zis_object_meta: 1, default: 0) \
+)                                              \
+// ^^^ zis_struct_maybe_object() ^^^
+
+/* ----- convenience macros to define native things ------------------------- */
 
 /// Variable name for `ZIS_NATIVE_NAME_LIST_DEF()`.
 #define ZIS_NATIVE_NAME_LIST_VAR(NAME)  _name_list_ ## NAME
@@ -38,6 +51,7 @@ static const struct zis_native_func_def ZIS_NATIVE_FUNC_LIST_VAR( NAME ) [] = { 
 #define ZIS_NATIVE_TYPE_DEF( \
     NAME, STRUCT, BYTES_FIRST_VAR, SLOT_NAME_LIST, METHOD_LIST, STATIC_LIST \
 )                            \
+static_assert(zis_struct_maybe_object(STRUCT), "not an object-struct: " #STRUCT); \
 const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( NAME ) = {            \
     .name = #NAME,           \
     .slots_num = (offsetof(STRUCT, BYTES_FIRST_VAR) - ZIS_OBJECT_HEAD_SIZE) / sizeof(void *), \
@@ -52,6 +66,7 @@ const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( NAME ) = {            \
 #define ZIS_NATIVE_TYPE_DEF_NB( \
     NAME, STRUCT, SLOT_NAME_LIST, METHOD_LIST, STATIC_LIST \
 )                               \
+static_assert(zis_struct_maybe_object(STRUCT), "not an object-struct: " #STRUCT); \
 const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( NAME ) = {  \
     .name = #NAME,              \
     .slots_num = (sizeof(STRUCT) - ZIS_OBJECT_HEAD_SIZE) / sizeof(void *), \
@@ -66,6 +81,7 @@ const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( NAME ) = {  \
 #define ZIS_NATIVE_TYPE_DEF_XS_NB( \
     NAME, STRUCT, SLOT_NAME_LIST, METHOD_LIST, STATIC_LIST \
 )                               \
+static_assert(zis_struct_maybe_object(STRUCT), "not an object-struct: " #STRUCT); \
 const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( NAME ) = {  \
     .name = #NAME,              \
     .slots_num = (size_t)-1, \
@@ -79,6 +95,7 @@ const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( NAME ) = {  \
 #define ZIS_NATIVE_TYPE_DEF_XB( \
     NAME, STRUCT, BYTES_SIZE_VAR, SLOT_NAME_LIST, METHOD_LIST, STATIC_LIST \
 )                               \
+static_assert(zis_struct_maybe_object(STRUCT), "not an object-struct: " #STRUCT); \
 const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( NAME ) = {  \
     .name = #NAME,              \
     .slots_num = (offsetof(STRUCT, BYTES_SIZE_VAR) - ZIS_OBJECT_HEAD_SIZE) / sizeof(void *), \
@@ -91,6 +108,8 @@ const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( NAME ) = {  \
 /// Size of fixed part of extendable BYTES part of a native object based on the C struct.
 #define ZIS_NATIVE_TYPE_STRUCT_XB_FIXED_SIZE(STRUCT, BYTES_SIZE_VAR) \
     (sizeof(STRUCT) - offsetof(STRUCT, BYTES_SIZE_VAR))
+
+/* ----- functions to operate a vector of objects --------------------------- */
 
 /// Copy a vector of object pointers like `memcpy()`.
 zis_static_force_inline struct zis_object **

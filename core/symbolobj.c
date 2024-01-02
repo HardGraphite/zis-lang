@@ -165,9 +165,22 @@ static void symbol_registry_wr_visitor(void *_sr, enum zis_objmem_weak_ref_visit
         assert(&prev_node->_registry_next == &buckets[bucket_i]);
         while (this_node) {
             bool delete_this_node = false;
+
+#if defined(__GNUC__) && !defined(__clang__)
+            static_assert(zis_struct_maybe_object(struct zis_symbol_obj), "");
+#    pragma GCC diagnostic push
+#    pragma GCC diagnostic ignored "-Wstrict-aliasing"
+            // The following code breaks the strict-aliasing rule. GCC wisely points this out.
+            // But stupid me could not think of a better solution.
+#endif // GCC
+
 #define WEAK_REF_FINI(the_obj)  (delete_this_node = true)
             zis_objmem_visit_weak_ref(prev_node->_registry_next, op);
 #undef WEAK_REF_FINI
+
+#if defined(__GNUC__) && !defined(__clang__)
+#    pragma GCC diagnostic pop
+#endif // GCC
 
             if (zis_unlikely(delete_this_node)) {
                 zis_debug_log(
