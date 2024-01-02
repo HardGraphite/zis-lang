@@ -69,6 +69,8 @@ A callstack frame is allocated for each invocation,
 where there are slots for arguments and local variables (aka registers).
 
 ```text
+|       | <- unused stack slots
+|-------|
 | LOC-M | <- frame top
 |  ...  |  ^
 | LOC-3 | local variables
@@ -80,6 +82,9 @@ where there are slots for arguments and local variables (aka registers).
 | ARG-2 |  v
 | ARG-1 | <- REG-1
 | TEMP  | <- frame base, REG-0
+|-------|
+|  ...  | <- previous frame
+| FUNC  | <- previous REG-0
 ```
 
 The first register (`REG-0`) is for temporary use only.
@@ -89,7 +94,13 @@ Data should not be stored here except as input or output to instructions or func
 Function arguments are placed in order starting from the second register (`REG-1`).
 The rest of the registers are for local variables and may contain specific data.
 
-### Associated module
+The function that is being called
+is in the first register in the previous frame (`prev_frame/REG-0`).
+
+### Current function and module
+
+The "current function" is the function that is being called,
+whose location has been discussed in the previous section.
 
 Every function has a module associated with it.
 Such a module provides global variables.
@@ -109,6 +120,7 @@ If it is a `Function`, continues the invocation.
 Otherwise, throws an exception to report the type error.
 2. **Enters a new frame.**
 Records current context.
+Store the function object to call to `REG-0`.
 Moves the stack frame pointer and top pointer to make space for the frame.
 Panics if there is no sufficient space in the stack.
 Fills the registers with known objects to avoid dangling references.

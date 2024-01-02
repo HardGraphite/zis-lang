@@ -9,33 +9,31 @@
 struct zis_context;
 struct zis_object;
 
-/// Prepare a frame for an invocation and return the function to call.
-/// On failure (like object is not invocable or argument number mismatches),
-/// makes an exception and stores to REG-0, and returns NULL.
-struct zis_func_obj *zis_invoke_prepare(
-    struct zis_context *z,
-    struct zis_object *callable, size_t argc
-);
-
-/// Pass arguments after `zis_invoke_prepare()` is called.
+/// Prepare the environment for an invocation and return the function to call.
+/// On failure, makes an exception and stores to REG-0, and returns NULL.
 /// The arguments (`argv`) must be a vector of objects on the stack.
-void zis_invoke_pass_args_v(
-    struct zis_context *z, struct zis_func_meta func_meta,
+/// `REG-0` must not be used for argument passing.
+struct zis_func_obj *zis_invoke_prepare_va(
+    struct zis_context *z, struct zis_object *callable,
     struct zis_object **argv, size_t argc
 );
 
-/// Pass arguments after `zis_invoke_prepare()` is called.
-/// The packed arguments (`packed_args`) must be a `Tuple` or an `Array.Slots`.
-void zis_invoke_pass_args_p(
-    struct zis_context *z, struct zis_func_meta func_meta,
+/// Prepare the environment for an invocation and return the function to call.
+/// On failure, makes an exception and stores to REG-0, and returns NULL.
+/// The packed arguments (`packed_args`) must be a `Tuple` or an `Array.Slots`..
+/// `REG-0` must not be used for argument passing.
+struct zis_func_obj *zis_invoke_prepare_pa(
+    struct zis_context *z, struct zis_object *callable,
     struct zis_object *packed_args, size_t argc
 );
 
-/// Pass arguments after `zis_invoke_prepare()` is called.
+/// Prepare the environment for an invocation and return the function to call.
+/// On failure, makes an exception and stores to REG-0, and returns NULL.
 /// `arg_regs` is an array of register indices that refers to the argument objects
-/// in the previous callstack frame.
-void zis_invoke_pass_args_d(
-    struct zis_context *z, struct zis_func_meta func_meta,
+/// in the previous callstack frame..
+/// `REG-0` must not be used for argument passing.
+struct zis_func_obj *zis_invoke_prepare_da(
+    struct zis_context *z, struct zis_object *callable,
     const unsigned int arg_regs[], size_t argc
 );
 
@@ -43,7 +41,7 @@ void zis_invoke_pass_args_d(
 struct zis_object *zis_invoke_cleanup(struct zis_context *z);
 
 /// Call a function object.
-/// `zis_invoke_prepare()` and `zis_invoke_pass_args_*() should be called
-/// before calling this function; `zis_invoke_cleanup()` should be called
-/// after calling this function.
+/// `zis_invoke_prepare_*() should be called before calling this function;
+/// `zis_invoke_cleanup()` should be called after calling this function.
+/// The function `func` shall have been stored in the REG-0 in caller's frame.
 int zis_invoke_func(struct zis_context *z, struct zis_func_obj *func);

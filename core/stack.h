@@ -87,6 +87,11 @@ struct zis_object **zis_callstack_frame_alloc_temp(struct zis_context *z, size_t
 /// Free temporary storage allocated with `zis_callstack_frame_alloc_temp()`.
 void zis_callstack_frame_free_temp(struct zis_context *z, size_t n);
 
+/// Check if no frame has been created.
+zis_static_force_inline bool zis_callstack_empty(const struct zis_callstack *cs) {
+    return cs->_fi_list._list == NULL;
+}
+
 /// Get frame info of the current frame.
 zis_static_force_inline const struct zis_callstack_frame_info *
 zis_callstack_frame_info(const struct zis_callstack *cs) {

@@ -21,7 +21,7 @@ struct zis_func_obj {
     // --- SLOTS ---
     struct zis_array_slots_obj *_symbols;
     struct zis_array_slots_obj *_constants;
-    struct zis_module_obj      *_module; // Optional (= smallint 0). TODO: use a top level module if module is omitted.
+    struct zis_module_obj      *_module; // Optional.
     // --- BYTES ---
     size_t _bytes_size;
     struct zis_func_meta         meta;
@@ -32,17 +32,27 @@ struct zis_func_obj {
 /// Create a `Function` from native function. `module` is optional.
 struct zis_func_obj *zis_func_obj_new_native(
     struct zis_context *z,
-    struct zis_func_meta meta, zis_native_func_t code,
-    struct zis_module_obj *module
+    struct zis_func_meta meta, zis_native_func_t code
 );
 
 /// Create a `Function` from bytecode. `module` is optional.
 struct zis_func_obj *zis_func_obj_new_bytecode(
     struct zis_context *z,
     struct zis_func_meta meta,
-    const zis_func_obj_bytecode_word_t *code, size_t code_len,
-    struct zis_module_obj *module
+    const zis_func_obj_bytecode_word_t *code, size_t code_len
 );
+
+/// Set parent module of a function. Shall only be used after function created.
+void zis_func_obj_set_module(
+    struct zis_context *z,
+    struct zis_func_obj *self, struct zis_module_obj *mod
+);
+
+/// Get parent module of a function.
+zis_static_force_inline struct zis_module_obj *
+zis_func_obj_module(const struct zis_func_obj *self) {
+    return self->_module;
+}
 
 /// Get a symbol from function symbol table.
 zis_static_force_inline struct zis_object *
@@ -54,11 +64,4 @@ zis_func_obj_symbol(const struct zis_func_obj *self, size_t id) {
 zis_static_force_inline struct zis_object *
 zis_func_obj_constant(const struct zis_func_obj *self, size_t id) {
     return zis_array_slots_obj_get(self->_constants, id);
-}
-
-/// Get parent module of a function. Return NULL if it does not have one.
-zis_static_force_inline struct zis_module_obj *
-zis_func_obj_module(const struct zis_func_obj *self) {
-    struct zis_module_obj *const mod = self->_module;
-    return zis_likely(zis_object_from(mod) != zis_smallint_to_ptr(0)) ? mod : NULL;
 }

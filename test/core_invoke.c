@@ -163,7 +163,7 @@ static void make_func(
     const struct zis_native_func_def *fd
 ) {
     int status;
-    status = zis_make_function(z, 1, fd);
+    status = zis_make_function(z, 1, fd, (unsigned int)-1);
     zis_test_assert_eq(status, ZIS_OK);
 }
 

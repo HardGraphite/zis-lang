@@ -17,19 +17,23 @@ struct zis_module_obj *zis_module_obj_new_r(
 ) {
     // ~~ regs[0] = module, regs[1] = tmp ~~
 
-    struct zis_module_obj *const self = zis_object_cast(
+    struct zis_module_obj *self = zis_object_cast(
         zis_objmem_alloc_ex(z, ZIS_OBJMEM_ALLOC_SURV, z->globals->type_Module, 0, 0),
         struct zis_module_obj
     );
     regs[0] = zis_object_from(self);
 
-    self->_variables = z->globals->val_empty_array_slots;
-    self->_functions = z->globals->val_empty_array_slots;
+    struct zis_array_slots_obj *const empty_array_slots = z->globals->val_empty_array_slots;
+    self->_variables = empty_array_slots;
+    self->_functions = empty_array_slots;
+    zis_object_write_barrier(self, empty_array_slots);
     self->_parent = zis_smallint_to_ptr(0);
 
     self->_name_map = zis_object_cast(zis_smallint_to_ptr(0), struct zis_map_obj);
-    self->_name_map = zis_map_obj_new_r(z, regs + 1, 0.0f, 0);
-    zis_object_write_barrier(self, self->_name_map);
+    struct zis_map_obj *name_map = zis_map_obj_new_r(z, regs + 1, 0.0f, 0);
+    self = zis_object_cast(regs[0], struct zis_module_obj);
+    self->_name_map = name_map;
+    zis_object_write_barrier(self, name_map);
 
     return self;
 }
@@ -81,9 +85,13 @@ void zis_module_obj_load_native_def(
                 continue;
             i++;
             tmp_regs[4] = zis_object_from(zis_func_obj_new_native(
-                z, func_def->meta, func_def->code,
-                zis_object_cast(tmp_regs[0], struct zis_module_obj)
+                z, func_def->meta, func_def->code
             ));
+            zis_func_obj_set_module(
+                z,
+                zis_object_cast(tmp_regs[4], struct zis_func_obj),
+                zis_object_cast(tmp_regs[0], struct zis_module_obj)
+            );
             zis_module_obj_set(
                 z,
                 zis_object_cast(tmp_regs[0], struct zis_module_obj),

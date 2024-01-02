@@ -426,9 +426,13 @@ ZIS_API int zis_read_exception(
  * @param z zis instance
  * @param reg register index
  * @param def native function definition; field `name` is ignored
- * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`).
+ * @param reg_module index of the register where the module is; or `-1` to ignore.
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg` or `reg_module`).
  */
-ZIS_API int zis_make_function(zis_t z, unsigned int reg, const struct zis_native_func_def *def) ZIS_NOEXCEPT;
+ZIS_API int zis_make_function(
+    zis_t z, unsigned int reg,
+    const struct zis_native_func_def *def, unsigned int reg_module
+) ZIS_NOEXCEPT;
 
 /**
  * Create a module.
@@ -469,6 +473,8 @@ ZIS_API int zis_make_module(zis_t z, unsigned int reg, const struct zis_native_m
  * @note Normally, the minimum length of array `regs` is `(argc + 2)`: 1 ret + 1 obj + N args.
  * When `regs[3]` is `-1`, the minimum length is `4`: 1 ret + 1 obj + 1 first_arg + (-1).
  * When `argc` is `-1`, the minimum length is `3`: 1 ret + 1 obj + 1 packed_args.
+ *
+ * @warning `REG-0` must not be used for argument passing.
  */
 ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) ZIS_NOEXCEPT;
 
@@ -490,6 +496,34 @@ ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) ZIS_NOEX
 ZIS_API int zis_move_local(zis_t z, unsigned int dst, unsigned int src) ZIS_NOEXCEPT;
 
 /**
+ * Get global variable from current module.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param name name of the global variable; or `NULL` to get name from `REG-0`
+ * @param name_len string length of parameter `name`; or `-1` to calculate length with `strlen()`
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (name does not exist or REG-0 is not a `Symbol`).
+ *
+ * @warning Do not try to access global variable outside a function,
+ * in which case there is no *current module*.
+ */
+ZIS_API int zis_load_global(zis_t z, unsigned int reg, const char *name, size_t name_len) ZIS_NOEXCEPT;
+
+/**
+ * Set global variable to current module.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param name name of the global variable; or `NULL` to get name from `REG-0`
+ * @param name_len string length of parameter `name`; or `-1` to calculate length with `strlen()`
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (REG-0 is not a `Symbol`).
+ *
+ * @warning Do not try to access global variable outside a function,
+ * in which case there is no *current module*.
+ */
+ZIS_API int zis_store_global(zis_t z, unsigned int reg, const char *name, size_t name_len) ZIS_NOEXCEPT;
+
+/**
  * Get field of an object.
  *
  * `REG[reg_fld] <- ( REG[reg_obj] ) . ( REG[reg_name] )`
@@ -499,7 +533,7 @@ ZIS_API int zis_move_local(zis_t z, unsigned int dst, unsigned int src) ZIS_NOEX
  * @param name field name string; or `NULL` to get name from `REG-0`.
  * @param name_len string length of parameter `name`; or `-1` to calculate length with `strlen()`
  * @param reg_val register to load the field to
- * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (name does not exist).
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (name does not exist or REG-0 is not a `Symbol`).
  */
 ZIS_API int zis_load_field(
     zis_t z, unsigned int reg_obj,
@@ -516,7 +550,7 @@ ZIS_API int zis_load_field(
  * @param name field name string; or `NULL` to get name from `REG-0`.
  * @param name_len string length of parameter `name`; or `-1` to calculate length with `strlen()`
  * @param reg_val register where the new field value is
- * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (name does not exist).
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (name does not exist or REG-0 is not a `Symbol`).
  */
 ZIS_API int zis_store_field(
     zis_t z, unsigned int reg_obj,

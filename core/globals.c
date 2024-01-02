@@ -6,6 +6,7 @@
 #include "memory.h"
 #include "ndefutil.h"
 #include "objmem.h"
+#include "stack.h"
 
 #include "arrayobj.h"
 #include "boolobj.h"
@@ -17,15 +18,24 @@
 
 /// Initialize values.
 static void globals_init_values(struct zis_context_globals *g, struct zis_context *z) {
-    // Use uninitialized part of `struct zis_context_globals` as `tmp_regs`.
-    g->val_common_top_module = zis_module_obj_new_r(z, (struct zis_object **)g);
-    // Initialize other members.
+    const size_t tmp_regs_num = 3;
+    struct zis_callstack *callstack = z->callstack;
+    struct zis_object **tmp_regs = callstack->top;
+    callstack->top = tmp_regs + tmp_regs_num;
+    zis_object_vec_zero(tmp_regs, tmp_regs_num);
+
     g->val_nil = _zis_nil_obj_new(z);
     g->val_true = _zis_bool_obj_new(z, true);
     g->val_false = _zis_bool_obj_new(z, false);
     g->val_empty_string = _zis_string_obj_new_empty(z);
     g->val_empty_tuple = _zis_tuple_obj_new_empty(z);
     g->val_empty_array_slots = _zis_array_slots_obj_new_empty(z);
+
+    g->val_common_top_module = zis_module_obj_new_r(z, tmp_regs);
+
+    assert(callstack->top == tmp_regs + tmp_regs_num);
+    callstack->top = tmp_regs;
+    tmp_regs[0] = zis_smallint_to_ptr(0);
 }
 
 // Declare type definitions.

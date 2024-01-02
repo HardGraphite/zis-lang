@@ -254,6 +254,7 @@ struct zis_map_obj *zis_map_obj_new_r(
     );
     regs[0] = zis_object_from(self);
     self->_buckets = z->globals->val_empty_array_slots;
+    zis_object_assert_no_write_barrier_2(self, zis_object_from(self->_buckets));
     self->node_count = 0;
     self->node_count_threshold = 0;
     self->load_factor = load_factor > 0.0f ? load_factor : 0.9f;
@@ -263,6 +264,7 @@ struct zis_map_obj *zis_map_obj_new_r(
         assert(zis_object_type(regs[0]) == z->globals->type_Map);
         self = zis_object_cast(regs[0], struct zis_map_obj);
         self->_buckets = buckets;
+        zis_object_write_barrier(self, self->_buckets);
         self->node_count_threshold = reserve;
     }
     return self;

@@ -535,7 +535,7 @@ static void do_test_function__F_add_int(zis_t z) {
     func_def.name = NULL;
     func_def.meta = (struct zis_func_meta){ 2, 0, 3 };
     func_def.code = F_add_int;
-    status = zis_make_function(z, 1, &func_def);
+    status = zis_make_function(z, 1, &func_def, (unsigned int)-1);
     zis_test_assert_eq(status, ZIS_OK);
 
     // call
@@ -633,6 +633,39 @@ zis_test_define(test_module, z) {
 }
 
 // zis-api-variables //
+
+static int F_test_load_store_global(zis_t z) {
+    int status;
+    int64_t v_i64;
+    const char *var_name = "__test_load_store_global__var";
+
+    status = zis_load_global(z, 1, var_name, (size_t)-1);
+    zis_test_assert_eq(status, ZIS_E_ARG);
+
+    for (int i = 0; i < 10; i++) {
+        zis_make_int(z, 1, i);
+        status = zis_store_global(z, 1, var_name, (size_t)-1);
+        zis_test_assert_eq(status, ZIS_OK);
+        zis_load_nil(z, 1, 1);
+        status = zis_load_global(z, 1, var_name, (size_t)-1);
+        zis_test_assert_eq(status, ZIS_OK);
+        status = zis_read_int(z, 1, &v_i64);
+        zis_test_assert_eq(status, ZIS_OK);
+        zis_test_assert_eq(v_i64, i);
+    }
+
+    zis_load_nil(z, 0, 1);
+    return ZIS_OK;
+}
+
+zis_test_define(test_load_store_global, z) {
+    zis_make_function(
+        z, 0,
+        &(struct zis_native_func_def){NULL, {0, 0, 10}, F_test_load_store_global},
+        (unsigned int)-1
+    );
+    zis_invoke(z, (unsigned[]){0, 0}, 0);
+}
 
 static void do_test_load_element__array_and_tuple(zis_t z) {
     int status;
@@ -926,6 +959,7 @@ zis_test_list(
     test_function,
     test_module,
     // zis-api-variables //
+    test_load_store_global,
     test_load_element,
     test_store_element,
     test_insert_element,
