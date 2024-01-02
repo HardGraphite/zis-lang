@@ -2011,22 +2011,27 @@ zis_static_force_inline void _zis_objmem_mark_object_rec_y(struct zis_object *ob
 zis_static_force_inline void _zis_objmem_mark_object_rec_o2x(struct zis_object *obj) {
     assert(!zis_object_is_smallint(obj));
 
+    if (zis_object_meta_get_gc_state(obj->_meta) == ZIS_OBJMEM_OBJ_NEW) // Make NEW object MID, and it will become OLD after GC.
+        zis_object_meta_set_gc_state(obj->_meta, ZIS_OBJMEM_OBJ_MID); // TODO: meta_word &= 1
+
     MARK_OBJ_IMPL__RET_IF_MARKED(obj)
     MARK_OBJ_IMPL__MARK_SELF(obj)
 
-    if (zis_object_meta_get_gc_state(obj->_meta) == ZIS_OBJMEM_OBJ_NEW) // Make NEW object MID, and it will become OLD after GC.
-        zis_object_meta_set_gc_state(obj->_meta, ZIS_OBJMEM_OBJ_MID); // TODO: meta_word &= 1
     _zis_objmem_mark_object_slots_rec_o2x(obj);
 }
 
 zis_static_force_inline void _zis_objmem_mark_object_rec_o2y(struct zis_object *obj) {
     assert(!zis_object_is_smallint(obj));
 
-    MARK_OBJ_IMPL__RET_IF_OLD_OR_MARKED(obj)
-    MARK_OBJ_IMPL__MARK_SELF(obj)
+    if (zis_object_meta_is_not_young(obj->_meta))
+        return;
 
     if (zis_object_meta_young_is_new(obj->_meta))
         zis_object_meta_set_gc_state(obj->_meta, ZIS_OBJMEM_OBJ_MID); // TODO: meta_word &= 1
+
+    MARK_OBJ_IMPL__RET_IF_MARKED(obj) // MARK_OBJ_IMPL__RET_IF_OLD_OR_MARKED(obj)
+    MARK_OBJ_IMPL__MARK_SELF(obj)
+
     _zis_objmem_mark_object_slots_rec_o2y(obj);
 }
 
