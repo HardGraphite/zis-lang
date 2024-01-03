@@ -69,11 +69,11 @@ static void globals_init_types(struct zis_context_globals *g, struct zis_context
 
 /// GC visitor. See `zis_objmem_object_visitor_t`.
 static void globals_gc_visitor(void *_g, enum zis_objmem_obj_visit_op op) {
-    struct zis_object **const gv = (struct zis_object **)_g;
-    for (size_t i = 0, n = sizeof(struct zis_context_globals) / sizeof(void *); i < n; i++) {
-        struct zis_object **p = gv + i;
-        zis_objmem_visit_object(*p, op);
-    }
+    struct zis_context_globals *const g = _g;
+    const size_t go_n = sizeof(*g) / sizeof(struct zis_object *);
+    struct zis_object **const go_begin = (struct zis_object **)g;
+    struct zis_object **const go_end   = go_begin + go_n;
+    zis_objmem_visit_object_vec(go_begin, go_end, op);
 }
 
 struct zis_context_globals *zis_context_globals_create(struct zis_context *z) {

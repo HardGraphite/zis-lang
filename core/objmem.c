@@ -1685,6 +1685,14 @@ void zis_objmem_add_gc_root(
     mem_span_set_add(&ctx->gc_roots, root, (void(*)(void))fn);
 }
 
+void zis_objmem_visit_object_vec(
+    struct zis_object **begin, struct zis_object **end,
+    enum zis_objmem_obj_visit_op op
+) {
+    for (struct zis_object **p = begin; p < end; p++)
+        zis_objmem_visit_object(*p, op);
+}
+
 bool zis_objmem_remove_gc_root(struct zis_context *z, void *root) {
     struct zis_objmem_context *const ctx = z->objmem_context;
     return mem_span_set_remove(&ctx->gc_roots, root);

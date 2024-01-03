@@ -72,10 +72,9 @@ zis_static_force_inline void fi_list_pop(struct _zis_callstack_fi_list *fi_list)
 static void callstack_gc_visitor(void *_cs, enum zis_objmem_obj_visit_op op) {
     struct zis_callstack *const cs = _cs;
     struct zis_object **const bp = cs->_data;
-    struct zis_object **const sp = cs->top;
-    assert(sp < cs->_data_end);
-    for (struct zis_object **p = bp; p <= sp; p++)
-        zis_objmem_visit_object(*p, op);
+    struct zis_object **const sp_p1 = cs->top + 1;
+    assert(sp_p1 <= cs->_data_end);
+    zis_objmem_visit_object_vec(bp, sp_p1, op);
 }
 
 /// Fill slots with known objects.

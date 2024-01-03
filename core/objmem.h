@@ -176,7 +176,7 @@ enum zis_objmem_obj_visit_op {
 };
 
 /// GC: object scanning function used by a GC root. Visit each object in the
-/// GC root with macro `zis_objmem_visit_object()`.
+/// GC root with macro `zis_objmem_visit_object()` or function `zis_objmem_visit_object_vec()`.
 typedef void (*zis_objmem_object_visitor_t)(void *, enum zis_objmem_obj_visit_op);
 
 /// GC: visit an object in a GC root. Parameter `obj` must be an object in the root,
@@ -197,6 +197,12 @@ do {                                     \
         zis_unreachable();               \
 } while (0)                              \
 // ^^^ zis_objmem_visit_object() ^^^
+
+/// Apply `zis_objmem_visit_object()` to a vector of objects in range `[begin, end)`.
+void zis_objmem_visit_object_vec(
+    struct zis_object **begin, struct zis_object **end,
+    enum zis_objmem_obj_visit_op op
+);
 
 /// Add a GC root.
 void zis_objmem_add_gc_root(
