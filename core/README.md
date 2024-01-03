@@ -7,6 +7,7 @@ Source code for the runtime core.
   - [`attributes.h`](attributes.h)
   - [`bits.h`](bits.h)
   - [`compat.h`](compat.h)
+  - [`fsutil.h`](fsutil.h), [`fsutil.c`](fsutil.c)
   - [`memory.h`](memory.h), [`memory.c`](memory.c)
   - [`platform.h`](platform.h)
   - [`strutil.h`](strutil.h), [`strutil.c`](strutil.c)
