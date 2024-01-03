@@ -28,6 +28,7 @@ struct zis_type_obj;
     E(Map_Node)                \
     E(Module)                  \
     E(Nil)                     \
+    E(Path)                    \
     E(String)                  \
     E(Symbol)                  \
     E(Tuple)                   \
