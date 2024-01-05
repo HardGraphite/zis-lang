@@ -3,6 +3,9 @@
 #include <assert.h>
 
 #include "platform.h"
+#include "strutil.h"
+
+#include "zis_config.h" // ZIS_ENVIRON_NAME_DEBUG_LOG
 
 #if ZIS_DEBUG
 
@@ -28,8 +31,6 @@ void zis_debug_time(struct timespec *tp) {
 #include <string.h>
 #include <time.h>
 
-#define ZIS_DEBUG_LOGGING_ENV "ZIS_DEBUG_LOGGING"
-
 static FILE *logging_stream = NULL;
 static char logging_group[32] = { 0 };
 static enum zis_debug_log_level logging_level = ZIS_DEBUG_LOG_WARN;
@@ -44,7 +45,7 @@ static const char *const logging_level_name[] = {
 
 #define logging_level_count (sizeof logging_level_name / sizeof logging_level_name[0])
 
-static void logging_parse_config(const char *conf_str) {
+zis_unused_fn static void logging_parse_config(const char *conf_str) {
     // "[LEVEL]:[GROUP]:[FILE]"
     if (!*conf_str)
         return;
@@ -53,7 +54,7 @@ static void logging_parse_config(const char *conf_str) {
     if (n < 1)
         return;
     for (size_t i = 0; i < logging_level_count; i++) {
-        if (strcmp(level_name, logging_level_name[i]) == 0) {
+        if (zis_str_icmp(level_name, logging_level_name[i]) == 0) {
             logging_level = (enum zis_debug_log_level)i;
             break;
         }
@@ -81,10 +82,13 @@ static void logging_init(void) {
     if (logging_stream) // FIXME: use atomic operation or mutex.
         return;
 
-    const char *config_string = getenv(ZIS_DEBUG_LOGGING_ENV);
     logging_stream = stderr;
+
+#ifdef ZIS_ENVIRON_NAME_DEBUG_LOG
+    const char *config_string = getenv(ZIS_ENVIRON_NAME_DEBUG_LOG);
     if (config_string)
         logging_parse_config(config_string);
+#endif // ZIS_ENVIRON_NAME_DEBUG_LOG
 
     at_quick_exit(logging_fini);
 
@@ -102,7 +106,7 @@ static void logging_init(void) {
 static bool logging_check(enum zis_debug_log_level level, const char *group) {
     if ((size_t)level >= logging_level_count || (int)level > (int)logging_level)
         return false;
-    if (*logging_group && strcmp(group, logging_group) != 0)
+    if (*logging_group && zis_str_icmp(group, logging_group) != 0)
         return false;
     return true;
 }

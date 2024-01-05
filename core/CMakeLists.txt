@@ -13,7 +13,10 @@ set(ZIS_FILENAME_EXTENSION_BYT ".zsc" CACHE STRING "File name extension for byte
 set(ZIS_FILENAME_EXTENSION_ASM ".zsa" CACHE STRING "File name extension for assembly code.")
 
 string(TOUPPER ${ZIS_OUTPUT_NAME} zis_name_upper)
-set(ZIS_ENVIRON_NAME_PATH "${zis_name_upper}_PATH" CACHE STRING "Environment variable name for search path. Optional.")
+set(ZIS_ENVIRON_NAME_PATH "${zis_name_upper}_PATH" CACHE STRING
+    "Environment variable name for search path. Optional.")
+set(ZIS_ENVIRON_NAME_DEBUG_LOG "${zis_name_upper}_DEBUG_LOG" CACHE STRING
+    "Environment variable name for debug logging configuration. Optional.")
 unset(zis_name_upper)
 
 ##########################
@@ -33,6 +36,7 @@ file(CONFIGURE OUTPUT "${zis_core_conf_header_dir}/zis_config.h" @ONLY CONTENT [
 #define         ZIS_FILENAME_EXTENSION_BYT "@ZIS_FILENAME_EXTENSION_BYT@"
 #define         ZIS_FILENAME_EXTENSION_ASM "@ZIS_FILENAME_EXTENSION_ASM@"
 #cmakedefine    ZIS_ENVIRON_NAME_PATH "@ZIS_ENVIRON_NAME_PATH@"
+#cmakedefine    ZIS_ENVIRON_NAME_DEBUG_LOG "@ZIS_ENVIRON_NAME_DEBUG_LOG@"
 #cmakedefine    ZIS_DISPLAY_NAME    "@ZIS_DISPLAY_NAME@"
 #cmakedefine    ZIS_MALLOC_INCLUDE  "@ZIS_MALLOC_INCLUDE@"
 #cmakedefine01  ZIS_DEBUG

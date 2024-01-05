@@ -15,6 +15,11 @@ typedef uint8_t zis_char8_t;
 /// UTF-32 char.
 typedef uint32_t zis_wchar_t;
 
+/* ----- C-style string utilities ------------------------------------------- */
+
+/// Compare two string, ignoring the letter cases.
+int zis_str_icmp(const char *s1, const char *s2);
+
 /* ----- UTF-8 support ------------------------------------------------------ */
 
 /// Convert Unicode code point to UTF-8 character. Return character length.

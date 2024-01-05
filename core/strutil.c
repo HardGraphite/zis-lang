@@ -4,12 +4,33 @@
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "algorithm.h"
 #include "attributes.h"
+#include "platform.h"
+
+#if ZIS_SYSTEM_POSIX
+#    include <strings.h> // strcasecmp()
+#endif // ZIS_SYSTEM_POSIX
 
 static_assert(sizeof(zis_char8_t) == 1, "");
 static_assert(sizeof(zis_wchar_t) == 4, "");
+
+int zis_str_icmp(const char *s1, const char *s2) {
+#if ZIS_SYSTEM_WINDOWS
+    return _stricmp(s1, s2);
+#elif ZIS_SYSTEM_POSIX
+    return strcasecmp(s1, s2);
+#else
+    while (true) {
+        const int c1 = (int)*s1++, c2 = (int)*s2++;
+        const int d = tolower(c1) - tolower(c2);
+        if (d || !c1)
+            return d;
+    }
+#endif
+}
 
 size_t zis_u8char_from_code(
     zis_wchar_t code, zis_char8_t utf8_char_buf[ZIS_PARAMARRAY_STATIC 4]
