@@ -13,16 +13,14 @@
 #include "moduleobj.h"
 #include "nilobj.h"
 #include "stringobj.h"
+#include "symbolobj.h"
 #include "tupleobj.h"
 #include "typeobj.h"
 
 /// Initialize values.
 static void globals_init_values(struct zis_context_globals *g, struct zis_context *z) {
     const size_t tmp_regs_num = 3;
-    struct zis_callstack *callstack = z->callstack;
-    struct zis_object **tmp_regs = callstack->top;
-    callstack->top = tmp_regs + tmp_regs_num;
-    zis_object_vec_zero(tmp_regs, tmp_regs_num);
+    struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, tmp_regs_num);
 
     g->val_nil = _zis_nil_obj_new(z);
     g->val_true = _zis_bool_obj_new(z, true);
@@ -33,8 +31,7 @@ static void globals_init_values(struct zis_context_globals *g, struct zis_contex
 
     g->val_common_top_module = zis_module_obj_new_r(z, tmp_regs);
 
-    assert(callstack->top == tmp_regs + tmp_regs_num);
-    callstack->top = tmp_regs;
+    zis_callstack_frame_free_temp(z, tmp_regs_num);
     tmp_regs[0] = zis_smallint_to_ptr(0);
 }
 
@@ -67,6 +64,17 @@ static void globals_init_types(struct zis_context_globals *g, struct zis_context
 #undef E
 }
 
+/// Initialize symbols
+static void globals_init_symbols(struct zis_context_globals *g, struct zis_context *z) {
+
+#define E(NAME) g-> sym_##NAME = zis_symbol_registry_get(z, #NAME, (size_t)-1);
+
+    _ZIS_BUILTIN_SYM_LIST
+
+#undef E
+
+}
+
 /// GC visitor. See `zis_objmem_object_visitor_t`.
 static void globals_gc_visitor(void *_g, enum zis_objmem_obj_visit_op op) {
     struct zis_context_globals *const g = _g;
@@ -84,6 +92,7 @@ struct zis_context_globals *zis_context_globals_create(struct zis_context *z) {
     z->globals = g;
     globals_init_types(g, z); // types first
     globals_init_values(g, z);
+    globals_init_symbols(g, z);
     z->globals = orig_z_g;
     return g;
 }

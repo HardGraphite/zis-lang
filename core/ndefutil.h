@@ -10,6 +10,11 @@
 #include "object.h"
 #include "zis.h" // zis_native_*
 
+/* ----- macros ------------------------------------------------------------- */
+
+#define ZIS_IDENTIFIER_TO_STR(X)  _ZIS_IDENTIFIER_TO_STR(X)
+#define _ZIS_IDENTIFIER_TO_STR(X) #X
+
 /* ----- object structs ----------------------------------------------------- */
 
 /// Check whether a C struct may be an object struct
@@ -108,6 +113,12 @@ const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( NAME ) = {  \
 /// Size of fixed part of extendable BYTES part of a native object based on the C struct.
 #define ZIS_NATIVE_TYPE_STRUCT_XB_FIXED_SIZE(STRUCT, BYTES_SIZE_VAR) \
     (sizeof(STRUCT) - offsetof(STRUCT, BYTES_SIZE_VAR))
+
+/// See `ZIS_NATIVE_MODULE()`.
+#define ZIS_NATIVE_MODULE_VARNAME(MOD_NAME)  ZIS_NATIVE_MODULE(MOD_NAME)
+
+/// Prefix of `ZIS_NATIVE_MODULE_VARNAME()` defined variables as a string.
+#define ZIS_NATIVE_MODULE_VARNAME_PREFIX_STR  ZIS_IDENTIFIER_TO_STR(ZIS_NATIVE_MODULE_VARNAME())
 
 /* ----- functions to operate a vector of objects --------------------------- */
 

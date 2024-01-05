@@ -7,6 +7,7 @@
 struct zis_callstack;
 struct zis_context;
 struct zis_context_globals;
+struct zis_module_loader;
 struct zis_objmem_context;
 struct zis_symbol_registry;
 
@@ -18,6 +19,7 @@ struct zis_context {
     struct zis_callstack       *callstack;
     struct zis_context_globals *globals;
     struct zis_symbol_registry *symbol_registry;
+    struct zis_module_loader   *module_loader;
     zis_context_panic_handler_t panic_handler;
 };
 

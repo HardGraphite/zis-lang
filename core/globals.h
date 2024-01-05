@@ -34,6 +34,10 @@ struct zis_type_obj;
     E(Tuple)                   \
 // ^^^ _ZIS_BUILTIN_TYPE_LIST ^^^
 
+#define _ZIS_BUILTIN_SYM_LIST \
+    E(init)                   \
+// ^^^ _ZIS_BUILTIN_SYM_LIST ^^^
+
 /// Globals. This is a GC root.
 struct zis_context_globals {
 
@@ -44,6 +48,10 @@ struct zis_context_globals {
 #define E(NAME) struct zis_type_obj * type_##NAME ;
     _ZIS_BUILTIN_TYPE_LIST
     E(Type)
+#undef E
+
+#define E(NAME) struct zis_symbol_obj * sym_##NAME ;
+    _ZIS_BUILTIN_SYM_LIST
 #undef E
 
 };

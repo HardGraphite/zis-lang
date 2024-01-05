@@ -11,12 +11,26 @@
 static const struct clopts_program program;
 
 struct command_line_args {
-    int _;
+    const char **rest_args;
+    size_t rest_args_num;
 };
 
 static void oh_help(struct clopts_context *ctx, const char *arg, void *_data) {
     assert(!arg), (void)arg, (void)_data;
-    clopts_help(&program, stdout, ctx);
+    FILE *stream = stdout;
+
+    clopts_help(&program, stream, ctx);
+
+    const char *const environ_helps[] = {
+#ifdef ZIS_ENVIRON_NAME_PATH
+        ZIS_ENVIRON_NAME_PATH "\0A semicolon-separated list of module search paths.",
+#endif // ZIS_ENVIRON_NAME_PATH
+        NULL,
+    };
+    fputs("\nEnvironment variables:\n", stream);
+    for (const char *const *p = environ_helps; *p; p++)
+        fprintf(stream, "  %-13s %s\n", *p, strchr(*p, 0) + 1);
+
     clopts_handler_break(ctx);
 }
 
@@ -32,7 +46,11 @@ static void oh_version(struct clopts_context *ctx, const char *arg, void *_data)
 static void rest_args_handler(
     struct clopts_context *ctx, const char *argv[], int argc, void *_data
 ) {
-    (void)ctx, (void)argv, (void)argc, (void)_data;
+    (void)ctx;
+    struct command_line_args *args = _data;
+    assert(argc >= 0);
+    args->rest_args = argv;
+    args->rest_args_num = (size_t)argc;
 }
 
 static const struct clopts_option program_options[] = {
@@ -42,7 +60,7 @@ static const struct clopts_option program_options[] = {
 };
 
 static const struct clopts_program program = {
-    .usage_args = "[OPTION...]",
+    .usage_args = "[OPTION...] [FILE|@MODULE [ARGUMENT...]]",
     .options = program_options,
     .rest_args = rest_args_handler,
 };
@@ -57,13 +75,39 @@ static void parse_command_line_args(
     exit(ret > 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
+static int start(zis_t z, void *_args) {
+    struct command_line_args *const args = _args;
+    int exit_status = EXIT_SUCCESS;
+
+    if (args->rest_args_num) {
+        const char *module = args->rest_args[0];
+        int imp_flags = 0;
+        if (module[0] == '@') {
+            module++;
+            imp_flags |= ZIS_IMP_NAME;
+        } else {
+            imp_flags |= ZIS_IMP_PATH;
+        }
+        if (zis_import(z, module, imp_flags) == ZIS_THR) {
+            char msg[64];
+            size_t msg_sz = sizeof msg;
+            zis_read_exception(z, 0, 0, 0, 0);
+            if (zis_read_string(z, 0, msg, &msg_sz) == ZIS_OK)
+                fprintf(stderr, ZIS_DISPLAY_NAME ": error: %.*s\n", (int)msg_sz, msg);
+            exit_status = EXIT_FAILURE;
+        }
+    }
+
+    return exit_status;
+}
+
 static int zis_main(int argc, char *argv[]) {
     struct command_line_args args;
     parse_command_line_args(argc, argv, &args);
-
     struct zis_context *const z = zis_create();
+    int exit_status = zis_native_block(z, 0, start, &args);
     zis_destroy(z);
-    return EXIT_SUCCESS;
+    return exit_status;
 }
 
 #ifdef _WIN32

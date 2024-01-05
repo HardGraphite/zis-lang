@@ -7,17 +7,32 @@ set(ZIS_MALLOC_INCLUDE "" CACHE FILEPATH
 set(ZIS_MALLOC_LINK "" CACHE FILEPATH
     "Path to a library to link, which provides the functions in `ZIS_MALLOC_INCLUDE'.")
 
+set(ZIS_FILENAME_EXTENSION_SRC ".zis" CACHE STRING "File name extension for source code.")
+set(ZIS_FILENAME_EXTENSION_NDL ".zso" CACHE STRING "File name extension for native dynamic libraries.")
+set(ZIS_FILENAME_EXTENSION_BYT ".zsc" CACHE STRING "File name extension for bytecode dumps.")
+set(ZIS_FILENAME_EXTENSION_ASM ".zsa" CACHE STRING "File name extension for assembly code.")
+
+string(TOUPPER ${ZIS_OUTPUT_NAME} zis_name_upper)
+set(ZIS_ENVIRON_NAME_PATH "${zis_name_upper}_PATH" CACHE STRING "Environment variable name for search path. Optional.")
+unset(zis_name_upper)
+
 ##########################
 ##### Generate files #####
 ##########################
 
 set(zis_core_conf_header_dir "${CMAKE_CURRENT_BINARY_DIR}")
+set(zis_core_conf_header_dir ${zis_core_conf_header_dir} PARENT_SCOPE)
 
 file(CONFIGURE OUTPUT "${zis_core_conf_header_dir}/zis_config.h" @ONLY CONTENT [==[
 #pragma once
 #define         ZIS_VERSION_MAJOR   @ZIS_VERSION_MAJOR@
 #define         ZIS_VERSION_MINOR   @ZIS_VERSION_MINOR@
 #define         ZIS_VERSION_PATCH   @ZIS_VERSION_PATCH@
+#define         ZIS_FILENAME_EXTENSION_SRC "@ZIS_FILENAME_EXTENSION_SRC@"
+#define         ZIS_FILENAME_EXTENSION_NDL "@ZIS_FILENAME_EXTENSION_NDL@"
+#define         ZIS_FILENAME_EXTENSION_BYT "@ZIS_FILENAME_EXTENSION_BYT@"
+#define         ZIS_FILENAME_EXTENSION_ASM "@ZIS_FILENAME_EXTENSION_ASM@"
+#cmakedefine    ZIS_ENVIRON_NAME_PATH "@ZIS_ENVIRON_NAME_PATH@"
 #cmakedefine    ZIS_DISPLAY_NAME    "@ZIS_DISPLAY_NAME@"
 #cmakedefine    ZIS_MALLOC_INCLUDE  "@ZIS_MALLOC_INCLUDE@"
 #cmakedefine01  ZIS_DEBUG
@@ -72,7 +87,7 @@ if(UNIX)
     else()
         set(scope INTERFACE)
     endif()
-    target_link_libraries(${zis_core_tgt} ${scope} "m")
+    target_link_libraries(${zis_core_tgt} ${scope} "m" "dl")
     unset(scope)
 endif()
 

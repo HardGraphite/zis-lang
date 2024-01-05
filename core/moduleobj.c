@@ -2,6 +2,7 @@
 
 #include "context.h"
 #include "globals.h"
+#include "invoke.h"
 #include "ndefutil.h"
 #include "objmem.h"
 #include "stack.h"
@@ -43,7 +44,8 @@ void zis_module_obj_load_native_def(
     struct zis_module_obj *self,
     const struct zis_native_module_def *def
 ) {
-    struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 5);
+    const size_t tmp_regs_n = 5;
+    struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, tmp_regs_n);
 
     // ~~ tmp_regs[0] = mod, tmp_regs[1...4] = tmp ~~
 
@@ -62,6 +64,26 @@ void zis_module_obj_load_native_def(
         for (const struct zis_native_type_def *p = def->types; p->name || p->slots_num || p->bytes_size; p++) {
             if (p->name)
                 def_type_cnt++;
+        }
+    }
+
+    // ~~ tmp_regs[0] = mod, tmp_regs[1] = func_table ~~
+
+    if (def->functions) {
+        const struct zis_native_func_def *const first_func_def = &def->functions[0];
+        if (!first_func_def->name && first_func_def->code) {
+            struct zis_array_slots_obj *func_table = zis_array_slots_obj_new(z, NULL, 1);
+            tmp_regs[1] = zis_object_from(func_table);
+            struct zis_object *const init_func = zis_object_from(
+                zis_func_obj_new_native(z, first_func_def->meta, first_func_def->code)
+            );
+            assert(zis_object_type(tmp_regs[1]) == z->globals->type_Array_Slots);
+            func_table = zis_object_cast(tmp_regs[1], struct zis_array_slots_obj);
+            zis_array_slots_obj_set(func_table, 0, init_func);
+            assert(zis_object_type(tmp_regs[0]) == z->globals->type_Module);
+            self = zis_object_cast(tmp_regs[0], struct zis_module_obj);
+            self->_functions = func_table;
+            zis_object_write_barrier(self, func_table);
         }
     }
 
@@ -115,6 +137,8 @@ void zis_module_obj_load_native_def(
             );
         }
     }
+
+    zis_callstack_frame_free_temp(z, tmp_regs_n);
 }
 
 void zis_module_obj_add_parent(
@@ -242,6 +266,61 @@ struct zis_object *zis_module_obj_get(
     const zis_smallint_t index_smi = zis_smallint_from_ptr(index_obj);
     assert(index_smi >= 0);
     return zis_array_slots_obj_get(self->_variables, (size_t)index_smi);
+}
+
+struct zis_func_obj *zis_module_obj_function(
+    const struct zis_module_obj *self, size_t index
+) {
+    struct zis_array_slots_obj *const func_table = self->_functions;
+    if (zis_unlikely(index >= zis_array_slots_obj_length(func_table)))
+        return NULL;
+    struct zis_object *f = zis_array_slots_obj_get(func_table, index);
+    if (zis_unlikely(zis_object_is_smallint(f)))
+        return NULL;
+    // assert(zis_object_type(f) == z->globals->type_Function);
+    return zis_object_cast(f, struct zis_func_obj);
+}
+
+int zis_module_obj_do_init(
+    struct zis_context *z,
+    struct zis_module_obj *self
+) {
+    struct zis_func_obj *mod_init_fn = zis_module_obj_function(self, 0);
+    if (!mod_init_fn)
+        return ZIS_OK;
+
+    int status;
+
+    struct zis_object **const tmp_regs = zis_callstack_frame_alloc_temp(z, 2);
+    tmp_regs[0] = zis_object_from(self);
+    tmp_regs[1] = zis_object_from(self);
+
+    if (!zis_invoke_prepare_va(z, zis_object_from(mod_init_fn), tmp_regs, 1)) {
+        tmp_regs[0] = z->callstack->frame[0];
+        status = ZIS_THR;
+    } else if (zis_invoke_func(z, mod_init_fn) == ZIS_THR) {
+        // TODO: add to traceback.
+        zis_invoke_cleanup(z);
+        tmp_regs[0] = z->callstack->frame[0];
+        status = ZIS_THR;
+    } else {
+        tmp_regs[0] = zis_invoke_cleanup(z);
+        status = ZIS_OK;
+    }
+
+    assert(zis_object_type(tmp_regs[1]) == z->globals->type_Module);
+    self = zis_object_cast(tmp_regs[1], struct zis_module_obj);
+
+    if (zis_array_slots_obj_length(self->_functions) == 1) {
+        self->_functions = z->globals->val_empty_array_slots;
+        zis_object_write_barrier(self, self->_functions);
+    } else {
+        zis_array_slots_obj_set(self->_functions, 0, zis_smallint_to_ptr(0));
+    }
+
+    zis_callstack_frame_free_temp(z, 2);
+
+    return status;
 }
 
 ZIS_NATIVE_TYPE_DEF_NB(

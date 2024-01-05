@@ -17,6 +17,7 @@ Source code for the runtime core.
   - [`debug.h`](debug.h), [`debug.c`](debug.c)
   - [`globals.h`](globals.h), [`globals.c`](globals.c)
   - [`invoke.h`](invoke.h), [`invoke.c`](invoke.c)
+  - [`loader.h`](loader.h), [`loader.c`](loader.c)
   - [`stack.h`](stack.h), [`stack.c`](stack.c)
 + object system support (`obj*.*`)
   - [`ndefutil.h`](ndefutil.h)

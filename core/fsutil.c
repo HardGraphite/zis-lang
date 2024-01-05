@@ -10,6 +10,7 @@
 #if ZIS_FS_POSIX
 
 #include <dirent.h>
+#include <dlfcn.h>
 #include <limits.h>
 #include <unistd.h>
 #include <sys/param.h>
@@ -82,6 +83,14 @@ size_t zis_path_len(const zis_path_char_t *path) {
     return strlen(path);
 #elif ZIS_FS_WINDOWS
     return wcslen(path);
+#endif
+}
+
+int zis_path_compare(const zis_path_char_t *path1, const zis_path_char_t *path2) {
+#if ZIS_FS_POSIX
+    return strcmp(path1, path2);
+#elif ZIS_FS_WINDOWS
+    return _wcsicmp(path);
 #endif
 }
 
@@ -218,7 +227,25 @@ size_t zis_path_filename(zis_path_char_t *buf, const zis_path_char_t *path) {
     return zis_path_copy(buf, s);
 }
 
+static size_t _zis_path_stem_len(const zis_path_char_t *path) {
+    // Adapted from `zis_path_stem()`.
+
+    const zis_path_char_t *last_dir_sep = rfind_dir_sep(path);
+    if (last_dir_sep) {
+        if (zis_unlikely(last_dir_sep[1] == 0))
+            return 0;
+        path = last_dir_sep + 1;
+    }
+    const zis_path_char_t *const last_dot = rfind_ext_dot(path);
+    if (last_dot)
+        return (size_t)(last_dot - path);
+    return zis_path_len(path);
+}
+
 size_t zis_path_stem(zis_path_char_t *buf, const zis_path_char_t *path) {
+    if (!buf)
+        return _zis_path_stem_len(path);
+
     const zis_path_char_t *last_dir_sep = rfind_dir_sep(path);
     size_t res_len;
     if (last_dir_sep) {
@@ -241,10 +268,11 @@ size_t zis_path_stem(zis_path_char_t *buf, const zis_path_char_t *path) {
 size_t zis_path_extension(zis_path_char_t *buf, const zis_path_char_t *path) {
     const zis_path_char_t *const last_dot = rfind_ext_dot(path);
     if (zis_unlikely(!last_dot)) {
-        buf[0] = 0;
+        if (buf)
+            buf[0] = 0;
         return 0;
     }
-    return zis_path_copy(buf, last_dot);
+    return buf ? zis_path_copy(buf, last_dot) : zis_path_len(last_dot);
 }
 
 size_t zis_path_parent(zis_path_char_t *buf, const zis_path_char_t *path) {
@@ -310,34 +338,32 @@ size_t zis_fs_absolute(zis_path_char_t *buf, const zis_path_char_t *path) {
 #endif
 }
 
-int zis_fs_filetype(const zis_path_char_t *path) {
+enum zis_fs_filetype zis_fs_filetype(const zis_path_char_t *path) {
 #if ZIS_FS_POSIX
 
     struct stat file_stat;
     if (zis_unlikely(stat(path, &file_stat)))
-        return -1;
-    int result = 0;
+        return ZIS_FS_FT_ERROR;
     if (S_ISREG(file_stat.st_mode))
-        result |= ZIS_FS_FT_REG;
+        return ZIS_FS_FT_REG;
     if (S_ISDIR(file_stat.st_mode))
-        result |= ZIS_FS_FT_DIR;
+        return ZIS_FS_FT_DIR;
     if (S_ISLNK(file_stat.st_mode))
-        result |= ZIS_FS_FT_LNK;
-    return result;
+        return ZIS_FS_FT_LNK;
+    return ZIS_FS_FT_OTHER;
 
 #elif ZIS_FS_WINDOWS
 
     const DWORD attr = GetFileAttributesW(path);
     if (attr == INVALID_FILE_ATTRIBUTES)
-        return -1;
-    int result = 0;
+        return ZIS_FS_FT_ERROR;
     if (attr & FILE_ATTRIBUTE_NORMAL)
-        result |= ZIS_FS_FT_REG;
+        return ZIS_FS_FT_REG;
     if (attr & FILE_ATTRIBUTE_DIRECTORY)
-        result |= ZIS_FS_FT_DIR;
+        return  ZIS_FS_FT_DIR;
     if (attr & FILE_ATTRIBUTE_REPARSE_POINT)
-        result |= ZIS_FS_FT_LNK;
-    return result;
+        return  ZIS_FS_FT_LNK;
+    return ZIS_FS_FT_OTHER;
 
 #endif
 }
@@ -398,5 +424,33 @@ const zis_path_char_t *zis_fs_user_home_dir(void) {
     return getenv("HOME");
 #elif ZIS_FS_WINDOWS
     return _wgetenv(L"USERPROFILE");
+#endif
+}
+
+/* ----- file I/O ----------------------------------------------------------- */
+
+zis_nodiscard zis_dl_handle_t zis_dl_open(const zis_path_char_t *file) {
+#if ZIS_FS_POSIX
+    static_assert(sizeof(void *) == sizeof(zis_dl_handle_t), "");
+    return dlopen(file, RTLD_LAZY);
+#elif ZIS_FS_WINDOWS
+    static_assert(sizeof(HMODULE) == sizeof(zis_dl_handle_t), "");
+    return LoadLibraryW(file);
+#endif
+}
+
+void zis_dl_close(zis_dl_handle_t lib) {
+#if ZIS_FS_POSIX
+    dlclose(lib);
+#elif ZIS_FS_WINDOWS
+    FreeLibrary(lib);
+#endif
+}
+
+void *zis_dl_get(zis_dl_handle_t lib, const char *name) {
+#if ZIS_FS_POSIX
+    return dlsym(lib, name);
+#elif ZIS_FS_WINDOWS
+    return (void *)GetProcAddress(lib, name);
 #endif
 }

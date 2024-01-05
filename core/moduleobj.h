@@ -20,7 +20,7 @@ struct zis_module_obj {
     // --- SLOTS ---
     struct zis_map_obj *_name_map; // { name (Symbol) -> var_index (smallint) }
     struct zis_array_slots_obj *_variables; // { variable }
-    struct zis_array_slots_obj *_functions; // { function (Function) }
+    struct zis_array_slots_obj *_functions; // { function (Function|smallint{0}) }; the first is the initializer
     struct zis_object *_parent; // smallint{0} / Module / Array[Module]
 };
 
@@ -91,10 +91,15 @@ struct zis_object *zis_module_obj_get(
     struct zis_symbol_obj *name
 );
 
-/// Visit module function table by index. No bounds checking.
-zis_static_force_inline struct zis_func_obj *zis_module_obj_function(
+/// Visit module function table by index with bounds checking.
+/// Returns NULL if fails.
+struct zis_func_obj *zis_module_obj_function(
     const struct zis_module_obj *self, size_t index
-) {
-    struct zis_object *f = zis_array_slots_obj_get(self->_functions, index);
-    return zis_object_cast(f, struct zis_func_obj);
-}
+);
+
+/// Call module initializer function if given. Returns `ZIS_OK` or `ZIS_THR`.
+/// Thrown object (if there is) will also be copied to REG-0.
+int zis_module_obj_do_init(
+    struct zis_context *z,
+    struct zis_module_obj *self
+);

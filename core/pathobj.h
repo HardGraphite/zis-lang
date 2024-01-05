@@ -21,3 +21,6 @@ size_t zis_path_obj_path_len(const struct zis_path_obj *self);
 
 /// Get path string.
 const zis_path_char_t *zis_path_obj_data(const struct zis_path_obj *self);
+
+/// Check whether two paths are lexicographically equal.
+bool zis_path_obj_same(const struct zis_path_obj *path1, const struct zis_path_obj *path2);

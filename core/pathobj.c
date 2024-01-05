@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <stddef.h>
+#include <string.h>
 
 #include "context.h"
 #include "fsutil.h"
@@ -48,6 +49,12 @@ size_t zis_path_obj_path_len(const struct zis_path_obj *self) {
 
 const zis_path_char_t *zis_path_obj_data(const struct zis_path_obj *self) {
     return self->_data;
+}
+
+bool zis_path_obj_same(const struct zis_path_obj *path1, const struct zis_path_obj *path2) {
+    if (path1->_path_len != path2->_path_len)
+        return false;
+    return memcmp(path1->_data, path2->_data, path1->_path_len * sizeof(zis_path_char_t)) == 0;
 }
 
 ZIS_NATIVE_TYPE_DEF_XB(

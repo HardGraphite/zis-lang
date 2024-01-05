@@ -53,6 +53,9 @@ typedef wchar_t zis_path_char_t;
 /// Get path string length (number of `zis_path_char_t` characters).
 size_t zis_path_len(const zis_path_char_t *path);
 
+/// Compare two paths.
+int zis_path_compare(const zis_path_char_t *path1, const zis_path_char_t *path2);
+
 /// Allocate a path string. `len` is the max number of characters (excluding terminating NUL).
 zis_nodiscard zis_path_char_t *zis_path_alloc(size_t len);
 
@@ -109,10 +112,11 @@ size_t zis_path_join_n(
 /// Get the file name component of a path. Writes the result to `buf` and returns the result length.
 size_t zis_path_filename(zis_path_char_t *buf, const zis_path_char_t *path);
 
-/// Get the file name without the final extension of a path. Writes the result to `buf` and returns the result length.
+/// Get the file name without the final extension of a path.
+/// Writes the result to `buf` (optional) and returns the result length.
 size_t zis_path_stem(zis_path_char_t *buf, const zis_path_char_t *path);
 
-/// Get the extension component of a path. Writes the result to `buf` and returns the result length.
+/// Get the extension component of a path. Writes the result to `buf` (optional) and returns the result length.
 size_t zis_path_extension(zis_path_char_t *buf, const zis_path_char_t *path);
 
 /// Get the parent path. Writes the result to `buf` and returns the result length.
@@ -133,12 +137,17 @@ bool zis_fs_exists(const zis_path_char_t *path);
 /// On failure, returns 0.
 size_t zis_fs_absolute(zis_path_char_t *buf, const zis_path_char_t *path);
 
-#define ZIS_FS_FT_REG  0x01 ///< Is a regular file.
-#define ZIS_FS_FT_DIR  0x02 ///< Is a directory.
-#define ZIS_FS_FT_LNK  0x04 ///< Is a symbolic link.
+enum zis_fs_filetype {
+    ZIS_FS_FT_ERROR = -1, ///< File was not found.
+    ZIS_FS_FT_OTHER =  0, ///< File exits but the type is unknown.
 
-/// Get file type. On success, return `ZIS_FS_FT_XXX` values; on failure, return `-1`.
-int zis_fs_filetype(const zis_path_char_t *path);
+    ZIS_FS_FT_REG, ///< Is a regular file.
+    ZIS_FS_FT_DIR, ///< Is a directory.
+    ZIS_FS_FT_LNK, ///< Is a symbolic link.
+};
+
+/// Get file type. On success, returns a `ZIS_FS_FT_XXX` value.
+enum zis_fs_filetype zis_fs_filetype(const zis_path_char_t *path);
 
 /// Visit files in a directory. Returns -1 on failure.
 int zis_fs_iter_dir(
@@ -148,3 +157,17 @@ int zis_fs_iter_dir(
 
 /// Get home directory of current user. Return NULL if unknown.
 const zis_path_char_t *zis_fs_user_home_dir(void);
+
+/* ----- file I/O ----------------------------------------------------------- */
+
+/// Dynamic library handle.
+typedef struct zis_dl_handle *zis_dl_handle_t;
+
+/// Open a dynamic library.
+zis_nodiscard zis_dl_handle_t zis_dl_open(const zis_path_char_t *file);
+
+/// Close a dynamic library.
+void zis_dl_close(zis_dl_handle_t lib);
+
+/// Get the address of a variable or function in the dynamic library.
+void *zis_dl_get(zis_dl_handle_t lib, const char *name);

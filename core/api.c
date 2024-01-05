@@ -9,6 +9,7 @@
 #include "debug.h"
 #include "globals.h"
 #include "invoke.h"
+#include "loader.h"
 #include "ndefutil.h"
 #include "object.h"
 #include "stack.h"
@@ -21,6 +22,7 @@
 #include "intobj.h"
 #include "mapobj.h"
 #include "moduleobj.h"
+#include "pathobj.h"
 #include "stringobj.h"
 #include "symbolobj.h"
 #include "tupleobj.h"
@@ -957,6 +959,55 @@ ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) {
     const int status = zis_invoke_func(z, func_obj);
     *ret_val_ref = zis_invoke_cleanup(z);
     return status;
+}
+
+static int api_import_by_name(zis_t z, const char *name) {
+    struct zis_symbol_obj *const name_sym =
+        zis_symbol_registry_get(z, name, (size_t)-1);
+    const int loader_flags = ZIS_MOD_LDR_SEARCH_LOADED | ZIS_MOD_LDR_UPDATE_LOADED;
+    struct zis_module_obj *const mod =
+        zis_module_loader_import(z, NULL, name_sym, NULL, loader_flags);
+    if (!mod)
+        return ZIS_THR;
+    z->callstack->frame[0] = zis_object_from(mod);
+    return ZIS_OK;
+}
+
+static int _api_import_by_path_fn(const zis_path_char_t *path, void *_z) {
+    zis_t z = _z;
+    struct zis_path_obj *const path_obj = zis_path_obj_new(z, path, (size_t)-1);
+    struct zis_module_obj *const mod = zis_module_loader_import_file(z, NULL, path_obj);
+    if (!mod)
+        return ZIS_THR;
+    z->callstack->frame[0] = zis_object_from(mod);
+    return ZIS_OK;
+}
+
+static int api_import_by_path(zis_t z, const char *path) {
+    return zis_path_with_temp_path_from_str(path, _api_import_by_path_fn, z);
+}
+
+static int _api_import_add_path_fn(const zis_path_char_t *path, void *_z) {
+    zis_t z = _z;
+    zis_module_loader_add_path(z, zis_path_obj_new(z, path, (size_t)-1));
+    return ZIS_OK;
+}
+
+static int api_import_add_path(zis_t z, const char *path) {
+    return zis_path_with_temp_path_from_str(path, _api_import_add_path_fn, z);
+}
+
+ZIS_API int zis_import(zis_t z, const char *what, int flags) {
+    switch (flags & 0xf) {
+    case ZIS_IMP_NAME:
+        return api_import_by_name(z, what);
+    case ZIS_IMP_PATH:
+        return api_import_by_path(z, what);
+    case ZIS_IMP_ADDP:
+        return api_import_add_path(z, what);
+    default:
+        return ZIS_E_ARG;
+    }
 }
 
 /* ----- zis-api-variables --------------------------------------------------- */

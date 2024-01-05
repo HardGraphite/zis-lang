@@ -167,6 +167,15 @@ struct zis_native_module_def {
 };
 
 /**
+ * A macro to generate the name of the module-def variable.
+ *
+ * To export a module from C, a symbol named `__zis__mod_<MODULE_NAME>` shall be defined,
+ * which is of the type `struct zis_native_module_def`. The symbol must be visible
+ * from outside the compiled object.
+ */
+#define ZIS_NATIVE_MODULE(MODULE_NAME)  __zis__mod_ ## MODULE_NAME
+
+/**
  * Call a C function within an isolated zis frame.
  *
  * Enter a new frame with `reg_max + 1` registers and call C function `fn`.
@@ -456,7 +465,7 @@ ZIS_API int zis_make_module(zis_t z, unsigned int reg, const struct zis_native_m
  * @param argc number of arguments; or `-1` to indicate that `regs[2]` is the
  * packed arguments, which is an Array or a Tuple
  * @return `ZIS_OK` or `ZIS_THR`; `ZIS_E_IDX` (invalid `regs`),
- * `ZIS_E_ARG` (or wrong type of packed arguments).
+ * `ZIS_E_ARG` (wrong type of packed arguments).
  *
  * @details In summary, there are three forms to pass arguments.
  * Here are examples to call function in `REG-0` with arguments in `REG-1` to `REG-3`:
@@ -477,6 +486,30 @@ ZIS_API int zis_make_module(zis_t z, unsigned int reg, const struct zis_native_m
  * @warning `REG-0` must not be used for argument passing.
  */
 ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) ZIS_NOEXCEPT;
+
+#define ZIS_IMP_NAME   0x01 ///< Import by name.
+#define ZIS_IMP_PATH   0x02 ///< Import by file path.
+#define ZIS_IMP_ADDP   0x0f ///< Add to search path.
+
+/**
+ * Import a module by name and store it to `REG-0`.
+ *
+ * @param z zis instance
+ * @param what module name, or file path; see @@details
+ * @param flags `ZIS_IMP_*` values; see @@details
+ * @return `ZIS_OK` or `ZIS_THR`; `ZIS_E_ARG` (illegal `flags` or `what`).
+ *
+ * @details Examples:
+ * ```c
+ * // ##  To import a module by name
+ * zis_import(z, "module_name", ZIS_IMP_NAME);
+ * // ##  To import a module by file path
+ * zis_import(z, "path/to/the/module/file.ext", ZIS_IMP_PATH);
+ * // ##  To add a module search path
+ * zis_import(z, "path/to/the/module/dir", ZIS_IMP_ADDP);
+ * ```
+ */
+ZIS_API int zis_import(zis_t z, const char *what, int flags) ZIS_NOEXCEPT;
 
 /** @} */
 
