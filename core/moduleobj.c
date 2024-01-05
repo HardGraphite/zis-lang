@@ -1,6 +1,7 @@
 #include "moduleobj.h"
 
 #include "context.h"
+#include "debug.h"
 #include "globals.h"
 #include "invoke.h"
 #include "ndefutil.h"
@@ -71,17 +72,19 @@ void zis_module_obj_load_native_def(
 
     if (def->functions) {
         const struct zis_native_func_def *const first_func_def = &def->functions[0];
-        if (!first_func_def->name && first_func_def->code) {
+        if (!first_func_def->name && first_func_def->code && !first_func_def->meta.na && !first_func_def->meta.no) {
             struct zis_array_slots_obj *func_table = zis_array_slots_obj_new(z, NULL, 1);
             tmp_regs[1] = zis_object_from(func_table);
-            struct zis_object *const init_func = zis_object_from(
-                zis_func_obj_new_native(z, first_func_def->meta, first_func_def->code)
-            );
-            assert(zis_object_type(tmp_regs[1]) == z->globals->type_Array_Slots);
-            func_table = zis_object_cast(tmp_regs[1], struct zis_array_slots_obj);
-            zis_array_slots_obj_set(func_table, 0, init_func);
+            const struct zis_func_obj_meta func_obj_meta = { 0, 0, first_func_def->meta.nl + 1 };
+            assert(func_obj_meta.nr != 0);
+            struct zis_func_obj *const init_func =
+                zis_func_obj_new_native(z, func_obj_meta, first_func_def->code);
             assert(zis_object_type(tmp_regs[0]) == z->globals->type_Module);
             self = zis_object_cast(tmp_regs[0], struct zis_module_obj);
+            zis_func_obj_set_module(z, init_func, self);
+            assert(zis_object_type(tmp_regs[1]) == z->globals->type_Array_Slots);
+            func_table = zis_object_cast(tmp_regs[1], struct zis_array_slots_obj);
+            zis_array_slots_obj_set(func_table, 0, zis_object_from(init_func));
             self->_functions = func_table;
             zis_object_write_barrier(self, func_table);
         }
@@ -106,9 +109,16 @@ void zis_module_obj_load_native_def(
             if (!func_def->name)
                 continue;
             i++;
-            tmp_regs[4] = zis_object_from(zis_func_obj_new_native(
-                z, func_def->meta, func_def->code
-            ));
+            struct zis_func_obj_meta func_obj_meta;
+            if (zis_unlikely(!zis_func_obj_meta_conv(&func_obj_meta, func_def->meta))) {
+                zis_debug_log(
+                    ERROR, "Loader",
+                    "(struct zis_native_func_meta){ .na=%u, .no=%u, .nl=%u }: `.nl' is too big",
+                    func_def->meta.na, func_def->meta.no, func_def->meta.nl
+                );
+                continue;
+            }
+            tmp_regs[4] = zis_object_from(zis_func_obj_new_native(z, func_obj_meta, func_def->code));
             zis_func_obj_set_module(
                 z,
                 zis_object_cast(tmp_regs[4], struct zis_func_obj),

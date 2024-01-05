@@ -533,7 +533,7 @@ static void do_test_function__F_add_int(zis_t z) {
 
     // make function
     func_def.name = NULL;
-    func_def.meta = (struct zis_func_meta){ 2, 0, 3 };
+    func_def.meta = (struct zis_native_func_meta){ 2, 0, 0 };
     func_def.code = F_add_int;
     status = zis_make_function(z, 1, &func_def, (unsigned int)-1);
     zis_test_assert_eq(status, ZIS_OK);

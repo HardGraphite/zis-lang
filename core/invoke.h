@@ -4,7 +4,7 @@
 
 #include <stddef.h>
 
-#include "funcobj.h" // struct zis_func_meta func_meta
+#include "funcobj.h"
 
 struct zis_context;
 struct zis_object;

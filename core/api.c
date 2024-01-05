@@ -882,7 +882,10 @@ ZIS_API int zis_make_function(
     struct zis_object **obj_ref = api_ref_local(z, reg);
     if (zis_unlikely(!obj_ref))
         return ZIS_E_IDX;
-    struct zis_func_obj *const func_obj = zis_func_obj_new_native(z, def->meta, def->code);
+    struct zis_func_obj_meta func_obj_meta;
+    if (zis_unlikely(!zis_func_obj_meta_conv(&func_obj_meta, def->meta)))
+        return ZIS_E_ARG;
+    struct zis_func_obj *const func_obj = zis_func_obj_new_native(z, func_obj_meta, def->code);
     *obj_ref = zis_object_from(func_obj);
     struct zis_object *maybe_mod_obj = api_get_local(z, reg_module);
     if (maybe_mod_obj && zis_object_type(maybe_mod_obj) == z->globals->type_Module)

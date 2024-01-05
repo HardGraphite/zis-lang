@@ -24,7 +24,7 @@ format_error_type(struct zis_context *z, struct zis_object *fn) {
 
 zis_noinline zis_cold_fn static void
 format_error_argc(struct zis_context *z, struct zis_func_obj *fn, size_t argc) {
-    const struct zis_func_meta func_meta = fn->meta;
+    const struct zis_func_obj_meta func_meta = fn->meta;
     size_t expected_argc = func_meta.na;
     const char *expected_prefix = "";
     if (func_meta.no) {
@@ -45,9 +45,9 @@ format_error_argc(struct zis_context *z, struct zis_func_obj *fn, size_t argc) {
 /* ----- invocation tools --------------------------------------------------- */
 
 struct invocation_info {
-    struct zis_object  **caller_frame;
-    size_t               arg_shift;
-    struct zis_func_meta func_meta;
+    struct zis_object      **caller_frame;
+    size_t                   arg_shift;
+    struct zis_func_obj_meta func_meta;
 };
 
 /// Enter a new frame for a invocation.
@@ -89,7 +89,7 @@ zis_static_force_inline bool invocation_pass_args_vec(
     size_t argc,
     struct invocation_info *info
 ) {
-    const struct zis_func_meta func_meta = info->func_meta;
+    const struct zis_func_obj_meta func_meta = info->func_meta;
     assert(func_meta.nr >= 1U + func_meta.na + (func_meta.no == (unsigned char)-1 ? 1U : func_meta.no));
     const size_t argc_min = func_meta.na;
     assert(info->arg_shift > 0);
@@ -146,7 +146,7 @@ zis_static_force_inline bool invocation_pass_args_dis(
 ) {
     // Adapted from `invocation_pass_args_vec()`.
 
-    const struct zis_func_meta func_meta = info->func_meta;
+    const struct zis_func_obj_meta func_meta = info->func_meta;
     assert(func_meta.nr >= 1U + func_meta.na + (func_meta.no == (unsigned char)-1 ? 1U : func_meta.no));
     const size_t argc_min = func_meta.na;
     assert(info->arg_shift > 0);
@@ -249,7 +249,7 @@ static bool _zis_invoke_prepare_pa_pass_args(
     assert(zis_tuple_obj_length(zis_object_cast(packed_args, struct zis_tuple_obj)) >= argc);
     assert(zis_array_slots_obj_length(zis_object_cast(packed_args, struct zis_array_slots_obj)) >= argc);
 
-    const struct zis_func_meta func_meta = info->func_meta;
+    const struct zis_func_obj_meta func_meta = info->func_meta;
     if (zis_likely(argc <= func_meta.na || func_meta.no != (unsigned char)-1)) {
         // No object allocation. No need to worry about `packed_args` been moved.
         return invocation_pass_args_vec(z, argv, argc, info);

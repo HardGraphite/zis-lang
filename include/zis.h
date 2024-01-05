@@ -122,21 +122,21 @@ ZIS_API zis_panic_handler_t zis_at_panic(zis_t z, zis_panic_handler_t h) ZIS_NOE
 typedef int (*zis_native_func_t)(zis_t) ZIS_NOEXCEPT;
 
 /**
- * Metadata of a function.
+ * Metadata of a native function.
  */
-struct zis_func_meta {
-    unsigned char  na; ///< Number of arguments (excluding optional ones).
-    unsigned char  no; ///< Number of optional arguments. Or `-1` to accept a `Tuple` holding the rest arguments (variadic).
-    unsigned short nr; ///< Number of registers (arguments and local variables, including REG-0).
+struct zis_native_func_meta {
+    uint8_t  na; ///< Number of arguments (excluding optional ones).
+    uint8_t  no; ///< Number of optional arguments. Or `-1` to accept a `Tuple` holding the rest arguments (variadic).
+    uint16_t nl; ///< Number of local variables (excluding REG-0 and arguments).
 };
 
 /**
  * Definition of a native function.
  */
 struct zis_native_func_def {
-    const char          *name;
-    struct zis_func_meta meta;
-    zis_native_func_t    code;
+    const char                 *name;
+    struct zis_native_func_meta meta;
+    zis_native_func_t           code;
 };
 
 /**
@@ -436,7 +436,7 @@ ZIS_API int zis_read_exception(
  * @param reg register index
  * @param def native function definition; field `name` is ignored
  * @param reg_module index of the register where the module is; or `-1` to ignore.
- * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg` or `reg_module`).
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg` or `reg_module`), `ZIS_E_ARG` (illegal `def`).
  */
 ZIS_API int zis_make_function(
     zis_t z, unsigned int reg,
