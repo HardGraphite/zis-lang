@@ -22,9 +22,9 @@ static void context_read_environ_path(struct zis_context *z) {
 #ifdef ZIS_ENVIRON_NAME_PATH
 
 #if ZIS_SYSTEM_WINDOWS
-#    define char     wchar_t
-#    define strchr   wcschr
-#    define getenv   _wgetenv
+#    define char       wchar_t
+#    define strchr     wcschr
+#    define getenv(x)  _wgetenv(ZIS_PATH_STR(x))
 #endif // ZIS_SYSTEM_WINDOWS
 
     const char *const var_path = getenv(ZIS_ENVIRON_NAME_PATH);

@@ -90,7 +90,7 @@ int zis_path_compare(const zis_path_char_t *path1, const zis_path_char_t *path2)
 #if ZIS_FS_POSIX
     return strcmp(path1, path2);
 #elif ZIS_FS_WINDOWS
-    return _wcsicmp(path);
+    return _wcsicmp(path1, path2);
 #endif
 }
 
@@ -122,12 +122,12 @@ int zis_path_with_temp_path_from_str(
 
 #elif ZIS_FS_WINDOWS
 
-    int path_len = MultiByteToWideChar(CP_UTF8, 0, utf8String, -1, NULL, 0);
+    int path_len = MultiByteToWideChar(CP_UTF8, 0, str, -1, NULL, 0);
     assert(path_len >= 0);
     wchar_t *path = zis_path_alloc(path_len);
-    MultiByteToWideChar(CP_UTF8, 0, utf8String, -1, path, path_len);
+    MultiByteToWideChar(CP_UTF8, 0, str, -1, path, path_len);
 
-    const in fn_ret = fn(path, fn_arg);
+    const int fn_ret = fn(path, fn_arg);
     zis_mem_free(path);
     return fn_ret;
 
@@ -144,12 +144,12 @@ int zis_path_with_temp_str_from_path(
 
 #elif ZIS_FS_WINDOWS
 
-    int u8str_sz = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, NULL, 0, NULL, NULL);
+    int u8str_sz = WideCharToMultiByte(CP_UTF8, 0, path, -1, NULL, 0, NULL, NULL);
     assert(u8str_sz >= 0);
     char *const u8str = zis_mem_alloc(u8str_sz);
-    WideCharToMultiByte(CP_UTF8, 0, wstr, -1, u8str, u8str_sz, NULL, NULL);
+    WideCharToMultiByte(CP_UTF8, 0, path, -1, u8str, u8str_sz, NULL, NULL);
 
-    const in fn_ret = fn(u8str, fn_arg);
+    const int fn_ret = fn(u8str, fn_arg);
     zis_mem_free(u8str);
     return fn_ret;
 
@@ -287,7 +287,7 @@ size_t zis_path_parent(zis_path_char_t *buf, const zis_path_char_t *path) {
 #if ZIS_FS_WINDOWS
     if (n == 2 && path[1] == L':' && isalpha(path[0])) { // "X:/"
         buf[2] = L'\\', buf[3] = 0;
-        return path_buffer;
+        return 3;
     }
 #endif // ZIS_FS_WINDOWS
     if (zis_unlikely(!n)) {
@@ -395,25 +395,26 @@ int zis_fs_iter_dir(
 
 #elif ZIS_FS_WINDOWS
 
-    size_t dir_len = zis_path_len(dir_path);
-    if (zis_unlikely(dir_len > (MAX_PATH - 3)))
-        return -1; // Too long.
-    zis_path_char_t *const dir = zis_path_copy_n(path_buffer, dir_path, dir_len);
-    dir[dir_len] = L'\\', dir[dir_len + 1] = L'*', dir[dir_len + 2] = 0;
+    zis_path_char_t *const path_buffer = zis_path_alloc(ZIS_PATH_MAX);
+    zis_path_concat(path_buffer, dir_path, L"\\*");
 
     WIN32_FIND_DATAW ffd;
     HANDLE hFind = INVALID_HANDLE_VALUE;
-    if ((hFind = FindFirstFileW(dir, &ffd)) == INVALID_HANDLE_VALUE)
+    if ((hFind = FindFirstFileW(path_buffer, &ffd)) == INVALID_HANDLE_VALUE) {
+        zis_mem_free(path_buffer);
         return -1;
+    }
     int ret = 0;
     do {
         const DWORD attr = ffd.dwFileAttributes;
         if (!(attr & FILE_ATTRIBUTE_DIRECTORY || attr & FILE_ATTRIBUTE_NORMAL))
             continue;
-        if ((ret = func(arg, ffd.cFileName)) != 0)
+        if ((ret = fn(fn_arg, ffd.cFileName)) != 0)
             break;
     } while (FindNextFileW(hFind, &ffd));
     FindClose(hFind);
+
+    zis_mem_free(path_buffer);
     return ret;
 
 #endif

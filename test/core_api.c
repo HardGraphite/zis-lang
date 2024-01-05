@@ -617,7 +617,7 @@ zis_test_define(test_module, z) {
     zis_test_assert_eq(status, ZIS_OK);
 
     // Set and get variables.
-    status = zis_load_field(z, 1, "num", -1, 0);
+    status = zis_load_field(z, 1, "num", (size_t)-1, 0);
     zis_test_assert_eq(status, ZIS_E_ARG);
     for (int64_t i = 100; i < 110; i++) {
         int64_t v_i64;

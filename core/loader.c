@@ -97,7 +97,7 @@ static int _module_loader_search_fn(const zis_path_char_t *mod_name, void *_arg)
 
 #define FILL_BUF_EXT(EXT_NAME) \
     static_assert(sizeof(ZIS_FILENAME_EXTENSION_##EXT_NAME) - 1 <= 4, ""); \
-    zis_path_copy_n(buffer + path_len_nex, ZIS_FILENAME_EXTENSION_##EXT_NAME, sizeof(ZIS_FILENAME_EXTENSION_##EXT_NAME)); \
+    zis_path_copy_n(buffer + path_len_nex, ZIS_PATH_STR(ZIS_FILENAME_EXTENSION_##EXT_NAME), sizeof(ZIS_FILENAME_EXTENSION_##EXT_NAME)); \
 // ^^^ FILL_BUF_EXT() ^^^
 
         enum zis_fs_filetype file_type;

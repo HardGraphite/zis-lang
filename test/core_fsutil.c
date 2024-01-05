@@ -188,23 +188,29 @@ zis_test0_define(test_path_parent) {
     do_test_path_func_1("zis_path_parent", zis_path_parent, ZIS_PATH_STR( X ), ZIS_PATH_STR( Y ))
 
     DO_TEST("/var/tmp/example.txt", "/var/tmp");
-    DO_TEST("/", "/");
     DO_TEST("/var/tmp/.", "/var/tmp");
+#ifndef _WIN32
+    DO_TEST("/", "/");
+#endif // _WIN32
 
 #undef DO_TEST
 }
 
 zis_test0_define(test_path_with_extension) {
-#define DO_TEST(X, Y, Z) \
+#define DO_TEST1(X, Z) \
+    do_test_path_func_2("zis_path_with_extension", zis_path_with_extension, \
+        ZIS_PATH_STR( X ), NULL, ZIS_PATH_STR( Z ))
+#define DO_TEST2(X, Y, Z) \
     do_test_path_func_2("zis_path_with_extension", zis_path_with_extension, \
         ZIS_PATH_STR( X ), ZIS_PATH_STR( Y ), ZIS_PATH_STR( Z ))
 
-    DO_TEST("foo.txt", ".tar", "foo.tar");
-    DO_TEST("foo.txt", NULL, "foo");
-    DO_TEST("foo", ".txt", "foo.txt");
-    DO_TEST("foo", NULL, "foo");
+    DO_TEST2("foo.txt", ".tar", "foo.tar");
+    DO_TEST1("foo.txt", "foo");
+    DO_TEST2("foo", ".txt", "foo.txt");
+    DO_TEST1("foo", "foo");
 
-#undef DO_TEST
+#undef DO_TEST1
+#undef DO_TEST2
 }
 
 zis_test0_list(

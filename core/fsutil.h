@@ -161,7 +161,7 @@ const zis_path_char_t *zis_fs_user_home_dir(void);
 /* ----- file I/O ----------------------------------------------------------- */
 
 /// Dynamic library handle.
-typedef struct zis_dl_handle *zis_dl_handle_t;
+typedef void *zis_dl_handle_t;
 
 /// Open a dynamic library.
 zis_nodiscard zis_dl_handle_t zis_dl_open(const zis_path_char_t *file);
