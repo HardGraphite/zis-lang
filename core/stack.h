@@ -70,7 +70,7 @@ struct zis_callstack {
 };
 
 /// Crate a call stack.
-zis_nodiscard struct zis_callstack *zis_callstack_create(struct zis_context *z);
+zis_nodiscard struct zis_callstack *zis_callstack_create(struct zis_context *z, size_t sz);
 
 /// Destroy a call stack.
 void zis_callstack_destroy(struct zis_callstack *cs, struct zis_context *z);

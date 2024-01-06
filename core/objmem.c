@@ -24,13 +24,68 @@
 
 /* ----- Configurations ----------------------------------------------------- */
 
-#define NON_BIG_SPACE_MAX_ALLOC_SIZE   ((size_t)8 * 1024)
-#define NEW_SPACE_CHUNK_SIZE           ((size_t)512 * 1024)
-#define OLD_SPACE_CHUNK_SIZE           ((size_t)256 * 1024)
-#define BIG_SPACE_THRESHOLD_INIT       ((size_t)16 * NON_BIG_SPACE_MAX_ALLOC_SIZE)
+#define OBJECT_POINTER_SIZE            (sizeof(struct zis_object *))
+#define SIZE_KiB(N)                    ((N) * (size_t)1024)
+#define SIZE_MiB(N)                    (SIZE_KiB((N)) * (size_t)1024)
+#define SIZE_GiB(N)                    (SIZE_MiB((N)) * (size_t)1024)
 
-static_assert(NON_BIG_SPACE_MAX_ALLOC_SIZE >= 4 * 1024, "");
-static_assert(NON_BIG_SPACE_MAX_ALLOC_SIZE < OLD_SPACE_CHUNK_SIZE / 16, "");
+#define NON_BIG_SPACE_MAX_ALLOC_SIZE   (OBJECT_POINTER_SIZE * SIZE_KiB(1))
+
+#define NEW_SPACE_CHUNK_SIZE_MIN       (OBJECT_POINTER_SIZE * SIZE_KiB(4))
+#define NEW_SPACE_CHUNK_SIZE_DFL       (OBJECT_POINTER_SIZE * SIZE_KiB(64))
+
+#define OLD_SPACE_CHUNK_SIZE_MIN       (OBJECT_POINTER_SIZE * SIZE_KiB(4))
+#define OLD_SPACE_CHUNK_SIZE_DFL       (OBJECT_POINTER_SIZE * SIZE_KiB(32))
+#define OLD_SPACE_SIZE_LIMIT_DFL       (SIZE_GiB(1))
+
+#define BIG_SPACE_THRESHOLD_INIT_DFL   (16 * NON_BIG_SPACE_MAX_ALLOC_SIZE)
+#define BIG_SPACE_SIZE_LIMIT_DFL       (SIZE_GiB(1))
+
+static_assert(NON_BIG_SPACE_MAX_ALLOC_SIZE >= SIZE_KiB(4), "");
+static_assert(NEW_SPACE_CHUNK_SIZE_DFL >= NEW_SPACE_CHUNK_SIZE_MIN, "");
+static_assert(OLD_SPACE_CHUNK_SIZE_DFL >= OLD_SPACE_CHUNK_SIZE_MIN, "");
+static_assert(NEW_SPACE_CHUNK_SIZE_MIN > NON_BIG_SPACE_MAX_ALLOC_SIZE * 2, "");
+static_assert(OLD_SPACE_CHUNK_SIZE_MIN > NON_BIG_SPACE_MAX_ALLOC_SIZE * 2, "");
+
+struct objmem_config {
+    size_t new_spc_chunk_size;
+    size_t old_spc_chunk_size;
+    size_t old_spc_size_limit;
+    size_t big_spc_threshold_init;
+    size_t big_spc_size_limit;
+};
+
+static void objmem_config_conv(struct objmem_config *config, const struct zis_objmem_options *opts) {
+    // new space
+    if (opts->new_space_size == 0)
+        config->new_spc_chunk_size = NEW_SPACE_CHUNK_SIZE_DFL;
+    else if (opts->new_space_size < NEW_SPACE_CHUNK_SIZE_MIN * 2)
+        config->new_spc_chunk_size = NEW_SPACE_CHUNK_SIZE_MIN;
+    else
+        config->new_spc_chunk_size = opts->new_space_size / 2;
+    // old space
+    if (opts->old_space_size_new == 0)
+        config->old_spc_chunk_size = OLD_SPACE_CHUNK_SIZE_DFL;
+    else if (opts->old_space_size_new < OLD_SPACE_CHUNK_SIZE_MIN)
+        config->old_spc_chunk_size = OLD_SPACE_CHUNK_SIZE_MIN;
+    else
+        config->old_spc_chunk_size = opts->old_space_size_new;
+    if (opts->old_space_size_max == 0)
+        config->old_spc_size_limit = OLD_SPACE_SIZE_LIMIT_DFL;
+    else if (opts->old_space_size_max < config->old_spc_chunk_size)
+        config->old_spc_size_limit = config->old_spc_chunk_size;
+    else
+        config->old_spc_size_limit = opts->old_space_size_max;
+    // big space
+    if (opts->big_space_size_new == 0)
+        config->big_spc_threshold_init = BIG_SPACE_THRESHOLD_INIT_DFL;
+    else
+        config->big_spc_threshold_init = opts->big_space_size_new;
+    if (opts->big_space_size_max == 0)
+        config->big_spc_size_limit = BIG_SPACE_SIZE_LIMIT_DFL;
+    else
+        config->big_spc_size_limit = opts->big_space_size_max;
+}
 
 /* ----- Memory span set with function pointer ------------------------------ */
 
@@ -466,9 +521,9 @@ static void _big_space_set_first(struct big_space *space, struct zis_object *obj
 }
 
 /// Initialize space.
-static void big_space_init(struct big_space *space) {
+static void big_space_init(struct big_space *space, const struct objmem_config *conf) {
     space->allocated_size = 0U;
-    space->threshold_size = BIG_SPACE_THRESHOLD_INIT;
+    space->threshold_size = conf->big_spc_threshold_init;
     zis_object_meta_init(space->_head._meta, ZIS_OBJMEM_OBJ_BIG, 0U, NULL);
 }
 
@@ -748,6 +803,7 @@ zis_force_inline static void old_space_chunk_remembered_set_record(
 /// Old space manager.
 struct old_space {
     struct mem_chunk_list _chunks;
+    size_t chunk_size;
 };
 
 /// Meta data of a old space chunk.
@@ -844,7 +900,8 @@ zis_force_inline static void *old_space_iterator_forward(
 static struct mem_chunk *old_space_add_chunk(struct old_space *);
 
 /// Initialize space.
-static void old_space_init(struct old_space *space) {
+static void old_space_init(struct old_space *space, const struct objmem_config *conf) {
+    space->chunk_size = conf->old_spc_chunk_size;
     mem_chunk_list_init(&space->_chunks);
     old_space_add_chunk(space);
 }
@@ -871,7 +928,7 @@ static void old_space_fini(struct old_space *space) {
 
 /// Add a chunk to the end of list.
 zis_noinline static struct mem_chunk *old_space_add_chunk(struct old_space *space) {
-    const size_t chunk_size = OLD_SPACE_CHUNK_SIZE;
+    const size_t chunk_size = space->chunk_size;
     struct  mem_chunk *const chunk =
         mem_chunk_list_append_created(&space->_chunks, chunk_size);
     struct old_space_chunk_meta *const chunk_meta =
@@ -1272,8 +1329,11 @@ struct new_space {
 };
 
 /// Initialize space.
-static void new_space_init(struct new_space *space) {
-    const size_t chunk_size = NEW_SPACE_CHUNK_SIZE;
+static void new_space_init(
+    struct new_space *space,
+    const struct objmem_config *conf
+) {
+    const size_t chunk_size = conf->new_spc_chunk_size;
     space->_working_chunk = mem_chunk_create(chunk_size);
     space->_free_chunk    = mem_chunk_create(chunk_size);
 }
@@ -1512,14 +1572,16 @@ struct zis_objmem_context {
     struct mem_span_set weak_refs;
 };
 
-struct zis_objmem_context *zis_objmem_context_create(void) {
+struct zis_objmem_context *zis_objmem_context_create(const struct zis_objmem_options *opts) {
+    struct objmem_config conf;
+    objmem_config_conv(&conf, opts);
     struct zis_objmem_context *const ctx =
         zis_mem_alloc(sizeof(struct zis_objmem_context));
     ctx->force_full_gc = false;
     ctx->current_gc_type = (int8_t)ZIS_OBJMEM_GC_NONE;
-    new_space_init(&ctx->new_space);
-    old_space_init(&ctx->old_space);
-    big_space_init(&ctx->big_space);
+    new_space_init(&ctx->new_space, &conf);
+    old_space_init(&ctx->old_space, &conf);
+    big_space_init(&ctx->big_space, &conf);
     mem_span_set_init(&ctx->gc_roots);
     mem_span_set_init(&ctx->weak_refs);
     return ctx;

@@ -25,6 +25,12 @@ static void oh_help(struct clopts_context *ctx, const char *arg, void *_data) {
 #ifdef ZIS_ENVIRON_NAME_PATH
         ZIS_ENVIRON_NAME_PATH "\0A semicolon-separated list of module search paths.",
 #endif // ZIS_ENVIRON_NAME_PATH
+#ifdef ZIS_ENVIRON_NAME_MEMS
+        ZIS_ENVIRON_NAME_MEMS
+        "\0Object memory configuration. "
+        "Syntax: \"STACK_SZ;<heap_opts>\", "
+        "syntax for <heap_opts>: \"NEW_SPC,OLD_SPC_NEW:OLD_SPC_MAX,BIG_SPC_NEW:BIG_SPC_MAX\"", // See "core/context.c"
+#endif // ZIS_ENVIRON_NAME_MEMS
 #if ZIS_DEBUG_LOGGING && defined(ZIS_ENVIRON_NAME_DEBUG_LOG)
         ZIS_ENVIRON_NAME_DEBUG_LOG
         "\0Debug logging configuration. Syntax: \"[LEVEL]:[GROUP]:[FILE]\"", // See "core/debug.c"

@@ -1,6 +1,7 @@
 #include "context.h"
 
 #include <assert.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -31,6 +32,7 @@ static void context_read_environ_path(struct zis_context *z) {
     if (!var_path)
         return;
 
+    // syntax="PATH1;PATH2;..."
     for (const char *begin = var_path; ; ) {
         const char *const end = strchr(begin, ';');
         struct zis_path_obj *const path_obj =
@@ -54,14 +56,53 @@ static void context_read_environ_path(struct zis_context *z) {
 #endif // ZIS_ENVIRON_NAME_PATH
 }
 
+static void context_read_environ_mems(
+    size_t *restrict stack_size,
+    struct zis_objmem_options *restrict objmem_opts
+) {
+    *stack_size = 0;
+    memset(objmem_opts, 0, sizeof *objmem_opts);
+
+#ifdef ZIS_ENVIRON_NAME_MEMS
+
+#if ZIS_SYSTEM_WINDOWS
+#    define char  wchar_t
+#    define getenv(x)  _wgetenv(ZIS_PATH_STR(x))
+#    define sscanf(x, y, ...)  swscanf(x, ZIS_PATH_STR(y), __VA_ARGS__)
+#endif // ZIS_SYSTEM_WINDOWS
+
+    const char *const var = getenv(ZIS_ENVIRON_NAME_MEMS);
+    if (!var)
+        return;
+
+    // syntax="STACK_SZ;<heap_opts>", heap_opts="NEW_SPC,OLD_SPC_NEW:OLD_SPC_MAX,BIG_SPC_NEW:BIG_SPC_MAX"
+    sscanf(
+        var, "%zu;%zu,%zu:%zu,%zu:%zu",
+        stack_size, &objmem_opts->new_space_size,
+        &objmem_opts->old_space_size_new, &objmem_opts->old_space_size_max,
+        &objmem_opts->big_space_size_new, &objmem_opts->big_space_size_max
+    );
+
+#if ZIS_SYSTEM_WINDOWS
+#    undef char
+#    undef getenv
+#    undef sscanf
+#endif // ZIS_SYSTEM_WINDOWS
+
+#endif // ZIS_ENVIRON_NAME_MEMS
+}
+
 zis_nodiscard struct zis_context *zis_context_create(void) {
     zis_debug_try_init();
 
     struct zis_context *const z = zis_mem_alloc(sizeof(struct zis_context));
     memset(z, 0, sizeof *z);
 
-    z->objmem_context = zis_objmem_context_create();
-    z->callstack = zis_callstack_create(z);
+    size_t stack_size;
+    struct zis_objmem_options objmem_options;
+    context_read_environ_mems(&stack_size, &objmem_options);
+    z->objmem_context = zis_objmem_context_create(&objmem_options);
+    z->callstack = zis_callstack_create(z, stack_size);
 
     // Allow use of `zis_callstack_frame_alloc_temp()` and `zis_callstack_frame_free_temp()`.
     // See `zis_native_block()`.

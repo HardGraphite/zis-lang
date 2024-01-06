@@ -113,11 +113,20 @@ void _zis_object_write_barrier_n(struct zis_object *, struct zis_object *[], siz
 
 /* ----- object memory context ---------------------------------------------- */
 
+/// Object memory configuration.
+struct zis_objmem_options {
+    size_t new_space_size;
+    size_t old_space_size_new;
+    size_t old_space_size_max;
+    size_t big_space_size_new;
+    size_t big_space_size_max;
+};
+
 /// Context of object memory management.
 struct zis_objmem_context;
 
 /// Create a memory context.
-struct zis_objmem_context *zis_objmem_context_create(void);
+struct zis_objmem_context *zis_objmem_context_create(const struct zis_objmem_options *opts);
 
 /// Destroy a memory context. (All objects will be finalized.)
 void zis_objmem_context_destroy(struct zis_objmem_context *ctx);

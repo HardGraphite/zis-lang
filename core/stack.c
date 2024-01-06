@@ -9,7 +9,8 @@
 
 /* ----- configuration ------------------------------------------------------ */
 
-#define ZIS_CALLSTACK_SIZE  (sizeof(void *) * 1020)
+#define ZIS_CALLSTACK_SIZE_MIN  (sizeof(struct zis_callstack) + sizeof(void *) * 2)
+#define ZIS_CALLSTACK_SIZE_DFL  (sizeof(void *) * 1020)
 #define ZIS_CALLSTACK_FI_POOL_SIZE  20
 
 /* ----- frame info list operations ----------------------------------------- */
@@ -91,9 +92,12 @@ callstack_error_overflow(struct zis_callstack *cs) {
     zis_context_panic(cs->z, ZIS_CONTEXT_PANIC_SOV);
 }
 
-struct zis_callstack *zis_callstack_create(struct zis_context *z) {
-    static_assert(ZIS_CALLSTACK_SIZE > sizeof(struct zis_callstack), "");
-    const size_t cs_size = ZIS_CALLSTACK_SIZE;
+struct zis_callstack *zis_callstack_create(struct zis_context *z, size_t cs_size) {
+    if (cs_size == 0)
+        cs_size = ZIS_CALLSTACK_SIZE_DFL;
+    else if (cs_size < ZIS_CALLSTACK_SIZE_MIN)
+        cs_size = ZIS_CALLSTACK_SIZE_MIN;
+    assert(cs_size > sizeof(struct zis_callstack));
     struct zis_callstack *const cs = zis_mem_alloc(cs_size);
     cs->top = cs->_data;
     cs->frame = cs->_data;
