@@ -92,13 +92,17 @@ callstack_error_overflow(struct zis_callstack *cs) {
     zis_context_panic(cs->z, ZIS_CONTEXT_PANIC_SOV);
 }
 
+static size_t callstack_struct_size(const struct zis_callstack *cs) {
+    return (size_t)((char *)cs->_data_end - (char *)cs);
+}
+
 struct zis_callstack *zis_callstack_create(struct zis_context *z, size_t cs_size) {
     if (cs_size == 0)
         cs_size = ZIS_CALLSTACK_SIZE_DFL;
     else if (cs_size < ZIS_CALLSTACK_SIZE_MIN)
         cs_size = ZIS_CALLSTACK_SIZE_MIN;
     assert(cs_size > sizeof(struct zis_callstack));
-    struct zis_callstack *const cs = zis_mem_alloc(cs_size);
+    struct zis_callstack *const cs = zis_vmem_alloc(cs_size);
     cs->top = cs->_data;
     cs->frame = cs->_data;
     fi_list_init(&cs->_fi_list);
@@ -110,6 +114,7 @@ struct zis_callstack *zis_callstack_create(struct zis_context *z, size_t cs_size
         INFO, "Stack", "new stack @%p: size=%zu,n_slots=%zu",
         (void *)cs, cs_size, (cs_size - sizeof(struct zis_callstack)) / sizeof(void *)
     );
+    assert(callstack_struct_size(cs) == cs_size);
     return cs;
 }
 
@@ -119,7 +124,7 @@ void zis_callstack_destroy(struct zis_callstack *cs, struct zis_context *z) {
     assert(ok); zis_unused_var(ok);
     fi_list_fini(&cs->_fi_list);
     assert(cs->z == z);
-    zis_mem_free(cs);
+    zis_vmem_free(cs, callstack_struct_size(cs));
 }
 
 void zis_callstack_enter(struct zis_callstack *cs, size_t frame_size, void *return_ip) {
