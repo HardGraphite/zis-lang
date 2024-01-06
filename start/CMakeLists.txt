@@ -2,7 +2,7 @@
 ##### Collect source files #####
 ################################
 
-set(zis_start_src "start.c" "clopts.c")
+set(zis_start_src "start.c" "cliutil.c")
 
 if(WIN32)
     list(APPEND zis_start_src "winutil.c")

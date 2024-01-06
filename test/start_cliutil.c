@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../start/clopts.c"
+#include "../start/cliutil.c"
 
 struct data {
     int a;

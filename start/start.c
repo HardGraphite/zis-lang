@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "clopts.h"
+#include "cliutil.h"
 #include "zis_config.h"
 
 static const struct clopts_program program;
@@ -15,31 +15,32 @@ struct command_line_args {
     size_t rest_args_num;
 };
 
+static const char *const program_environ_helps[] = {
+#ifdef ZIS_ENVIRON_NAME_PATH
+    ZIS_ENVIRON_NAME_PATH
+    "\0A semicolon-separated list of module search paths.",
+#endif // ZIS_ENVIRON_NAME_PATH
+#ifdef ZIS_ENVIRON_NAME_MEMS
+    ZIS_ENVIRON_NAME_MEMS
+    "\0Object memory configuration. "
+    "Syntax: \"STACK_SZ;<heap_opts>\", "
+    "syntax for <heap_opts>: \"NEW_SPC,OLD_SPC_NEW:OLD_SPC_MAX,BIG_SPC_NEW:BIG_SPC_MAX\".",
+    // See "core/context.c"
+#endif // ZIS_ENVIRON_NAME_MEMS
+#if ZIS_DEBUG_LOGGING && defined(ZIS_ENVIRON_NAME_DEBUG_LOG)
+    ZIS_ENVIRON_NAME_DEBUG_LOG
+    "\0Debug logging configuration. Syntax: \"[LEVEL]:[GROUP]:[FILE]\".",
+    // See "core/debug.c"
+#endif // ZIS_DEBUG_LOGGING && ZIS_ENVIRON_NAME_DEBUG_LOG
+    NULL
+};
+
 static void oh_help(struct clopts_context *ctx, const char *arg, void *_data) {
     assert(!arg), (void)arg, (void)_data;
     FILE *stream = stdout;
 
     clopts_help(&program, stream, ctx);
-
-    const char *const environ_helps[] = {
-#ifdef ZIS_ENVIRON_NAME_PATH
-        ZIS_ENVIRON_NAME_PATH "\0A semicolon-separated list of module search paths.",
-#endif // ZIS_ENVIRON_NAME_PATH
-#ifdef ZIS_ENVIRON_NAME_MEMS
-        ZIS_ENVIRON_NAME_MEMS
-        "\0Object memory configuration. "
-        "Syntax: \"STACK_SZ;<heap_opts>\", "
-        "syntax for <heap_opts>: \"NEW_SPC,OLD_SPC_NEW:OLD_SPC_MAX,BIG_SPC_NEW:BIG_SPC_MAX\"", // See "core/context.c"
-#endif // ZIS_ENVIRON_NAME_MEMS
-#if ZIS_DEBUG_LOGGING && defined(ZIS_ENVIRON_NAME_DEBUG_LOG)
-        ZIS_ENVIRON_NAME_DEBUG_LOG
-        "\0Debug logging configuration. Syntax: \"[LEVEL]:[GROUP]:[FILE]\"", // See "core/debug.c"
-#endif // ZIS_DEBUG_LOGGING && ZIS_ENVIRON_NAME_DEBUG_LOG
-        NULL,
-    };
-    fputs("\nEnvironment variables:\n", stream);
-    for (const char *const *p = environ_helps; *p; p++)
-        fprintf(stream, "  %-13s %s\n", *p, strchr(*p, 0) + 1);
+    clopts_help_print_list(stream, "Environment variables", program_environ_helps);
 
     clopts_handler_break(ctx);
 }
@@ -64,8 +65,8 @@ static void rest_args_handler(
 }
 
 static const struct clopts_option program_options[] = {
-    {'h', NULL, oh_help, "print help message and exit"},
-    {'v', NULL, oh_version, "print version and exit"},
+    {'h', NULL, oh_help, "Print help message and exit."},
+    {'v', NULL, oh_version, "Print version and exit."},
     {0, 0, 0, 0},
 };
 

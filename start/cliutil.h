@@ -1,8 +1,19 @@
-/// Command-line option utilities
+/// Command-line utilities
 
 #pragma once
 
+#include <stdbool.h>
 #include <stdio.h>
+
+/* ----- terminal info ------------------------------------------------------ */
+
+/// Test whether stdout is a terminal.
+bool cli_stdout_isatty(void);
+
+/// Get terminal width of stdout.
+size_t cli_stdout_term_width(void);
+
+/* ----- command-line options (arguments) parsing --------------------------- */
 
 struct clopts_option;
 struct clopts_context;
@@ -43,9 +54,22 @@ struct clopts_program {
 /// error message (if `err_stream` is available) and returns -1; when
 /// `clopts_handler_break()` is called, returns 1.
 int clopts_parse(
-    const struct clopts_program *def,
-    void *data, FILE *err_stream, int argc, char *argv[]
+    const struct clopts_program *restrict def,
+    void *data, FILE *restrict err_stream, int argc, char *argv[]
 );
 
 /// Print program help message.
-void clopts_help(const struct clopts_program *def, FILE *stream, struct clopts_context *ctx);
+void clopts_help(
+    const struct clopts_program *restrict def, FILE *restrict stream,
+    struct clopts_context *restrict ctx
+);
+
+/// Print a list of strings for help message.
+/// The list entries shall be like "<KEY>\0<TEXT>" and the last one must be NULL.
+void clopts_help_print_list(
+    FILE *restrict stream,
+    const char *restrict title, const char *const restrict list[]
+);
+
+/// Get the filename component of a path.
+const char *clopts_path_filename(const char *s);
