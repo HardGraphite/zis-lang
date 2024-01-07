@@ -1,40 +1,37 @@
-function(zis_test_available file result)
-    if(${file} MATCHES "core_.*")
-        set(${result} ${ZIS_BUILD_CORE} PARENT_SCOPE)
-    elseif(${file} MATCHES "start_.*")
-        set(${result} ${ZIS_BUILD_START} PARENT_SCOPE)
-    else()
-        set(${result} TRUE PARENT_SCOPE)
-        message(WARNING "test file `${file}': unknown group")
-    endif()
-endfunction()
-
-set(
-    zis_test_src_no_core_lib_list
-    "core_bits"
-    "core_fsutil"
-    "start_clopts"
-)
-
-aux_source_directory(. zis_test_src_list)
-list(REMOVE_ITEM zis_test_src_list "test.c" "./test.c" ".\\test.c")
+# The test utility lib.
 add_library(zis_test_util STATIC "test.c")
 
-foreach(zis_test_src IN LISTS zis_test_src_list)
-    zis_test_available("${zis_test_src}" ok)
-    if(NOT ok)
-        continue()
+## zis_add_test("*.{c,cc}" [LINK_CORE] [ENABLE_EXPORTS])
+function(zis_add_test filename)
+    get_filename_component(filename_stem "${filename}" NAME_WLE)
+    set(test_name "zis_test_${filename_stem}")
+    if(${filename} MATCHES ".+\\.cc?")
+        cmake_parse_arguments(PARSE_ARGV 1 arg "LINK_CORE;ENABLE_EXPORTS" "" "")
+        add_executable(${test_name} ${filename})
+        target_link_libraries(${test_name} PRIVATE zis_test_util)
+        if(${arg_LINK_CORE})
+            target_link_libraries(${test_name} PRIVATE ${zis_core_tgt})
+        endif()
+        if(${arg_ENABLE_EXPORTS})
+            set_target_properties(${test_name} PROPERTIES ENABLE_EXPORTS TRUE)
+        endif()
+        add_test(
+            NAME ${test_name}
+            COMMAND "$<TARGET_FILE:${test_name}>"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
+        )
+    else()
+        message(SEND_ERROR "Unexpected file for tests: ${filename}")
+        return()
     endif()
-    get_filename_component(zis_test_src_stem "${zis_test_src}" NAME_WLE)
-    set(zis_test_name "zis_test_${zis_test_src_stem}")
-    add_executable(${zis_test_name} ${zis_test_src})
-    target_link_libraries(${zis_test_name} PRIVATE zis_test_util)
-    list(FIND zis_test_src_no_core_lib_list ${zis_test_src_stem} i)
-    if(${i} EQUAL -1)
-        target_link_libraries(${zis_test_name} PRIVATE ${zis_core_tgt})
-    endif()
-    add_test(
-        NAME ${zis_test_name}
-        COMMAND "${CMAKE_CURRENT_BINARY_DIR}/${zis_test_name}"
-    )
-endforeach()
+    message(VERBOSE "Add test: ${test_name}")
+endfunction()
+
+
+zis_add_test(core_api.c        LINK_CORE)
+zis_add_test(core_api_cxx.cc   LINK_CORE ENABLE_EXPORTS)
+zis_add_test(core_bits.c       )
+zis_add_test(core_fsutil.c     )
+zis_add_test(core_gc.c         LINK_CORE)
+zis_add_test(core_invoke.c     LINK_CORE)
+zis_add_test(start_cliutil.c   )

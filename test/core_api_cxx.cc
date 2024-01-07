@@ -4,6 +4,12 @@
 #include <string_view>
 #include <type_traits>
 
+#if defined __unix__ || defined unix
+#include <dlfcn.h>
+#elif defined _WIN32
+#include <Windows.h>
+#endif
+
 class ZiS {
 public:
     using regidx_type = unsigned int;
@@ -44,12 +50,45 @@ private:
     zis_t z;
 };
 
-int main() {
+void cxx_hello() {
     using namespace std::string_view_literals;
     ZiS z;
     constexpr auto hello = "Hello, World!"sv;
     constexpr ZiS::regidx_type reg = 0;
     z.make_string(reg, hello);
     const auto s = z.read_string(reg);
-    return s == hello ? EXIT_SUCCESS : EXIT_FAILURE;
+    if (s != hello)
+        abort();
+}
+
+ZIS_NATIVE_MODULE(foo) {
+    // Designated initializers are available after C++20.
+    "",
+    nullptr,
+    nullptr,
+};
+
+void export_module() {
+    const char *sym = "__zis__mod_foo";
+
+#if defined __unix__ || defined unix
+
+    auto lib = dlopen(nullptr, RTLD_LAZY);
+    if (!dlsym(lib, sym))
+        abort();
+    dlclose(lib);
+
+#elif defined _WIN32
+
+    auto lib = LoadLibraryW(nullptr);
+    if (!GetProcAddress(lib, sym))
+        abort();
+    FreeLibrary(lib);
+
+#endif
+}
+
+int main() {
+    cxx_hello();
+    export_module();
 }

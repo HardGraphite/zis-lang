@@ -18,14 +18,17 @@
 #    else
 #        define ZIS_API
 #    endif
+#    define ZIS_NATIVE_MODULE__EXPORT __declspec(dllexport)
 #elif (__GNUC__ + 0 >= 4) || defined(__clang__)
 #    if ZIS_EXPORT_API
 #        define ZIS_API __attribute__((visibility("default")))
 #    else
 #        define ZIS_API
 #    endif
+#    define ZIS_NATIVE_MODULE__EXPORT __attribute__((used, visibility("default")))
 #else
 #    define ZIS_API
+#    define ZIS_NATIVE_MODULE__EXPORT
 #endif
 
 #if !defined(__cplusplus) /* C */
@@ -34,6 +37,12 @@
 #    define ZIS_NOEXCEPT noexcept
 #else /* < C++11 */
 #    define ZIS_NOEXCEPT throw()
+#endif /* __cplusplus */
+
+#ifdef __cplusplus /* C++ */
+#    define ZIS_NATIVE_MODULE__EXTERN_C extern "C"
+#else /* C */
+#    define ZIS_NATIVE_MODULE__EXTERN_C
 #endif /* __cplusplus */
 
 #ifdef __cplusplus
@@ -167,13 +176,22 @@ struct zis_native_module_def {
 };
 
 /**
+ * A macro to define a global variable that exports a native module from C code.
+ *
+ * @see ZIS_NATIVE_MODULE__VAR
+ */
+#define ZIS_NATIVE_MODULE(MODULE_NAME)  \
+    ZIS_NATIVE_MODULE__EXTERN_C ZIS_NATIVE_MODULE__EXPORT \
+    const struct zis_native_module_def ZIS_NATIVE_MODULE__VAR(MODULE_NAME)
+
+/**
  * A macro to generate the name of the module-def variable.
  *
  * To export a module from C, a symbol named `__zis__mod_<MODULE_NAME>` shall be defined,
  * which is of the type `struct zis_native_module_def`. The symbol must be visible
  * from outside the compiled object.
  */
-#define ZIS_NATIVE_MODULE(MODULE_NAME)  __zis__mod_ ## MODULE_NAME
+#define ZIS_NATIVE_MODULE__VAR(MODULE_NAME)  __zis__mod_ ## MODULE_NAME
 
 /**
  * Call a C function within an isolated zis frame.
