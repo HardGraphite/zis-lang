@@ -51,7 +51,7 @@ if(ZIS_BUILD_IPO)
     endif()
 endif()
 
-if(CMAKE_C_COMPILER_ID STREQUAL "MSVC") # MSVC
+if(MSVC)
     add_compile_options(
         /W4 /utf-8 /Zc:inline,preprocessor
         $<$<COMPILE_LANGUAGE:C>:/wd4200> # warning C4200: nonstandard extension used : zero-sized array in struct/union

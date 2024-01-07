@@ -69,6 +69,11 @@ if(ZIS_BUILD_SHARED)
     set(zis_core_tgt zis_core_shared)
 else()
     add_library(zis_core_static STATIC ${zis_core_src})
+    target_compile_definitions(
+        zis_core_static
+        PRIVATE "ZIS_EXPORT_API=1"
+        INTERFACE "ZIS_EXPORT_API=1"
+    )
     if(ZIS_MALLOC_LINK)
         target_link_libraries(zis_core_static INTERFACE ${ZIS_MALLOC_LINK})
     endif()

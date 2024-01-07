@@ -31,7 +31,16 @@
 
 /* ----- common utilities --------------------------------------------------- */
 
-#if (__GNUC__ + 0 >= 4) || defined(__clang__)
+#if !ZIS_EXPORT_API
+#    error "macro ZIS_EXPORT_API must be true"
+#endif
+#if ZIS_IMPORT_API
+#    error "macro ZIS_IMPORT_API must be false"
+#endif
+
+#if defined(_WIN32) || defined(__CYGWIN__)
+#    define ZIS_API __declspec(dllexport)
+#elif (__GNUC__ + 0 >= 4) || defined(__clang__)
 #    define ZIS_API __attribute__((used, visibility("default")))
 #else
 #    define ZIS_API

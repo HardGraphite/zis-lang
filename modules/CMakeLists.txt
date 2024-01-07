@@ -6,15 +6,6 @@ include("ModuleConf.cmake")
 
 set(zis_embedded_modules)
 
-if(NOT DEFINED zis_core_tgt OR NOT DEFINED zis_start_tgt)
-    message(FATAL_ERROR "Variable `zis_core_tgt' or `zis_start_tgt' is not defined")
-endif()
-if(ZIS_BUILD_SHARED)
-    set(zis_mod_link_core_tgt ${zis_core_tgt})
-else()
-    set(zis_mod_link_core_tgt ${zis_start_tgt})
-endif()
-
 function(zis_add_module_target mod_name conf_strings sources)
     message(VERBOSE "Found ZiS module `${mod_name}'")
     string(TOUPPER ${mod_name} mod_name_upper)
@@ -82,7 +73,15 @@ function(zis_add_module_target mod_name conf_strings sources)
             set(mod_tgt "zis_mod_${mod_name}")
             message(VERBOSE "Add target ${mod_tgt} for module `${mod_name}'")
             add_library(${mod_tgt} MODULE ${sources})
-            target_link_libraries(${mod_tgt} ${zis_mod_link_core_tgt} ${mod_link_libs})
+            target_include_directories(${mod_tgt} PRIVATE "${CMAKE_SOURCE_DIR}/include")
+            if(MSVC)
+                if(ZIS_BUILD_SHARED)
+                    target_link_libraries(${mod_tgt} PRIVATE ${zis_core_tgt})
+                else()
+                    target_link_libraries(${mod_tgt} PRIVATE ${zis_start_tgt})
+                endif()
+            endif()
+            target_link_libraries(${mod_tgt} PRIVATE ${mod_link_libs})
             set_target_properties(
                 ${mod_tgt} PROPERTIES
                 PREFIX ""
