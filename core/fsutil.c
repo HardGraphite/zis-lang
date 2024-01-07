@@ -357,13 +357,13 @@ enum zis_fs_filetype zis_fs_filetype(const zis_path_char_t *path) {
     const DWORD attr = GetFileAttributesW(path);
     if (attr == INVALID_FILE_ATTRIBUTES)
         return ZIS_FS_FT_ERROR;
-    if (attr & FILE_ATTRIBUTE_NORMAL)
+    if (attr == FILE_ATTRIBUTE_NORMAL)
         return ZIS_FS_FT_REG;
     if (attr & FILE_ATTRIBUTE_DIRECTORY)
         return  ZIS_FS_FT_DIR;
     if (attr & FILE_ATTRIBUTE_REPARSE_POINT)
         return  ZIS_FS_FT_LNK;
-    return ZIS_FS_FT_OTHER;
+    return ZIS_FS_FT_REG;
 
 #endif
 }

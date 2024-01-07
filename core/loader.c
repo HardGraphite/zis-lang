@@ -665,6 +665,16 @@ struct zis_module_obj *zis_module_loader_import_file(
 ) {
     struct module_loader_data *const d = &z->module_loader->data;
 
+    const zis_path_char_t *file_path = zis_path_obj_data(file);
+    enum module_loader_module_file_type file_type =
+        module_loader_load_guess_file_type(file_path);
+    if (file_type == MOD_FILE_NOT_FOUND) {
+        z->callstack->frame[0] = zis_object_from(zis_exception_obj_format(
+            z, "sys", NULL, "not a module file: %" ZIS_PATH_STR_PRI, file_path
+        ));
+        return NULL;
+    }
+
     if (!module) {
         d->temp_var = zis_object_from(file);
         struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 2);
@@ -673,10 +683,7 @@ struct zis_module_obj *zis_module_loader_import_file(
         file = zis_object_cast(d->temp_var, struct zis_path_obj);
     }
     d->temp_var = zis_object_from(module);
-    const zis_path_char_t *file_path = zis_path_obj_data(file);
-    const bool load_file_ok = module_loader_load_from_file(
-        z, d, file_path, module_loader_load_guess_file_type(file_path)
-    );
+    const bool load_file_ok = module_loader_load_from_file(z, d, file_path, file_type);
     if (!load_file_ok) {
         assert(zis_object_type(d->temp_var) == z->globals->type_Exception);
         z->callstack->frame[0] = d->temp_var;
