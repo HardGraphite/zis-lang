@@ -45,7 +45,6 @@ zis_malloc_fn_attrs(1, size) void *zis_vmem_alloc(size_t size) {
     const DWORD type = MEM_RESERVE | MEM_COMMIT;
     const DWORD prot = PAGE_READWRITE;
     ptr = VirtualAlloc(NULL, size, type, prot);
-    return ptr;
 #else
     ptr = zis_mem_alloc(size);
 #endif

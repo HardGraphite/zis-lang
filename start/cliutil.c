@@ -284,7 +284,7 @@ const char *clopts_path_filename(const char *s) {
         const char *p = strrchr(s, '/');
         return p ? p + 1 : s;
     }
-    const char *p2 = wcsrchr(p1, '/');
+    const char *p2 = strrchr(p1, '/');
     return (p2 ? p2 : p1) + 1;
 
 #else // !_WIN32
