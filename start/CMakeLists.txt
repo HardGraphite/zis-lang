@@ -24,6 +24,7 @@ else()
 endif()
 set_target_properties(${zis_start_tgt} PROPERTIES OUTPUT_NAME "${ZIS_OUTPUT_NAME}")
 target_include_directories(${zis_start_tgt} PRIVATE ${zis_core_conf_header_dir})
+set(zis_start_tgt ${zis_start_tgt} PARENT_SCOPE)
 
 if(WIN32)
     include(ZisWinUtil)

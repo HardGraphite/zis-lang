@@ -12,16 +12,93 @@
 #include "memory.h"
 #include "ndefutil.h"
 #include "objmem.h"
+#include "platform.h" // ZIS_WORDSIZE
 #include "stack.h"
 
 #include "arrayobj.h"
 #include "exceptobj.h"
 #include "mapobj.h"
 #include "moduleobj.h"
+#include "ndefutil.h"
 #include "pathobj.h"
 #include "symbolobj.h"
 
 #include "zis_config.h"
+#include "zis_modules.h"
+
+/* ----- embedded modules --------------------------------------------------- */
+
+#if !ZIS_EMBEDDED_MODULE_LIST_EMPTY
+
+#define E(NAME)  extern const struct zis_native_module_def ZIS_NATIVE_MODULE_VARNAME(NAME);
+ZIS_EMBEDDED_MODULE_LIST
+#undef E
+
+static const struct zis_native_module_def *const embedded_module_list[] = {
+#define E(NAME)  & ZIS_NATIVE_MODULE_VARNAME(NAME) ,
+    ZIS_EMBEDDED_MODULE_LIST
+#undef E
+};
+
+#endif // !ZIS_EMBEDDED_MODULE_LIST_EMPTY
+
+/// Search for an embedded module by name. Returns NULL if not exists.
+static const struct zis_native_module_def *find_embedded_module(const char *name) {
+#if ZIS_EMBEDDED_MODULE_LIST_EMPTY
+
+    zis_unused_var(name);
+    return NULL;
+
+#else // !ZIS_EMBEDDED_MODULE_LIST_EMPTY
+
+    const size_t embedded_module_count =
+        sizeof embedded_module_list / sizeof embedded_module_list[0];
+#if ZIS_EMBEDDED_MODULE_LIST_SORTED
+
+    // List sorted. Use the binary search algorithm.
+
+    typedef
+#if ZIS_WORDSIZE == 64
+    int64_t
+#elif ZIS_WORDSIZE == 32
+    int32_t
+#else
+    int
+#endif
+    _ssize_t;
+    static_assert(sizeof(size_t) == sizeof(_ssize_t), "");
+
+    assert(embedded_module_count && embedded_module_count < SIZE_MAX / 2);
+    size_t index_l = 0, index_r = embedded_module_count - 1;
+
+    do {
+        const size_t index_m = index_l + (index_r - index_l) / 2;
+        const struct zis_native_module_def *const def = embedded_module_list[index_m];
+        const int diff = strcmp(name, def->name);
+        if (diff == 0)
+            return def;
+        if (diff < 0)
+            index_l = index_m + 1;
+        else
+            index_r = index_m - 1;
+    } while ((_ssize_t)index_l <= (_ssize_t)index_r);
+
+    return NULL;
+
+#else // !ZIS_EMBEDDED_MODULE_LIST_SORTED
+
+    for (size_t i = 0; i < embedded_module_count; i++) {
+        const struct zis_native_module_def *const def = embedded_module_list[i];
+        if (strcmp(name, def->name) == 0)
+            return def;
+    }
+
+#endif // ZIS_EMBEDDED_MODULE_LIST_SORTED
+
+    return NULL;
+
+#endif // ZIS_EMBEDDED_MODULE_LIST_EMPTY
+}
 
 /* ----- internal data structures ------------------------------------------- */
 
@@ -251,6 +328,32 @@ static bool module_loader_load_from_file(
     }
 }
 
+/// Try to Load an embedded module.
+/// Returns whether found and loaded.
+static struct zis_module_obj *module_loader_try_load_from_embedded(
+    struct zis_context *z,
+    const struct zis_symbol_obj *name_sym
+) {
+    char name_str[64];
+    const size_t name_sz = zis_symbol_obj_data_size(name_sym);
+    if (name_sz >= sizeof name_str)
+        return NULL; // TODO: handles names longer than 64.
+    memcpy(name_str, zis_symbol_obj_data(name_sym), name_sz);
+    name_str[name_sz] = 0;
+
+    const struct zis_native_module_def *mod_def = find_embedded_module(name_str);
+    if (!mod_def)
+        return NULL;
+
+    struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 2);
+    struct zis_module_obj *module = zis_module_obj_new_r(z, tmp_regs);
+    zis_module_obj_load_native_def(z, module, mod_def);
+    assert(zis_object_type(tmp_regs[0]) == z->globals->type_Module);
+    module = zis_object_cast(tmp_regs[0], struct zis_module_obj);
+    zis_callstack_frame_free_temp(z, 2);
+    return module;
+}
+
 /* ----- public functions --------------------------------------------------- */
 
 struct zis_module_loader *zis_module_loader_create(struct zis_context *z) {
@@ -413,6 +516,15 @@ static struct zis_module_obj *_module_loader_load_top(
     struct zis_symbol_obj *module_name
 ) {
     struct module_loader_data *const d = &z->module_loader->data;
+
+    // Maybe it is an embedded module.
+    {
+        struct zis_module_obj *mod =
+            module_loader_try_load_from_embedded(z, module_name);
+        // FIXME: load to `top_module` if given.
+        if (mod)
+            return mod;
+    }
 
     // Allocate a path buffer.
     zis_path_char_t *path_buffer = zis_path_alloc(ZIS_PATH_MAX);

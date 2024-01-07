@@ -15,6 +15,7 @@ option(ZIS_BUILD_IPO     "Enable inter-procedural optimization."             ON)
 option(ZIS_BUILD_SHARED  "Build and link shared library (static otherwise)" OFF)
 option(ZIS_BUILD_CORE    "Build `core', the ZIS library"                     ON)
 option(ZIS_BUILD_START   "Build `start', an executable entry"                ON)
+option(ZIS_BUILD_MODULES "Build `modules', the modules"                      ON)
 option(ZIS_DEBUG         "Enable debugging"                                 OFF)
 option(ZIS_DEBUG_LOGGING "Enable debug logging"                             OFF)
 option(ZIS_DOC           "Generate documentation. See ZIS_DOC_* options."   OFF)
@@ -71,6 +72,10 @@ endif()
 
 if(ZIS_BUILD_START)
     add_subdirectory("start")
+endif()
+
+if(ZIS_BUILD_MODULES)
+    add_subdirectory("modules")
 endif()
 
 if(ZIS_TEST)
