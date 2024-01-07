@@ -105,7 +105,7 @@ void zis_module_obj_load_native_def(
     tmp_regs[2] = zis_object_from(self->_variables);
     if (def_func_cnt) {
         const struct zis_native_func_def *func_def = def->functions;
-        for (size_t i = 0; i < def_func_cnt;) {
+        for (size_t i = 0; i < def_func_cnt; func_def++) {
             if (!func_def->name)
                 continue;
             i++;
@@ -134,7 +134,7 @@ void zis_module_obj_load_native_def(
     }
     if (def_type_cnt) {
         const struct zis_native_type_def *type_def = def->types;
-        for (size_t i = 0; i < def_type_cnt;) {
+        for (size_t i = 0; i < def_type_cnt; type_def++) {
             if (!type_def->name)
                 continue;
             i++;
@@ -299,28 +299,6 @@ int zis_module_obj_do_init(
     if (!mod_init_fn)
         return ZIS_OK;
 
-    int status;
-
-    struct zis_object **const tmp_regs = zis_callstack_frame_alloc_temp(z, 2);
-    tmp_regs[0] = zis_object_from(self);
-    tmp_regs[1] = zis_object_from(self);
-
-    if (!zis_invoke_prepare_va(z, zis_object_from(mod_init_fn), tmp_regs, 1)) {
-        tmp_regs[0] = z->callstack->frame[0];
-        status = ZIS_THR;
-    } else if (zis_invoke_func(z, mod_init_fn) == ZIS_THR) {
-        // TODO: add to traceback.
-        zis_invoke_cleanup(z);
-        tmp_regs[0] = z->callstack->frame[0];
-        status = ZIS_THR;
-    } else {
-        tmp_regs[0] = zis_invoke_cleanup(z);
-        status = ZIS_OK;
-    }
-
-    assert(zis_object_type(tmp_regs[1]) == z->globals->type_Module);
-    self = zis_object_cast(tmp_regs[1], struct zis_module_obj);
-
     if (zis_array_slots_obj_length(self->_functions) == 1) {
         self->_functions = z->globals->val_empty_array_slots;
         zis_object_write_barrier(self, self->_functions);
@@ -328,8 +306,17 @@ int zis_module_obj_do_init(
         zis_array_slots_obj_set(self->_functions, 0, zis_smallint_to_ptr(0));
     }
 
-    zis_callstack_frame_free_temp(z, 2);
-
+    int status;
+    if (!zis_invoke_prepare_va(z, zis_object_from(mod_init_fn), NULL, 0)) {
+        status = ZIS_THR;
+    } else if (zis_invoke_func(z, mod_init_fn) == ZIS_THR) {
+        // TODO: add to traceback.
+        zis_invoke_cleanup(z);
+        status = ZIS_THR;
+    } else {
+        zis_invoke_cleanup(z);
+        status = ZIS_OK;
+    }
     return status;
 }
 

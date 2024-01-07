@@ -221,7 +221,7 @@ struct zis_func_obj *zis_invoke_prepare_va(
     if (zis_unlikely(!invocation_enter(z, NULL, &ii))) {
         return NULL;
     }
-    assert(argv > ii.caller_frame);
+    assert(!argv || argv > ii.caller_frame);
     if (zis_unlikely(!invocation_pass_args_vec(z, argv, argc, &ii))) {
         // TODO: add to traceback.
         ii.caller_frame[0] = invocation_leave(z, NULL);

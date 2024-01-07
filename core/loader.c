@@ -508,12 +508,12 @@ struct zis_module_obj *zis_module_loader_import(
 
     /// Do load.
     if (found_in_loaded) {
-        tmp_regs[3] = zis_object_from(module);
+        tmp_regs[0] = zis_object_from(module);
     } else {
         module = _module_loader_load_top(z, module, module_name);
         if (!module)
             goto do_return;
-        tmp_regs[3] = zis_object_from(module);
+        tmp_regs[0] = zis_object_from(module);
         PULL_REG_VARS();
     }
 
@@ -524,7 +524,7 @@ struct zis_module_obj *zis_module_loader_import(
     }
 
     // Initialize the module.
-    if (found_in_loaded) {
+    if (!found_in_loaded) {
         if (zis_module_obj_do_init(z, module) == ZIS_THR)
             goto do_return;
         PULL_REG_VARS();

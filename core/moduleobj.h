@@ -98,7 +98,7 @@ struct zis_func_obj *zis_module_obj_function(
 );
 
 /// Call module initializer function if given. Returns `ZIS_OK` or `ZIS_THR`.
-/// Thrown object (if there is) will also be copied to REG-0.
+/// The thrown object, if there is one, is in REG-0.
 int zis_module_obj_do_init(
     struct zis_context *z,
     struct zis_module_obj *self
