@@ -90,19 +90,20 @@ void zis_module_obj_load_native_def(
         }
     }
 
-    // ~~ tmp_regs[1] = name_map, tmp_regs[2...4] = tmp ~~
+    // ~~ tmp_regs[0] = mod, tmp_regs[1] = name_map, tmp_regs[2...4] = tmp ~~
 
     const size_t var_cnt_max = orig_var_cnt + def_func_cnt + def_type_cnt;
     tmp_regs[1] = zis_object_from(self->_name_map);
     zis_map_obj_reserve_r(z, tmp_regs + 1, var_cnt_max);
     self = zis_object_cast(tmp_regs[0], struct zis_module_obj);
-    zis_array_slots_obj_new2(z, var_cnt_max, self->_variables);
-
-    // ~~ tmp_regs[1] = name_map, tmp_regs[2] = vars / funcs, tmp_regs[3] = name, tmp_regs[4] = func / type ~~
-
+    struct zis_array_slots_obj *new_vars =
+        zis_array_slots_obj_new2(z, var_cnt_max, self->_variables);
     self = zis_object_cast(tmp_regs[0], struct zis_module_obj);
-    tmp_regs[1] = zis_object_from(self->_name_map);
-    tmp_regs[2] = zis_object_from(self->_variables);
+    self->_variables = new_vars;
+    zis_object_write_barrier(self, new_vars);
+
+    // ~~ tmp_regs[0] = mod, tmp_regs[1] = var, tmp_regs[2...4] = tmp ~~
+
     if (def_func_cnt) {
         const struct zis_native_func_def *func_def = def->functions;
         for (size_t i = 0; i < def_func_cnt; func_def++) {
@@ -118,17 +119,18 @@ void zis_module_obj_load_native_def(
                 );
                 continue;
             }
-            tmp_regs[4] = zis_object_from(zis_func_obj_new_native(z, func_obj_meta, func_def->code));
+            struct zis_func_obj *func_obj =
+                zis_func_obj_new_native(z, func_obj_meta, func_def->code);
+            tmp_regs[1] = zis_object_from(func_obj);
             zis_func_obj_set_module(
-                z,
-                zis_object_cast(tmp_regs[4], struct zis_func_obj),
+                z, func_obj,
                 zis_object_cast(tmp_regs[0], struct zis_module_obj)
             );
             zis_module_obj_set(
                 z,
                 zis_object_cast(tmp_regs[0], struct zis_module_obj),
                 zis_symbol_registry_get(z, func_def->name, (size_t)-1),
-                tmp_regs[4]
+                tmp_regs[1]
             );
         }
     }
@@ -138,12 +140,14 @@ void zis_module_obj_load_native_def(
             if (!type_def->name)
                 continue;
             i++;
-            zis_type_obj_from_native_def(z, &tmp_regs[4], type_def);
+            struct zis_type_obj *type_obj = zis_type_obj_new_r(z, tmp_regs + 2);
+            tmp_regs[1] = zis_object_from(type_obj);
+            zis_type_obj_load_native_def(z, type_obj, type_def);
             zis_module_obj_set(
                 z,
                 zis_object_cast(tmp_regs[0], struct zis_module_obj),
                 zis_symbol_registry_get(z, type_def->name, (size_t)-1),
-                tmp_regs[4]
+                tmp_regs[1]
             );
         }
     }

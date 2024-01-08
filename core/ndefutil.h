@@ -61,7 +61,7 @@ const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( NAME ) = {            \
     .name = #NAME,           \
     .slots_num = (offsetof(STRUCT, BYTES_FIRST_VAR) - ZIS_OBJECT_HEAD_SIZE) / sizeof(void *), \
     .bytes_size = sizeof(STRUCT) - offsetof(STRUCT, BYTES_FIRST_VAR),       \
-    .slots = SLOT_NAME_LIST, \
+    .fields = SLOT_NAME_LIST,\
     .methods = METHOD_LIST,  \
     .statics = STATIC_LIST,  \
 }                            \
@@ -76,7 +76,7 @@ const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( NAME ) = {  \
     .name = #NAME,              \
     .slots_num = (sizeof(STRUCT) - ZIS_OBJECT_HEAD_SIZE) / sizeof(void *), \
     .bytes_size = 0,            \
-    .slots = SLOT_NAME_LIST,    \
+    .fields = SLOT_NAME_LIST,   \
     .methods = METHOD_LIST,     \
     .statics = STATIC_LIST,     \
 }                               \
@@ -89,9 +89,9 @@ const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( NAME ) = {  \
 static_assert(zis_struct_maybe_object(STRUCT), "not an object-struct: " #STRUCT); \
 const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( NAME ) = {  \
     .name = #NAME,              \
-    .slots_num = (size_t)-1, \
-    .bytes_size = 0,   \
-    .slots = SLOT_NAME_LIST,    \
+    .slots_num = (size_t)-1,    \
+    .bytes_size = 0,            \
+    .fields = SLOT_NAME_LIST,   \
     .methods = METHOD_LIST,     \
     .statics = STATIC_LIST,     \
 } // ^^^ ZIS_NATIVE_TYPE_DEF_XB() ^^^
@@ -105,7 +105,7 @@ const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( NAME ) = {  \
     .name = #NAME,              \
     .slots_num = (offsetof(STRUCT, BYTES_SIZE_VAR) - ZIS_OBJECT_HEAD_SIZE) / sizeof(void *), \
     .bytes_size = (size_t)-1,   \
-    .slots = SLOT_NAME_LIST,    \
+    .fields = SLOT_NAME_LIST,   \
     .methods = METHOD_LIST,     \
     .statics = STATIC_LIST,     \
 } // ^^^ ZIS_NATIVE_TYPE_DEF_XB() ^^^

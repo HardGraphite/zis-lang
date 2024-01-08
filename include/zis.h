@@ -155,9 +155,9 @@ struct zis_native_type_def {
     const char                       *name;      ///< Type name.
     size_t                            slots_num; ///< Number of slots in object SLOTS part.
     size_t                            bytes_size;///< Size of object BYTES part.
-    const char *const                *slots;     ///< An array of slot names, the length of which must be `slots_num`. Optional.
+    const char *const                *fields;    ///< An array of field names (or NULL), the length of which must be `slots_num`. Optional.
     const struct zis_native_func_def *methods;   ///< A zero-terminated array of functions that define methods. Optional.
-    const struct zis_native_func_def *statics;   ///< Static methods definitions like `methods`. Optional.
+    const struct zis_native_func_def *statics;   ///< Static methods definitions like `methods`, but those without a name are ignored. Optional.
 };
 
 /**
@@ -460,6 +460,19 @@ ZIS_API int zis_make_function(
     zis_t z, unsigned int reg,
     const struct zis_native_func_def *def, unsigned int reg_module
 ) ZIS_NOEXCEPT;
+
+/**
+ * Create a type.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param def native function definition; field `name` is ignored
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`).
+ */
+ZIS_API int zis_make_type(
+    zis_t z, unsigned int reg,
+    const struct zis_native_type_def *def
+);
 
 /**
  * Create a module.

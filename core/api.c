@@ -26,6 +26,7 @@
 #include "stringobj.h"
 #include "symbolobj.h"
 #include "tupleobj.h"
+#include "typeobj.h"
 
 #include "zis_config.h"
 
@@ -902,6 +903,21 @@ ZIS_API int zis_make_function(
     return ZIS_OK;
 }
 
+ZIS_API int zis_make_type(
+    zis_t z, unsigned int reg,
+    const struct zis_native_type_def *def
+) {
+    struct zis_object **obj_ref = api_ref_local(z, reg);
+    if (zis_unlikely(!obj_ref))
+        return ZIS_E_IDX;
+    struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 2);
+    struct zis_type_obj *type_obj = zis_type_obj_new_r(z, tmp_regs);
+    zis_callstack_frame_free_temp(z, 2);
+    *obj_ref = zis_object_from(type_obj);
+    zis_type_obj_load_native_def(z, type_obj, def);
+    return ZIS_OK;
+}
+
 ZIS_API int zis_make_module(zis_t z, unsigned int reg, const struct zis_native_module_def *def) {
     struct zis_object **obj_ref = api_ref_local(z, reg);
     if (zis_unlikely(!obj_ref))
@@ -1104,8 +1120,14 @@ ZIS_API int zis_load_field(
             return ZIS_E_ARG;
         *val_ref = val;
         return ZIS_OK;
+    } else {
+        const size_t index = zis_type_obj_find_field(obj_type, name_sym);
+        if (zis_unlikely(index == (size_t)-1))
+            return ZIS_E_ARG;
+        assert(index < zis_object_slot_count(obj));
+        *val_ref = zis_object_get_slot(obj, index);
+        return ZIS_OK;
     }
-    return ZIS_E_ARG;
 }
 
 ZIS_API int zis_store_field(
@@ -1133,8 +1155,14 @@ ZIS_API int zis_store_field(
         struct zis_module_obj *const mod = zis_object_cast(obj, struct zis_module_obj);
         zis_module_obj_set(z, mod, name_sym, val);
         return ZIS_OK;
+    } else {
+        const size_t index = zis_type_obj_find_field(obj_type, name_sym);
+        if (zis_unlikely(index == (size_t)-1))
+            return ZIS_E_ARG;
+        assert(index < zis_object_slot_count(obj));
+        zis_object_set_slot(obj, index, val);
+        return ZIS_OK;
     }
-    return ZIS_E_ARG;
 }
 
 ZIS_API int zis_load_element(

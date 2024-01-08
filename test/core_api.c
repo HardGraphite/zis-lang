@@ -590,6 +590,35 @@ zis_test_define(test_function, z) {
     do_test_function__not_callable(z);
 }
 
+zis_test_define(test_type, z) {
+    int status;
+
+    const char *const type_fields[] = {
+        "foo",
+    };
+    const struct zis_native_func_def type_methods[] = {
+        { "add_int", { 2, 0, 3 }, F_add_int },
+        { NULL, {0}, NULL },
+    };
+    const struct zis_native_func_def type_statics[] = {
+        { "add_int", { 2, 0, 3 }, F_add_int },
+        { NULL, {0}, NULL },
+    };
+    const struct zis_native_type_def type_def = {
+        NULL,
+        1,
+        0,
+        type_fields,
+        type_methods,
+        type_statics,
+    };
+
+    status = zis_make_type(z, 1, &type_def);
+    zis_test_assert_eq(status, ZIS_OK);
+
+    // TODO: access the statics; create an instance and access the fields and methods.
+}
+
 zis_test_define(test_module, z) {
     int status;
 
@@ -957,6 +986,7 @@ zis_test_list(
     test_read_values,
     // zis-api-code //
     test_function,
+    test_type,
     test_module,
     // zis-api-variables //
     test_load_store_global,
