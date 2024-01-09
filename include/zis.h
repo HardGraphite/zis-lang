@@ -341,6 +341,29 @@ ZIS_API int zis_make_symbol(zis_t z, unsigned int reg, const char *str, size_t s
 ZIS_API int zis_read_symbol(zis_t z, unsigned int reg, char *buf, size_t *sz) ZIS_NOEXCEPT;
 
 /**
+ * Create a `Bytes` object.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param data pointer to the bytes data
+ * @param sz size of the data
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`).
+ */
+ZIS_API int zis_make_bytes(zis_t z, unsigned int reg, const void *data, size_t sz) ZIS_NOEXCEPT;
+
+/**
+ * Get the data in a `Bytes` object.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param buf pointer to a buffer to receive the data, or `NULL` to get expected buffer size
+ * @param sz pointer to a `size_t` value that tells the buffer size and receives written size
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_TYPE` (wrong type of `reg`),
+ * `ZIS_E_BUF` (`buf` is not big enough).
+ */
+ZIS_API int zis_read_bytes(zis_t z, unsigned int reg, void *buf, size_t *sz) ZIS_NOEXCEPT;
+
+/**
  * Create values and store them to `REG[reg_begin ...]`.
  *
  * @param z zis instance

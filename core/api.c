@@ -16,6 +16,7 @@
 
 #include "arrayobj.h"
 #include "boolobj.h"
+#include "bytesobj.h"
 #include "exceptobj.h"
 #include "floatobj.h"
 #include "funcobj.h"
@@ -278,6 +279,31 @@ ZIS_API int zis_read_symbol(zis_t z, unsigned int reg, char *buf, size_t *sz) {
         memcpy(buf, sym_obj->data, sym_sz);
     }
     *sz = sym_sz;
+    return ZIS_OK;
+}
+
+ZIS_API int zis_make_bytes(zis_t z, unsigned int reg, const void *data, size_t sz) {
+    struct zis_object **obj_ref = api_ref_local(z, reg);
+    if (zis_unlikely(!obj_ref))
+        return ZIS_E_IDX;
+    *obj_ref = zis_object_from(zis_bytes_obj_new(z, data, sz));
+    return ZIS_OK;
+}
+
+ZIS_API int zis_read_bytes(zis_t z, unsigned int reg, void *buf, size_t *sz) {
+    struct zis_object *obj = api_get_local(z, reg);
+    if (zis_unlikely(!obj))
+        return ZIS_E_IDX;
+    if (zis_unlikely(zis_object_is_smallint(obj) || zis_object_type(obj) != z->globals->type_Bytes))
+        return ZIS_E_TYPE;
+    struct zis_bytes_obj *const bytes_obj = zis_object_cast(obj, struct zis_bytes_obj);
+    const size_t bytes_sz = zis_bytes_obj_size(bytes_obj);
+    if (buf) {
+        if (zis_unlikely(*sz < bytes_sz))
+            return ZIS_E_BUF;
+        memcpy(buf, zis_bytes_obj_data(bytes_obj), bytes_sz);
+    }
+    *sz = bytes_sz;
     return ZIS_OK;
 }
 

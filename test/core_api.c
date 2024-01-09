@@ -225,6 +225,27 @@ zis_test_define(test_symbol, z) {
     do_test_symbol(z, "");
 }
 
+static void do_test_bytes(zis_t z, const void *data, size_t size) {
+    int status;
+    char buffer[64];
+    size_t out_sz;
+    assert(size <= sizeof buffer);
+
+    status = zis_make_bytes(z, 1, data, size);
+    zis_test_assert_eq(status, ZIS_OK);
+    out_sz = sizeof buffer;
+    status = zis_read_bytes(z, 1, buffer, &out_sz);
+    zis_test_assert_eq(status, ZIS_OK);
+    zis_test_assert_eq(out_sz, size);
+    zis_test_assert_eq(memcmp(data, buffer, size), 0);
+}
+
+zis_test_define(test_bytes, z) {
+    do_test_bytes(z, "", 0);
+    do_test_bytes(z, "1234", 4);
+    do_test_bytes(z, "\0\0\0\0", 4);
+}
+
 zis_test_define(test_exception, z) {
     int status;
     const char *type = "test";
@@ -981,6 +1002,7 @@ zis_test_list(
     test_float,
     test_string,
     test_symbol,
+    test_bytes,
     test_exception,
     test_make_values,
     test_read_values,

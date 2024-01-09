@@ -12,6 +12,7 @@
 
 #include "arrayobj.h"
 #include "boolobj.h"
+#include "bytesobj.h"
 #include "moduleobj.h"
 #include "nilobj.h"
 #include "stringobj.h"
@@ -83,6 +84,7 @@ zis_cold_fn static void _init_values_0(
     g->val_true = _zis_bool_obj_new(z, true);
     g->val_false = _zis_bool_obj_new(z, false);
     g->val_empty_string = _zis_string_obj_new_empty(z);
+    g->val_empty_bytes = _zis_bytes_obj_new_empty(z);
     g->val_empty_tuple = _zis_tuple_obj_new_empty(z);
     g->val_empty_array_slots = _zis_array_slots_obj_new_empty(z);
 }

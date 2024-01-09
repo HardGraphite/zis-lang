@@ -10,6 +10,7 @@ struct zis_type_obj;
     E(struct zis_bool_obj       , true              ) \
     E(struct zis_bool_obj       , false             ) \
     E(struct zis_string_obj     , empty_string      ) \
+    E(struct zis_bytes_obj      , empty_bytes       ) \
     E(struct zis_tuple_obj      , empty_tuple       ) \
     E(struct zis_array_slots_obj, empty_array_slots ) \
     E(struct zis_module_obj     , common_top_module ) \
@@ -20,6 +21,7 @@ struct zis_type_obj;
     E(Array)                   \
     E(Array_Slots)             \
     E(Bool)                    \
+    E(Bytes)                   \
     E(Exception)               \
     E(Float)                   \
     E(Function)                \
