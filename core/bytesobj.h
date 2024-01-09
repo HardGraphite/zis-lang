@@ -21,7 +21,7 @@ struct zis_bytes_obj *_zis_bytes_obj_new_empty(struct zis_context *z);
 /// Create a `Bytes` object.
 struct zis_bytes_obj *zis_bytes_obj_new(
     struct zis_context *z,
-    const void *volatile data, size_t size
+    const void *restrict data, size_t size
 );
 
 /// Get a the bytes data.

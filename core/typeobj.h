@@ -29,7 +29,7 @@ struct zis_type_obj {
     size_t _obj_size;  ///< Object size. `0` means SLOTS or BYTES extendable and the size needs to be calculated.
 };
 
-struct zis_type_obj *_zis_type_obj_bootstrap_alloc(struct zis_context *z, const struct zis_native_type_def *volatile def);
+struct zis_type_obj *_zis_type_obj_bootstrap_alloc(struct zis_context *z, const struct zis_native_type_def *restrict def);
 void _zis_type_obj_bootstrap_init_r(struct zis_context *z, struct zis_type_obj *self, struct zis_object *regs[ZIS_PARAMARRAY_STATIC 2]);
 
 /// Create an empty `Type`.
@@ -42,7 +42,7 @@ struct zis_type_obj *zis_type_obj_new_r(
 /// Load a native type def.
 void zis_type_obj_load_native_def(
     struct zis_context *z,
-    struct zis_type_obj *self, const struct zis_native_type_def *volatile def
+    struct zis_type_obj *self, const struct zis_native_type_def *restrict def
 );
 
 /// Get the index of a field by name. Returns -1 if not found.

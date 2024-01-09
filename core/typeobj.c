@@ -20,7 +20,7 @@ static struct zis_type_obj *type_obj_alloc(struct zis_context *z) {
 }
 
 zis_cold_fn struct zis_type_obj *_zis_type_obj_bootstrap_alloc(
-    struct zis_context *z, const struct zis_native_type_def *volatile def
+    struct zis_context *z, const struct zis_native_type_def *restrict def
 ) {
     // See `zis_type_obj_new_r()` and `zis_type_obj_load_native_def()`.
 
@@ -97,7 +97,7 @@ zis_noinline static size_t _func_def_arr_len(const struct zis_native_func_def *a
 
 void zis_type_obj_load_native_def(
     struct zis_context *z,
-    struct zis_type_obj *self, const struct zis_native_type_def *volatile def
+    struct zis_type_obj *self, const struct zis_native_type_def *restrict def
 ) {
     self->_slots_num = def->slots_num;
     self->_bytes_len = def->bytes_size;
