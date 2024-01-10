@@ -91,7 +91,7 @@ struct zis_string_obj *zis_string_obj_new(
         const zis_char8_t *src_p = (const zis_char8_t *)s, *const src_end = src_p + n;
         while (src_p < src_end) {
             zis_wchar_t  codepoint;
-            const size_t char_len = zis_u8char_to_code(&codepoint, src_p);
+            const size_t char_len = zis_u8char_to_code(&codepoint, src_p, src_end);
             if (zis_unlikely(!char_len)) // error at (src_p - s)
                 return NULL;
             if (codepoint > codepoint_max)
@@ -106,7 +106,7 @@ struct zis_string_obj *zis_string_obj_new(
         const zis_char8_t *src_p = (const zis_char8_t *)s;
         while (true) {
             zis_wchar_t  codepoint;
-            const size_t char_len = zis_u8char_to_code(&codepoint, src_p);
+            const size_t char_len = zis_u8char_to_code(&codepoint, src_p, (void *)UINTPTR_MAX);
             if (zis_unlikely(!char_len)) // error at (src_p - s)
                 return NULL;
             if (codepoint > codepoint_max)
@@ -124,7 +124,7 @@ struct zis_string_obj *zis_string_obj_new(
         string_obj_c##C_X##_t *dst_p = string_obj_data(self); \
         for (size_t i = 0; i < char_count; i++) {          \
             zis_wchar_t ch;\
-            src_p   += zis_u8char_to_code(&ch, src_p);     \
+            src_p   += zis_u8char_to_code(&ch, src_p, (void *)UINTPTR_MAX); \
             *dst_p++ = (string_obj_c##C_X##_t)ch;          \
         }                  \
     } while (0)            \

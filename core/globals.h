@@ -31,6 +31,7 @@ struct zis_type_obj;
     E(Module)                  \
     E(Nil)                     \
     E(Path)                    \
+    E(Stream)                  \
     E(String)                  \
     E(Symbol)                  \
     E(Tuple)                   \

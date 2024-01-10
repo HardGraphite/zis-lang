@@ -465,6 +465,32 @@ ZIS_API int zis_read_exception(
     unsigned int reg_type, unsigned int reg_data, unsigned int reg_what
 );
 
+#define ZIS_STREAM_FILE    0x01 ///< `zis_make_stream()` type: file stream
+
+#define ZIS_STREAM_RDONLY  0x10 ///< `zis_make_stream()` mode: read-only
+#define ZIS_STREAM_WRONLY  0x20 ///< `zis_make_stream()` mode: write-only
+#define ZIS_STREAM_WINEOL  0x40 ///< `zis_make_stream()` mode: use Windows style of end-of-line (CRLF)
+
+/**
+ * Create a stream object.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param flags `ZIS_STREAM_*` values
+ * @param ... data used to open a stream (see @@details)
+ * @return `ZIS_OK`, `ZIS_THR`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_ARG` (illegal `flags` or `...`).
+ *
+ * @details
+ * To open a file:
+ * ```c
+ * const char *file_path = ...; // path to the file
+ * const char *encoding  = ...; // text encoding (empty for UTF-8), or NULL to open as a binary file
+ * const int other_flags = ...;
+ * int status = zis_make_stream(z, reg, ZIS_STREAM_FILE | other_flags, file_path, encoding);
+ * ```
+ */
+ZIS_API int zis_make_stream(zis_t z, unsigned int reg, int flags, ...);
+
 /** @} */
 
 /** @defgroup zis-api-code API: code (functions and modules) */

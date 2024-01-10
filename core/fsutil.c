@@ -11,6 +11,7 @@
 
 #include <dirent.h>
 #include <dlfcn.h>
+#include <fcntl.h>
 #include <limits.h>
 #include <unistd.h>
 #include <sys/param.h>
@@ -453,5 +454,161 @@ void *zis_dl_get(zis_dl_handle_t lib, const char *name) {
     return dlsym(lib, name);
 #elif ZIS_FS_WINDOWS
     return (void *)GetProcAddress(lib, name);
+#endif
+}
+
+zis_nodiscard zis_file_handle_t zis_file_open(const zis_path_char_t *path, int mode) {
+#if ZIS_FS_POSIX
+
+    int o_mode, create_mode = 0;
+    if (mode & ZIS_FILE_MODE_WR) {
+        if (mode & ZIS_FILE_MODE_RD)
+            o_mode = O_RDWR;
+        else if (mode & ZIS_FILE_MODE_APP)
+            o_mode = O_WRONLY;
+        else
+            o_mode = O_WRONLY | O_CREAT, create_mode = S_IRUSR | S_IWUSR;
+    } else {
+        o_mode = O_RDONLY;
+    }
+    int fd = open(path, o_mode, create_mode);
+    return fd == -1 ? NULL : (void *)(intptr_t)fd;
+
+#elif ZIS_FS_WINDOWS
+
+    DWORD access = 0;
+    if (mode & ZIS_FILE_MODE_WR)
+        access |= GENERIC_WRITE;
+    if (mode & ZIS_FILE_MODE_RD)
+        access |= GENERIC_READ;
+    HANDLE h = CreateFileW(
+        path, //lpFileName
+        access, //dwDesiredAccess
+        FILE_SHARE_READ | FILE_SHARE_WRITE, //dwShareMode
+        NULL, //lpSecurityAttributes
+        (mode & ZIS_FILE_MODE_APP) ? OPEN_EXISTING : OPEN_ALWAYS, //dwCreationDisposition
+        FILE_ATTRIBUTE_NORMAL, //dwFlagsAndAttributes
+        NULL //hTemplateFile
+    );
+    if (h == INVALID_HANDLE_VALUE)
+        return NULL;
+    if (mode == 2)
+        SetFilePointer(h, 0, NULL, FILE_END);
+    return (void *)h;
+
+#endif
+}
+
+void zis_file_close(zis_file_handle_t f) {
+#if ZIS_FS_POSIX
+
+    const int fd = (int)(intptr_t)f;
+    close(fd);
+
+#elif ZIS_FS_WINDOWS
+
+    HANDLE h = (HANDLE)f;
+    CloseHandle(h);
+
+#endif
+}
+
+intptr_t zis_file_seek(zis_file_handle_t f, intptr_t offset, int whence) {
+#if ZIS_FS_POSIX
+
+    const int fd = (int)(intptr_t)f;
+    return (intptr_t)lseek(fd, (off_t)offset, whence);
+
+#elif ZIS_FS_WINDOWS
+
+    HANDLE h = (HANDLE)f;
+    LONG pos = 0;
+    static_assert(FILE_BEGIN == SEEK_SET, "");
+    static_assert(FILE_CURRENT == SEEK_CUR, "");
+    static_assert(FILE_END == SEEK_END, "");
+    const BOOL ok = SetFilePointer(
+        h, // hFile
+        (LONG)offset, // liDistanceToMove
+        &pos, // lpNewFilePointer
+        whence  // dwMoveMethod
+    );
+    if (!ok)
+        return -1;
+    return (intptr_t)pos;
+
+#endif
+}
+
+size_t zis_file_read(zis_file_handle_t f, char *restrict buffer, size_t size) {
+    if (zis_unlikely(!size))
+        return 0;
+
+#if ZIS_FS_POSIX
+
+    const int fd = (int)(intptr_t)f;
+    if (zis_unlikely(size > SSIZE_MAX))
+        size = SSIZE_MAX;
+    const ssize_t n = read(fd, buffer, (ssize_t)size);
+    if (n == -1)
+        return (size_t)-1;
+    return (size_t)n;
+
+#elif ZIS_FS_WINDOWS
+
+    HANDLE h = (HANDLE)f;
+    DWORD read_n;
+    const BOOL ok = ReadFile(
+        h, // hFile
+        buffer, // lpBuffer
+        (DWORD)size, // nNumberOfBytesToRead
+        &read_n, // lpNumberOfBytesRead
+        NULL // lpOverlapped
+    );
+    if (!ok)
+        return (size_t)-1;
+    return (size_t)read_n;
+
+#endif
+}
+
+int zis_file_write(zis_file_handle_t f, const char *restrict data, size_t size) {
+    if (zis_unlikely(!size))
+        return 0;
+
+#if ZIS_FS_POSIX
+
+    const int fd = (int)(intptr_t)f;
+    while (size) {
+        ssize_t n = zis_unlikely(size > SSIZE_MAX) ? SSIZE_MAX : (ssize_t)size;
+        n = write(fd, data, n);
+        if (zis_unlikely(n == -1))
+            return -1;
+        assert(n >= 0 && size >= (size_t)n);
+        size -= (size_t)n;
+        data += n;
+    }
+    return 0;
+
+#elif ZIS_FS_WINDOWS
+
+    HANDLE h = (HANDLE)f;
+    const DWORD dword_max = (DWORD)-1;
+    while (size) {
+        DWORD n = zis_unlikely(size > dword_max) ? dword_max : (DWORD)size;
+        const BOOL ok = WriteFile(
+            h, // hFile
+            data, // lpBuffer
+            n, // nNumberOfBytesToWrite
+            &n, // lpNumberOfBytesWritten
+            NULL // lpOverlapped
+        );
+        if (!ok)
+            return -1;
+        assert(size >= (size_t)n);
+        size -= (size_t)n;
+        data += (size_t)n;
+    }
+    return 0;
+
 #endif
 }

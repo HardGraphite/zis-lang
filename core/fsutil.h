@@ -4,6 +4,7 @@
 
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h> // FILENAME_MAX
 
 #include "attributes.h"
@@ -171,3 +172,25 @@ void zis_dl_close(zis_dl_handle_t lib);
 
 /// Get the address of a variable or function in the dynamic library.
 void *zis_dl_get(zis_dl_handle_t lib, const char *name);
+
+/// File handle.
+typedef void *zis_file_handle_t;
+
+#define ZIS_FILE_MODE_RD    1 ///< File open mode: read. Default.
+#define ZIS_FILE_MODE_WR    2 ///< File open mode: write.
+#define ZIS_FILE_MODE_APP   3 ///< File open mode: append. `ZIS_FILE_MODE_WR` required.
+
+/// Open a file.
+zis_nodiscard zis_file_handle_t zis_file_open(const zis_path_char_t *path, int mode);
+
+/// Close a file.
+void zis_file_close(zis_file_handle_t f);
+
+/// Move the file position indicator. Returns current position, or -1 on error.
+intptr_t zis_file_seek(zis_file_handle_t f, intptr_t offset, int whence);
+
+/// Read bytes from the file. Returns read size, or 0 on EOF, or -1 on error.
+size_t zis_file_read(zis_file_handle_t f, char *restrict buffer, size_t size);
+
+/// Write bytes to the file. Returns 0 on success, or -1 on error.
+int zis_file_write(zis_file_handle_t f, const char *restrict data, size_t size);

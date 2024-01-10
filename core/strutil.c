@@ -61,9 +61,12 @@ size_t zis_u8char_from_code(
 }
 
 size_t zis_u8char_to_code(
-    zis_wchar_t *restrict code, const zis_char8_t *restrict utf8_char
+    zis_wchar_t *restrict code,
+    const zis_char8_t *restrict utf8_char, const zis_char8_t *restrict utf8_char_end
 ) {
     const size_t n = zis_u8char_len_1(*utf8_char); // Or `zis_u8char_len_s()`?
+    if (zis_unlikely(utf8_char + n > utf8_char_end))
+        return 0;
     switch (n) {
     case 0:
         break;

@@ -13,6 +13,7 @@
 #include "ndefutil.h"
 #include "object.h"
 #include "stack.h"
+#include "strutil.h"
 
 #include "arrayobj.h"
 #include "boolobj.h"
@@ -24,6 +25,7 @@
 #include "mapobj.h"
 #include "moduleobj.h"
 #include "pathobj.h"
+#include "streamobj.h"
 #include "stringobj.h"
 #include "symbolobj.h"
 #include "tupleobj.h"
@@ -907,6 +909,73 @@ ZIS_API int zis_read_exception(
     *data_obj_ref = exc_obj->data;
     *what_obj_ref = exc_obj->what;
     return ZIS_OK;
+}
+
+struct _api_make_stream_context {
+    int stream_obj_flags;
+    va_list api_args;
+    struct zis_context *z;
+    struct zis_object **res_obj_ref;
+};
+
+static int _api_make_stream_open_file_fn(const zis_path_char_t *path, void *_arg) {
+    struct _api_make_stream_context *const x =_arg;
+    const char *const encoding = va_arg(x->api_args, char *);
+    int flags = x->stream_obj_flags;
+    if (encoding) {
+        flags |= ZIS_STREAM_OBJ_TEXT;
+        if (!encoding[0] || zis_str_icmp(encoding, "UTF-8") == 0)
+            flags |= ZIS_STREAM_OBJ_UTF8;
+        else
+            return ZIS_E_ARG; // Supports UTF-8 only.
+    }
+    struct zis_stream_obj *stream_obj = zis_stream_obj_new_file(x->z, path, flags);
+    if (!stream_obj)
+        return ZIS_THR;
+    *x->res_obj_ref = zis_object_from(stream_obj);
+    return ZIS_OK;
+}
+
+#define ZIS_STREAM_TYPE_MASK 0x0f
+
+static int api_stream_flags_conv(int api_flags) {
+    int result = 0;
+    if (api_flags & ZIS_STREAM_WRONLY) {
+        if (api_flags & ZIS_STREAM_RDONLY)
+            return 0;
+        result |= ZIS_STREAM_OBJ_MODE_OUT;
+    } else {
+        result |= ZIS_STREAM_OBJ_MODE_IN;
+    }
+    if (api_flags & ZIS_STREAM_WINEOL)
+        result |= ZIS_STREAM_OBJ_CRLF;
+    return result;
+}
+
+ZIS_API int zis_make_stream(zis_t z, unsigned int reg, int flags, ...) {
+    struct _api_make_stream_context context;
+    context.stream_obj_flags = api_stream_flags_conv(flags);
+    if (zis_unlikely(!context.stream_obj_flags))
+        return ZIS_E_ARG;
+    context.res_obj_ref = api_ref_local(z, reg);
+    if (zis_unlikely(!context.res_obj_ref))
+        return ZIS_E_IDX;
+    context.z = z;
+    int status;
+    va_start(context.api_args, flags);
+    switch (flags & ZIS_STREAM_TYPE_MASK) {
+    case ZIS_STREAM_FILE:
+        status = zis_path_with_temp_path_from_str(
+            va_arg(context.api_args, const char *),
+            _api_make_stream_open_file_fn, &context
+        );
+        break;
+    default:
+        status = ZIS_E_ARG;
+        break;
+    }
+    va_end(context.api_args);
+    return status;
 }
 
 /* ----- zis-api-code ------------------------------------------------------- */

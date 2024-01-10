@@ -31,7 +31,8 @@ size_t zis_u8char_from_code(
 /// Convert UTF-8 character to Unicode code point. Return character length.
 /// If the code point is illegal, return 0.
 size_t zis_u8char_to_code(
-    zis_wchar_t *restrict code, const zis_char8_t *restrict utf8_char
+    zis_wchar_t *restrict code,
+    const zis_char8_t *restrict utf8_char, const zis_char8_t *restrict utf8_char_end
 );
 
 /// Calculate expected UTF-8 character length (number of bytes) from code point.

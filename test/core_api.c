@@ -3,6 +3,7 @@
 #include <float.h>
 #include <inttypes.h>
 #include <setjmp.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -281,6 +282,22 @@ zis_test_define(test_exception, z) {
     zis_test_assert_eq(memcmp(buffer, what, what_strlen), 0);
 
     zis_load_nil(z, REG_MAX - 2, 3);
+}
+
+zis_test_define(test_file_stream, z) {
+    const char *const this_file = __FILE__;
+    int status;
+
+    FILE *const fp = fopen(this_file, "r");
+    if (!fp) {
+        zis_test_log(ZIS_TEST_LOG_ERROR, "cannot open %s", this_file);
+        return;
+    }
+
+    status = zis_make_stream(z, 1, ZIS_STREAM_FILE | ZIS_STREAM_RDONLY, this_file, "UTF-8");
+    zis_test_assert_eq(status, ZIS_OK);
+
+    fclose(fp);
 }
 
 static void do_test_make_values__basic(zis_t z) {
@@ -1004,6 +1021,7 @@ zis_test_list(
     test_symbol,
     test_bytes,
     test_exception,
+    test_file_stream,
     test_make_values,
     test_read_values,
     // zis-api-code //
