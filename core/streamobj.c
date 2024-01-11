@@ -26,12 +26,22 @@ static const struct zis_stream_obj_operations sop_file = {
 
 /* ----- stream object ------------------------------------------------------ */
 
+static void stream_obj_zero(struct zis_stream_obj *self) {
+    self->_ops = NULL;
+    self->_ops_data = NULL;
+    self->_flags = 0;
+    self->_c_buf = NULL,
+    self->_c_end = NULL;
+    self->_c_cur = NULL;
+    self->_b_cur = NULL;
+}
+
 struct zis_stream_obj *zis_stream_obj_new(struct zis_context *z) {
     struct zis_stream_obj *self = zis_object_cast(
         zis_objmem_alloc_ex(z, ZIS_OBJMEM_ALLOC_HUGE, z->globals->type_Stream, 0, 0),
         struct zis_stream_obj
     );
-    zis_stream_obj_close(self);
+    stream_obj_zero(self);
     return self;
 }
 
@@ -82,16 +92,9 @@ struct zis_stream_obj *zis_stream_obj_new_file(
 }
 
 void zis_stream_obj_close(struct zis_stream_obj *self) {
-    if (self->_ops) {
+    if (self->_ops)
         self->_ops->close(self);
-        self->_ops = NULL;
-        self->_ops_data = NULL;
-    }
-    self->_flags = 0;
-    self->_c_buf = NULL,
-    self->_c_end = NULL;
-    self->_c_cur = NULL;
-    self->_b_cur = NULL;
+    stream_obj_zero(self);
 }
 
 #define assert_stream_valid(obj) \
