@@ -154,6 +154,7 @@ void zis_callstack_leave(struct zis_callstack *cs) {
 struct zis_object **zis_callstack_frame_alloc_temp(struct zis_context *z, size_t n) {
     struct zis_callstack *const cs = z->callstack;
     struct zis_object **const old_sp = cs->top;
+    assert(old_sp >= zis_callstack_frame_info(cs)->frame_top);
     if (zis_unlikely((size_t)(cs->_data_end - old_sp) < n))
         callstack_error_overflow(cs);
     cs->top = old_sp + n;

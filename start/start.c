@@ -92,14 +92,16 @@ static int start(zis_t z, void *_args) {
 
     if (args->rest_args_num) {
         const char *module = args->rest_args[0];
-        int imp_flags = 0;
+        int imp_flags = ZIS_IMP_MAIN;
         if (module[0] == '@') {
             module++;
             imp_flags |= ZIS_IMP_NAME;
         } else {
             imp_flags |= ZIS_IMP_PATH;
         }
-        if (zis_import(z, module, imp_flags) == ZIS_THR) {
+        zis_make_int(z, 1, (int64_t)args->rest_args_num);
+        zis_make_int(z, 2, (intptr_t)args->rest_args);
+        if (zis_import(z, 0, module, imp_flags) == ZIS_THR) {
             char msg[64];
             size_t msg_sz = sizeof msg;
             zis_read_exception(z, 0, 0, 0, 0);
@@ -116,7 +118,7 @@ static int zis_main(int argc, char *argv[]) {
     struct command_line_args args;
     parse_command_line_args(argc, argv, &args);
     struct zis_context *const z = zis_create();
-    int exit_status = zis_native_block(z, 0, start, &args);
+    int exit_status = zis_native_block(z, 2, start, &args);
     zis_destroy(z);
     return exit_status;
 }

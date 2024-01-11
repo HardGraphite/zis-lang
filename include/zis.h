@@ -567,14 +567,17 @@ ZIS_API int zis_make_module(zis_t z, unsigned int reg, const struct zis_native_m
  */
 ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) ZIS_NOEXCEPT;
 
-#define ZIS_IMP_NAME   0x01 ///< Import by name.
-#define ZIS_IMP_PATH   0x02 ///< Import by file path.
-#define ZIS_IMP_ADDP   0x0f ///< Add to search path.
+#define ZIS_IMP_NAME     0x01 ///< `zis_import()` type: import by name.
+#define ZIS_IMP_PATH     0x02 ///< `zis_import()` type: import by file path.
+#define ZIS_IMP_ADDP     0x0f ///< `zis_import()` type: add to search path.
+
+#define ZIS_IMP_MAIN     0xf0 ///< `zis_import()` extra: call the `main` function (REG-1 = `(int)argc`, REG-2 = `(char**)argv`).
 
 /**
- * Import a module by name and store it to `REG-0`.
+ * Import a module.
  *
  * @param z zis instance
+ * @param reg register index
  * @param what module name, or file path; see @@details
  * @param flags `ZIS_IMP_*` values; see @@details
  * @return `ZIS_OK` or `ZIS_THR`; `ZIS_E_ARG` (illegal `flags` or `what`).
@@ -582,14 +585,18 @@ ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) ZIS_NOEX
  * @details Examples:
  * ```c
  * // ##  To import a module by name
- * zis_import(z, "module_name", ZIS_IMP_NAME);
+ * zis_import(z, reg, "module_name", ZIS_IMP_NAME);
  * // ##  To import a module by file path
- * zis_import(z, "path/to/the/module/file.ext", ZIS_IMP_PATH);
+ * zis_import(z, reg, "path/to/the/module/file.ext", ZIS_IMP_PATH);
  * // ##  To add a module search path
- * zis_import(z, "path/to/the/module/dir", ZIS_IMP_ADDP);
+ * zis_import(z, 0, "path/to/the/module/dir", ZIS_IMP_ADDP);
+ * // ##  To load a module by path as the entry
+ * zis_make_int(z, 1, argc);
+ * zis_make_int(z, 2, (intptr_t)argv);
+ * zis_import(z, "path", ZIS_IMP_PATH | ZIS_IMP_MAIN);
  * ```
  */
-ZIS_API int zis_import(zis_t z, const char *what, int flags) ZIS_NOEXCEPT;
+ZIS_API int zis_import(zis_t z, unsigned int reg, const char *what, int flags) ZIS_NOEXCEPT;
 
 /** @} */
 
