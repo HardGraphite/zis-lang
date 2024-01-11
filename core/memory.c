@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stdlib.h>
 
+#include "debug.h"
 #include "platform.h"
 #include "zis_config.h"
 
@@ -33,33 +34,38 @@ void zis_mem_free(void *ptr) {
 }
 
 zis_malloc_fn_attrs(1, size) void *zis_vmem_alloc(size_t size) {
+    void *ptr;
 #if ZIS_SYSTEM_POSIX
     const int   prot = PROT_READ | PROT_WRITE;
     const int   flags = MAP_PRIVATE | MAP_ANONYMOUS;
-    void *const ptr = mmap(NULL, size, prot, flags, -1, 0);
-    return ptr != MAP_FAILED ? ptr : NULL;
+    ptr = mmap(NULL, size, prot, flags, -1, 0);
+    if (zis_unlikely(ptr == MAP_FAILED))
+        ptr = NULL;
 #elif ZIS_SYSTEM_WINDOWS
     const DWORD type = MEM_RESERVE | MEM_COMMIT;
     const DWORD prot = PAGE_READWRITE;
-    void *const ptr = VirtualAlloc(NULL, size, type, prot);
-    return ptr;
+    ptr = VirtualAlloc(NULL, size, type, prot);
 #else
-    return zis_mem_alloc(size);
+    ptr = zis_mem_alloc(size);
 #endif
+    zis_debug_log(INFO, "Memory", "vmem_alloc(%zu) -> %p", size, ptr);
+    return ptr;
 }
 
-bool zis_vmem_free(void *ptr, size_t size) {
+void zis_vmem_free(void *ptr, size_t size) {
     bool ok;
+    zis_debug_log(INFO, "Memory", "vmem_free(%p, %zu)", ptr, size);
 #if ZIS_SYSTEM_POSIX
     ok = munmap(ptr, size) == 0;
 #elif ZIS_SYSTEM_WINDOWS
+    zis_unused_var(size);
     ok = VirtualFree(ptr, 0, MEM_RELEASE);
 #else
     zis_unused_var(size);
-    zis_mem_free(size);
+    zis_mem_free(ptr);
     ok = true;
 #endif
-    return ok;
+    assert(ok), zis_unused_var(ok);
 }
 
 size_t zis_vmem_pagesize(void) {

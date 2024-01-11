@@ -1,3 +1,7 @@
+###
+### ZiS: define version number and string
+###
+
 include_guard(DIRECTORY)
 
 file(READ "${CMAKE_SOURCE_DIR}/VERSION.txt" ZIS_VERSION_STRING)
@@ -6,4 +10,4 @@ set(ZIS_VERSION_MAJOR ${CMAKE_MATCH_1})
 set(ZIS_VERSION_MINOR ${CMAKE_MATCH_2})
 set(ZIS_VERSION_PATCH ${CMAKE_MATCH_3})
 
-message(STATUS "ZIS version ${ZIS_VERSION_STRING}")
+message(STATUS "ZiS version ${ZIS_VERSION_STRING}")

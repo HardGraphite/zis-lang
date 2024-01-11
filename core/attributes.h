@@ -2,6 +2,10 @@
 
 #pragma once
 
+#ifdef _MSC_VER
+#    include <sal.h>
+#endif // _MSC_VER
+
 #if defined __GNUC__
 #    define zis_likely(EXPR)   __builtin_expect((_Bool)(EXPR), 1)
 #    define zis_unlikely(EXPR) __builtin_expect((_Bool)(EXPR), 0)

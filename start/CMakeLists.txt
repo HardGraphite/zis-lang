@@ -2,37 +2,60 @@
 ##### Collect source files #####
 ################################
 
-aux_source_directory(. zis_exe_src)
+set(zis_start_src "start.c" "cliutil.c")
+
+if(WIN32)
+    list(APPEND zis_start_src "winutil.c")
+endif()
 
 ################################
 ##### Define build targets #####
 ################################
 
 if(ZIS_BUILD_SHARED)
-    add_executable(zis_exe_shared ${zis_exe_src})
-    target_link_libraries(zis_exe_shared PRIVATE zis_lib_shared)
-    set(zis_exe_tgt zis_exe_shared)
+    add_executable(zis_start_shared ${zis_start_src})
+    target_link_libraries(zis_start_shared PRIVATE zis_core_shared)
+    set(zis_start_tgt zis_start_shared)
 else()
-    add_executable(zis_exe_static ${zis_exe_src})
-    set_target_properties(zis_exe_static PROPERTIES ENABLE_EXPORTS TRUE)
-    target_link_libraries(zis_exe_static PRIVATE zis_lib_static)
-    set(zis_exe_tgt zis_exe_static)
+    add_executable(zis_start_static ${zis_start_src})
+    set_target_properties(zis_start_static PROPERTIES ENABLE_EXPORTS TRUE)
+    target_link_libraries(zis_start_static PRIVATE zis_core_static)
+    set(zis_start_tgt zis_start_static)
 endif()
-set_target_properties(${zis_exe_tgt} PROPERTIES OUTPUT_NAME "${ZIS_NAME}")
+set_target_properties(${zis_start_tgt} PROPERTIES OUTPUT_NAME "${ZIS_OUTPUT_NAME}")
+target_include_directories(${zis_start_tgt} PRIVATE ${zis_core_conf_header_dir})
+set(zis_start_tgt ${zis_start_tgt} PARENT_SCOPE)
+
+if(WIN32)
+    include(ZisWinUtil)
+    if(ZIS_BUILD_SHARED)
+        set(desc "${ZIS_DISPLAY_NAME} programming language executable")
+        set(prod "${ZIS_DISPLAY_NAME}LangStart")
+    else()
+        set(desc "${ZIS_DISPLAY_NAME} programming language executable with runtime core")
+        set(prod "${ZIS_DISPLAY_NAME}Lang")
+    endif()
+    zis_win_target_add_rc(
+        ${zis_start_tgt} "${desc}" "${prod}"
+        "${CMAKE_SOURCE_DIR}/misc/icon_win.ico"
+    )
+    unset(desc)
+    unset(prod)
+endif()
 
 #######################################
 ##### Installation configurations #####
 #######################################
 
-include(installdir)
+include(ZisInstallDirs)
 
 ### RPATH.
-if(DEFINED zis_exe_shared AND ZIS_PACK_RELA_RPATH AND UNIX)
+if(DEFINED zis_start_shared AND ZIS_PACK_RELA_RPATH AND UNIX)
     set_target_properties(
-        zis_exe_shared PROPERTIES INSTALL_RPATH
+        zis_start_shared PROPERTIES INSTALL_RPATH
         "$<IF:$<PLATFORM_ID:Darwin>,@executable_path,$ORIGIN>/../${zis_install_lib_dir}"
     )
 endif()
 
 ### Install rules.
-install(TARGETS ${zis_exe_targets} DESTINATION ${zis_install_exe_dir})
+install(TARGETS ${zis_start_tgt} DESTINATION ${zis_install_exe_dir})

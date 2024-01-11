@@ -5,6 +5,9 @@
 
 *build*/
 
+CMakeCache.txt
+CMakeFiles/
+
 *.patch
 *.orig
 *.rej
@@ -21,3 +24,6 @@
 *.lib
 *.out
 *.exe
+
+__pycache__/
+*.py[cdo]

@@ -3,5 +3,8 @@
 *.c     diff=cpp
 *.h     diff=cpp
 *.md    diff=markdown
+*.py    diff=python
+
+*.ico   binary
 
 .*      export-ignore
