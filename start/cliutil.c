@@ -174,7 +174,7 @@ static void print_text(
         while (true) {
             const char *p_end_1 = strchr(p_end + 1, ' ');
             if (!p_end_1) {
-                p_end_1 = p_end + strlen(p_end);
+                p_end_1 = p_end + strlen(p_end + 1) + 1;
                 end_of_text = true;
             }
             if ((size_t)(p_end_1 - p) > line_text_wid) {
@@ -189,6 +189,7 @@ static void print_text(
             if (end_of_text)
                 break;
         }
+        assert(p <= p_end);
         fwrite(p, 1, (size_t)(p_end - p), stream);
 
         if (incomplete_word)
