@@ -46,6 +46,15 @@ file(CONFIGURE OUTPUT "${zis_core_conf_header_dir}/zis_config.h" @ONLY CONTENT [
 #cmakedefine01  ZIS_DEBUG_LOGGING
 ]==])
 
+add_custom_command(
+    OUTPUT "oplist.h"
+    COMMAND ${CMAKE_COMMAND} -P "oplist.cmake"
+    MAIN_DEPENDENCY "oplist.txt"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Updating oplist.h"
+    VERBATIM
+)
+
 ################################
 ##### Collect source files #####
 ################################

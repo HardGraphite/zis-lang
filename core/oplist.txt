@@ -1,0 +1,39 @@
+##
+## List of instructions.
+##
+
+# Syntax:
+#   <OPCODE>  <NAME>  <OPERAND>,<OPERAND>,... # <DESCRIPTION>
+#   # Comment.
+#
+# where <OPERAND> is:
+#   <NAME>:<TYPE><SIZE>
+# the <TYPE> is one of:
+#   - R (register index)
+#   - C (constant index)
+#   - Y (symbol index)
+#   - I (signed integer)
+#   - U (unsigned integer)
+# the <SIZE> is one of:
+#   - 8
+#   - 9
+#   - 16
+#   - 25
+#
+# DO NOT use semicolon anywhere in this file.
+
+#NR#  #NAME#    #OPERANDS#                       #DESCRIPTION#
+
+0x00  NOP       unused:U25                       # No operation.
+0x01  ARG       data:U25                         # Extra arguments for other instructions.
+
+0x04  LDNIL     tgt:R9,count:U16                 # Load nils: REG[tgt ... tgt+count-1] <- nil.
+0x05  LDBLN     tgt:R9,val:U16                   # Load a boolean object: REG[tgt] <- (val ? true : false).
+0x06  LDCON     tgt:R9,id:C16                    # Load a constant: REG[tgt] <- CONSTANTS[id].
+0x07  LDSYM     tgt:R9,id:Y16                    # Load a symbol: REG[tgt] <- SYMBOLS[id].
+
+0x08  MKINT     tgt:R9,val:I16                   # Create an Int: REG[tgt] <- Int(val).
+0x09  MKFLT     tgt:R9,frac:I8,exp:U8            # Create a Float: REG[tgt] <- Float(frac * pow2(exp - 7)).
+0x0a  MKTUP     tgt:R9,val_start:R8,val_count:U8 # Create a Tuple: REG[tgt] <- Tuple(REG[val_start ... val_start+val_count-1])
+0x0b  MKARR     tgt:R9,val_start:R8,val_count:U8 # Create an Array: REG[tgt] <- Array(REG[val_start ... val_start+val_count-1])
+0x0c  MKMAP     tgt:R9,val_start:R8,val_count:U8 # Create a Map: REG[tgt] <- Map{REG[vs] -> REG[vs+1], ..., REG[vs+vc-2] -> REG[vs+vc-1]}
