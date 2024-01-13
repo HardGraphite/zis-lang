@@ -34,6 +34,7 @@ enum zis_context_panic_reason {
     ZIS_CONTEXT_PANIC_ABORT,///< Abort without calling a handler.
     ZIS_CONTEXT_PANIC_OOM,  ///< Out of memory.
     ZIS_CONTEXT_PANIC_SOV,  ///< Stack overflow.
+    ZIS_CONTEXT_PANIC_ILL,  ///< Illegal bytecode.
 };
 
 /// Call the panic handler and then abort.

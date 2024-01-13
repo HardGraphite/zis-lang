@@ -67,10 +67,22 @@ zis_func_obj_module(const struct zis_func_obj *self) {
     return self->_module;
 }
 
+/// Get the length of the symbol table.
+zis_static_force_inline size_t
+zis_func_obj_symbol_count(const struct zis_func_obj *self) {
+    return zis_array_slots_obj_length(self->_symbols);
+}
+
 /// Get a symbol from function symbol table.
 zis_static_force_inline struct zis_object *
 zis_func_obj_symbol(const struct zis_func_obj *self, size_t id) {
     return zis_array_slots_obj_get(self->_symbols, id);
+}
+
+/// Get the length of the constant table.
+zis_static_force_inline size_t
+zis_func_obj_constant_count(const struct zis_func_obj *self) {
+    return zis_array_slots_obj_length(self->_constants);
 }
 
 /// Get a constant from function constant table.

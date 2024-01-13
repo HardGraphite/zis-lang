@@ -136,6 +136,7 @@ void zis_context_destroy(struct zis_context *z) {
 zis_noreturn void zis_context_panic(struct zis_context *z, enum zis_context_panic_reason r) {
     static_assert(ZIS_PANIC_OOM == (int)ZIS_CONTEXT_PANIC_OOM, "");
     static_assert(ZIS_PANIC_SOV == (int)ZIS_CONTEXT_PANIC_SOV, "");
+    static_assert(ZIS_PANIC_ILL == (int)ZIS_CONTEXT_PANIC_ILL, "");
 
     zis_debug_log(WARN, "Context", "context@%p: panic(%i)", (void *)z, (int)r);
 

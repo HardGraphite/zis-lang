@@ -1,19 +1,27 @@
 #include "invoke.h"
 
+#include <math.h>
+
 #include "attributes.h"
 #include "context.h"
+#include "debug.h"
 #include "globals.h"
+#include "instr.h"
 #include "ndefutil.h"
 #include "object.h"
 #include "stack.h"
 
 #include "arrayobj.h"
 #include "exceptobj.h"
+#include "floatobj.h"
 #include "funcobj.h"
+#include "mapobj.h"
 #include "tupleobj.h"
 #include "typeobj.h"
 
-/* ----- common utilities --------------------------------------------------- */
+#include "zis_config.h" // ZIS_BUILD_CGOTO
+
+/* ----- invocation tools --------------------------------------------------- */
 
 zis_noinline zis_cold_fn static void
 format_error_type(struct zis_context *z, struct zis_object *fn) {
@@ -41,8 +49,6 @@ format_error_argc(struct zis_context *z, struct zis_func_obj *fn, size_t argc) {
     );
     z->callstack->frame[0] = zis_object_from(exc);
 }
-
-/* ----- invocation tools --------------------------------------------------- */
 
 struct invocation_info {
     struct zis_object      **caller_frame;
@@ -206,8 +212,287 @@ zis_static_force_inline void *invocation_leave(
 zis_hot_fn static int exec_bytecode(
     struct zis_context *z, struct zis_func_obj *func_obj
 ) {
-    zis_unused_var(z), zis_unused_var(func_obj);
-    zis_context_panic(z, ZIS_CONTEXT_PANIC_ABORT); // Not implemented.
+#define OP_DISPATCH_USE_COMPUTED_GOTO ZIS_BUILD_CGOTO
+
+    const zis_instr_word_t *ip = func_obj->bytecode - 1; // The instruction pointer.
+    zis_instr_word_t this_instr = *ip;
+
+#define IP_ADVANCE     (this_instr = *++ip)
+#define IP_JUMP_TO(X)  (ip = (X), this_instr = *ip)
+
+    struct zis_callstack *const stack = z->callstack;
+    struct zis_object **bp = stack->frame;
+    struct zis_object **sp = stack->top;
+
+#define BP_SP_CHANGED  (bp = stack->frame, sp = stack->top)
+
+    /* func_obj; */
+    assert(zis_callstack_frame_info(stack)->prev_frame[0] == zis_object_from(func_obj));
+    uint32_t func_sym_count = (uint32_t)zis_func_obj_symbol_count(func_obj);
+    uint32_t func_const_count = (uint32_t)zis_func_obj_constant_count(func_obj);
+
+#define FUNC_ENSURE \
+    do {            \
+        struct zis_object *p = zis_callstack_frame_info(stack)->prev_frame[0]; \
+        assert(zis_object_type(p) == g->type_Function);                        \
+        if (zis_unlikely((void *)func_obj != (void *)p))                       \
+            func_obj = zis_object_cast(p, struct zis_func_obj);                \
+        assert((size_t)func_sym_count == zis_func_obj_symbol_count(func_obj)); \
+        assert((size_t)func_const_count == zis_func_obj_constant_count(func_obj)); \
+    } while (0)
+#define FUNC_CHANGED \
+    do {             \
+        struct zis_object *p = zis_callstack_frame_info(stack)->prev_frame[0]; \
+        assert(zis_object_type(p) == g->type_Function);                        \
+        func_obj = zis_object_cast(p, struct zis_func_obj);                    \
+        func_sym_count = (uint32_t)zis_func_obj_symbol_count(func_obj);        \
+        func_const_count = (uint32_t)zis_func_obj_constant_count(func_obj);    \
+    } while (0)
+
+    struct zis_context_globals *const g = z->globals;
+
+#if OP_DISPATCH_USE_COMPUTED_GOTO // vvv
+
+    // https://gcc.gnu.org/onlinedocs/gcc/Labels-as-Values.html
+
+#define OP_LABEL(NAME)   _op_##NAME##_label
+#define OP_DEFINE(NAME)  OP_LABEL(NAME) :
+#define OP_UNDEFINED     OP_LABEL() :
+#define OP_DISPATCH      goto *(&& OP_LABEL(NOP) + _op_dispatch_table[zis_instr_extract_opcode(this_instr)])
+
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wpedantic" // &&label
+#pragma GCC diagnostic ignored "-Wpointer-arith" // &&label1 - &&label0
+
+    static const int _op_dispatch_table[] = {
+#define E(CODE, NAME) [CODE] = && OP_LABEL(NAME) - && OP_LABEL(NOP),
+        ZIS_OP_LIST_FULL
+#undef E
+    };
+
+    OP_DISPATCH;
+
+#else // ^^^ OP_DISPATCH_USE_COMPUTED_GOTO | !OP_DISPATCH_USE_COMPUTED_GOTO vvv
+
+#define OP_DEFINE(NAME)  case (zis_instr_word_t)ZIS_OPC_##NAME :
+#define OP_UNDEFINED     default :
+#define OP_DISPATCH      goto _interp_loop
+
+_interp_loop:
+    switch (zis_instr_extract_opcode(this_instr)) {
+
+#endif // ^^^ OP_DISPATCH_USE_COMPUTED_GOTO
+
+#define THROW_REG0 \
+    do {           \
+        this_instr = 0; \
+        goto op_THR;    \
+    } while (0)
+#define BOUND_CHECK_REG(PTR) \
+    do {                     \
+        assert(PTR >= bp);   \
+        if (zis_unlikely(PTR > sp)) { \
+            zis_debug_log(FATAL, "Interp", "register index out of range"); \
+            goto panic_ill;  \
+        }                    \
+    } while (0)
+#define BOUND_CHECK_SYM(I) \
+    do {                   \
+        if (zis_unlikely(I >= func_sym_count)) { \
+            zis_debug_log(FATAL, "Interp", "symbol index out of range"); \
+            goto panic_ill;\
+        }                  \
+    } while (0)
+#define BOUND_CHECK_CON(I) \
+    do {                   \
+        if (zis_unlikely(I >= func_const_count)) { \
+            zis_debug_log(FATAL, "Interp", "constant index out of range"); \
+            goto panic_ill;\
+        }                  \
+    } while (0)
+
+    OP_DEFINE(NOP) {
+        IP_ADVANCE;
+        OP_DISPATCH;
+    }
+
+    OP_DEFINE(ARG) {
+        zis_debug_log(FATAL, "Interp", "unexpected opcode %#04x", ZIS_OPC_ARG);
+        goto panic_ill;
+    }
+
+    OP_DEFINE(LDNIL) {
+        uint32_t tgt, count;
+        zis_instr_extract_operands_ABw(this_instr, tgt, count);
+        struct zis_object **tgt_p = bp + tgt, **tgt_last_p = tgt_p + count;
+        BOUND_CHECK_REG(tgt_last_p);
+        struct zis_object *const nil = zis_object_from(g->val_nil);
+        for (; tgt_p <= tgt_last_p; tgt_p++)
+            *tgt_p = nil;
+        IP_ADVANCE;
+        OP_DISPATCH;
+    }
+
+    OP_DEFINE(LDBLN) {
+        uint32_t tgt; bool val;
+        zis_instr_extract_operands_ABw(this_instr, tgt, val);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        *tgt_p = zis_object_from(val ? g->val_true : g->val_false);
+        IP_ADVANCE;
+        OP_DISPATCH;
+    }
+
+    OP_DEFINE(LDCON) {
+        uint32_t tgt, id;
+        zis_instr_extract_operands_ABw(this_instr, tgt, id);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        FUNC_ENSURE;
+        BOUND_CHECK_CON(id);
+        *tgt_p = zis_func_obj_constant(func_obj, id);
+        IP_ADVANCE;
+        OP_DISPATCH;
+    }
+
+    OP_DEFINE(LDSYM) {
+        uint32_t tgt, id;
+        zis_instr_extract_operands_ABw(this_instr, tgt, id);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        FUNC_ENSURE;
+        BOUND_CHECK_SYM(id);
+        *tgt_p = zis_func_obj_symbol(func_obj, id);
+        IP_ADVANCE;
+        OP_DISPATCH;
+    }
+
+    OP_DEFINE(MKINT) {
+        uint32_t tgt; zis_smallint_t val;
+        zis_instr_extract_operands_ABsw(this_instr, tgt, val);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        *tgt_p = zis_smallint_to_ptr(val);
+        IP_ADVANCE;
+        OP_DISPATCH;
+    }
+
+    OP_DEFINE(MKFLT) {
+        uint32_t tgt; double frac; int exp;
+        zis_instr_extract_operands_ABsCs(this_instr, tgt, frac, exp);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        *tgt_p = zis_object_from(zis_float_obj_new(z, ldexp(frac, exp - 7)));
+        IP_ADVANCE;
+        OP_DISPATCH;
+    }
+
+    OP_DEFINE(MKTUP) {
+        uint32_t tgt, val_start, val_count;
+        zis_instr_extract_operands_ABC(this_instr, tgt, val_start, val_count);
+        struct zis_object **tgt_p = bp + tgt, **val_p = bp + val_start;
+        BOUND_CHECK_REG(tgt_p);
+        BOUND_CHECK_REG(val_p + val_count - 1);
+        *tgt_p = zis_object_from(zis_tuple_obj_new(z, val_p, val_count));
+        IP_ADVANCE;
+        OP_DISPATCH;
+    }
+
+    OP_DEFINE(MKARR) {
+        uint32_t tgt, val_start, val_count;
+        zis_instr_extract_operands_ABC(this_instr, tgt, val_start, val_count);
+        struct zis_object **tgt_p = bp + tgt, **val_p = bp + val_start;
+        BOUND_CHECK_REG(tgt_p);
+        BOUND_CHECK_REG(val_p + val_count - 1);
+        *tgt_p = zis_object_from(zis_array_obj_new(z, val_p, val_count));
+        IP_ADVANCE;
+        OP_DISPATCH;
+    }
+
+    OP_DEFINE(MKMAP) {
+        uint32_t tgt, val_start, val_count;
+        zis_instr_extract_operands_ABC(this_instr, tgt, val_start, val_count);
+        struct zis_object **tgt_p = bp + tgt;
+        struct zis_object **val_p = bp + val_start, **val_end_p = val_p + val_count * 2;
+        BOUND_CHECK_REG(tgt_p);
+        zis_map_obj_new_r(z, tgt_p, 0.0f, val_count);
+        if (val_count) {
+            BOUND_CHECK_REG(val_end_p - 1);
+            struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 4);
+            for (; val_p < val_end_p; val_p += 2) {
+                tmp_regs[0] = *tgt_p, tmp_regs[1] = val_p[0], tmp_regs[2] = val_p[1];
+                if (zis_map_obj_set_r(z, tmp_regs) != ZIS_OK)
+                    THROW_REG0;
+            }
+            zis_callstack_frame_free_temp(z, 4);
+            assert(stack->top == sp);
+        }
+        IP_ADVANCE;
+        OP_DISPATCH;
+    }
+
+    op_THR:
+    OP_DEFINE(THR) {
+        goto panic_ill; // TODO: throw.
+        IP_ADVANCE;
+        OP_DISPATCH;
+    }
+
+    OP_DEFINE(RETNIL) {
+        bp[0] = zis_object_from(g->val_nil);
+        this_instr = 0; // RET 0
+#if !OP_DISPATCH_USE_COMPUTED_GOTO
+        zis_fallthrough;
+#endif // !OP_DISPATCH_USE_COMPUTED_GOTO
+    }
+
+    OP_DEFINE(RET) {
+        goto panic_ill; // TODO: return.
+        IP_ADVANCE;
+        OP_DISPATCH;
+    }
+
+    OP_UNDEFINED {
+        zis_debug_log(FATAL, "Interp", "unknown opcode %#04x", zis_instr_extract_opcode(this_instr));
+        goto panic_ill;
+    }
+
+#undef THROW_REG0
+#undef BOUND_CHECK_REG
+#undef BOUND_CHECK_SYM
+#undef BOUND_CHECK_CON
+
+panic_ill:
+    zis_context_panic(z, ZIS_CONTEXT_PANIC_ILL);
+
+#if OP_DISPATCH_USE_COMPUTED_GOTO // vvv
+
+#undef OP_LABEL
+#undef OP_DEFINE
+#undef OP_UNDEFINED
+#undef OP_DISPATCH
+
+#pragma GCC diagnostic pop
+
+#else // ^^^ OP_DISPATCH_USE_COMPUTED_GOTO | !OP_DISPATCH_USE_COMPUTED_GOTO vvv
+
+    }
+
+#undef OP_DEFINE
+#undef OP_UNDEFINED
+#undef OP_DISPATCH
+
+#endif // ^^^ OP_DISPATCH_USE_COMPUTED_GOTO
+
+#undef IP_ADVANCE
+#undef IP_JUMP_TO
+
+#undef BP_SP_CHANGED
+
+#undef FUNC_ENSURE
+#undef FUNC_CHANGED
+
+#undef OP_DISPATCH_USE_COMPUTED_GOTO
 }
 
 /* ----- public functions --------------------------------------------------- */

@@ -42,12 +42,13 @@ file(CONFIGURE OUTPUT "${zis_core_conf_header_dir}/zis_config.h" @ONLY CONTENT [
 #cmakedefine    ZIS_ENVIRON_NAME_DEBUG_LOG "@ZIS_ENVIRON_NAME_DEBUG_LOG@"
 #cmakedefine    ZIS_DISPLAY_NAME    "@ZIS_DISPLAY_NAME@"
 #cmakedefine    ZIS_MALLOC_INCLUDE  "@ZIS_MALLOC_INCLUDE@"
+#cmakedefine01  ZIS_BUILD_CGOTO
 #cmakedefine01  ZIS_DEBUG
 #cmakedefine01  ZIS_DEBUG_LOGGING
 ]==])
 
 add_custom_command(
-    OUTPUT "oplist.h"
+    OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/oplist.h"
     COMMAND ${CMAKE_COMMAND} -P "oplist.cmake"
     MAIN_DEPENDENCY "oplist.txt"
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -89,6 +90,8 @@ else()
     set(zis_core_tgt zis_core_static)
 endif()
 set(zis_core_tgt ${zis_core_tgt} PARENT_SCOPE)
+# Extra dependencies.
+target_sources(${zis_core_tgt} PRIVATE "oplist.h")
 # Output name and prefix.
 set_target_properties(${zis_core_tgt} PROPERTIES OUTPUT_NAME "${ZIS_OUTPUT_NAME}")
 get_target_property(prefix ${zis_core_tgt} PREFIX)

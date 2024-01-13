@@ -28,6 +28,9 @@ enum zis_opcode {
 #define zis_instr_make_ABC(OP, A, B, C) \
     ((uint32_t)(OP) | ((uint32_t)(A) & 0x1ff) << 7 | ((uint32_t)(B) & 0xff) << 16 | (uint32_t)(C) << 24)
 
+#define zis_instr_make_ABsCs(OP, A, B, C) \
+    ((uint32_t)(OP) | ((uint32_t)(A) & 0x1ff) << 7 | ((int32_t)(B) & 0xff) << 16 | (int32_t)(C) << 24)
+
 #define zis_instr_extract_opcode(I) \
     ((I) & 0x7f)
 
@@ -53,4 +56,11 @@ do {                                               \
     A = (uint32_t)(I) >> 7 & 0x1ff;                \
     B = (uint32_t)(I) >> 16 & 0xff;                \
     C = (uint32_t)(I) >> 24;                       \
+} while (0)
+
+#define zis_instr_extract_operands_ABsCs(I, A, B, C) \
+do {                                                 \
+    A = (uint32_t)(I) >> 7 & 0x1ff;                  \
+    B = (int32_t)(I) >> 16 & 0xff;                   \
+    C = (int32_t)(I) >> 24;                          \
 } while (0)

@@ -101,6 +101,7 @@ ZIS_API void zis_destroy(zis_t z) ZIS_NOEXCEPT;
 /** @{ */
 #define ZIS_PANIC_OOM   1  ///< Panic cause: out of memory (object memory)
 #define ZIS_PANIC_SOV   2  ///< Panic cause: stack overflow (runtime callstack)
+#define ZIS_PANIC_ILL   3  ///< Panic cause: illegal bytecode
 /** @} */
 
 /**

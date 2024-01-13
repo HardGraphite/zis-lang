@@ -33,7 +33,12 @@
 0x07  LDSYM     tgt:R9,id:Y16                    # Load a symbol: REG[tgt] <- SYMBOLS[id].
 
 0x08  MKINT     tgt:R9,val:I16                   # Create an Int: REG[tgt] <- Int(val).
-0x09  MKFLT     tgt:R9,frac:I8,exp:U8            # Create a Float: REG[tgt] <- Float(frac * pow2(exp - 7)).
+0x09  MKFLT     tgt:R9,frac:I8,exp:I8            # Create a Float: REG[tgt] <- Float(frac * pow2(exp - 7)).
 0x0a  MKTUP     tgt:R9,val_start:R8,val_count:U8 # Create a Tuple: REG[tgt] <- Tuple(REG[val_start ... val_start+val_count-1])
 0x0b  MKARR     tgt:R9,val_start:R8,val_count:U8 # Create an Array: REG[tgt] <- Array(REG[val_start ... val_start+val_count-1])
-0x0c  MKMAP     tgt:R9,val_start:R8,val_count:U8 # Create a Map: REG[tgt] <- Map{REG[vs] -> REG[vs+1], ..., REG[vs+vc-2] -> REG[vs+vc-1]}
+0x0c  MKMAP     tgt:R9,val_start:R8,val_count:U8 # Create a Map: REG[tgt] <- Map{REG[vs] -> REG[vs+1], ..., REG[vs+vc*2-2] -> REG[vs+vc*2-1]}
+
+0x10  THR       val:R25                          # Throw a value: throws REG[val].
+
+0x11  RETNIL    unused:U25                       # Return nil.
+0x12  RET       val:R25                          # Return a value: returns REG[val].

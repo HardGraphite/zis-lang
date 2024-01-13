@@ -14,6 +14,9 @@
     E(0x0a, MKTUP   ) \
     E(0x0b, MKARR   ) \
     E(0x0c, MKMAP   ) \
+    E(0x10, THR     ) \
+    E(0x11, RETNIL  ) \
+    E(0x12, RET     ) \
 // ^^^ ZIS_OP_LIST ^^^
 
 #define ZIS_OP_LIST_FULL \
@@ -33,9 +36,9 @@
     E(0x0d,         ) \
     E(0x0e,         ) \
     E(0x0f,         ) \
-    E(0x10,         ) \
-    E(0x11,         ) \
-    E(0x12,         ) \
+    E(0x10, THR     ) \
+    E(0x11, RETNIL  ) \
+    E(0x12, RET     ) \
     E(0x13,         ) \
     E(0x14,         ) \
     E(0x15,         ) \
@@ -159,4 +162,7 @@
     E(MKMAP   , 0x0c) \
     E(MKTUP   , 0x0a) \
     E(NOP     , 0x00) \
+    E(RET     , 0x12) \
+    E(RETNIL  , 0x11) \
+    E(THR     , 0x10) \
 // ^^^ ZIS_OP_LIST_BY_NAME ^^^
