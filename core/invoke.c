@@ -212,7 +212,7 @@ zis_static_force_inline void *invocation_leave(
 zis_hot_fn static int exec_bytecode(
     struct zis_context *z, struct zis_func_obj *func_obj
 ) {
-#define OP_DISPATCH_USE_COMPUTED_GOTO ZIS_BUILD_CGOTO
+#define OP_DISPATCH_USE_COMPUTED_GOTO ZIS_USE_COMPUTED_GOTO
 
     const zis_instr_word_t *ip = func_obj->bytecode - 1; // The instruction pointer.
     zis_instr_word_t this_instr = *ip;

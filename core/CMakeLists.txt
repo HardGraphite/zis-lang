@@ -42,7 +42,7 @@ file(CONFIGURE OUTPUT "${zis_core_conf_header_dir}/zis_config.h" @ONLY CONTENT [
 #cmakedefine    ZIS_ENVIRON_NAME_DEBUG_LOG "@ZIS_ENVIRON_NAME_DEBUG_LOG@"
 #cmakedefine    ZIS_DISPLAY_NAME    "@ZIS_DISPLAY_NAME@"
 #cmakedefine    ZIS_MALLOC_INCLUDE  "@ZIS_MALLOC_INCLUDE@"
-#cmakedefine01  ZIS_BUILD_CGOTO
+#cmakedefine01  ZIS_USE_COMPUTED_GOTO
 #cmakedefine01  ZIS_DEBUG
 #cmakedefine01  ZIS_DEBUG_LOGGING
 ]==])
