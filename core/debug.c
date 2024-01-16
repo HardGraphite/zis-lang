@@ -41,6 +41,7 @@ static const char *const logging_level_name[] = {
     [ZIS_DEBUG_LOG_WARN ] = "Warn" ,
     [ZIS_DEBUG_LOG_INFO ] = "Info" ,
     [ZIS_DEBUG_LOG_TRACE] = "Trace",
+    [ZIS_DEBUG_LOG_DUMP ] = "Dump" ,
 };
 
 #define logging_level_count (sizeof logging_level_name / sizeof logging_level_name[0])
@@ -142,16 +143,8 @@ void _zis_debug_log(
     logging_print(time, level, group, n > 0 ? buffer : "", n);
 }
 
-void _zis_debug_log_with(
-    enum zis_debug_log_level level, const char *group,
-    const char *prompt, zis_debug_log_with_func_t func, void *func_arg
-) {
-    if (!logging_check(level, group))
-        return;
-    const uintmax_t time = logging_timestamp();
-    logging_print(time, level, group, prompt, -1);
-    func(func_arg, logging_stream);
-    logging_print(time, level, group, prompt, -1);
+FILE *zis_debug_log_stream(enum zis_debug_log_level level, const char *group) {
+    return logging_check(level, group) ? logging_stream : NULL;
 }
 
 #endif // ZIS_DEBUG_LOGGING

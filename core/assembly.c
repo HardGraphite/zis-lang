@@ -289,11 +289,9 @@ struct zis_func_obj *zis_assembler_finish(struct zis_assembler *as, struct zis_c
         z, as->func_meta, as->instr_buffer.data, as->instr_buffer.length
     );
     zis_assembler_clear(as);
-#if ZIS_DEBUG_LOGGING
-    zis_debug_log(TRACE, "Asm", "dump of the new function vvv");
-    zis_disassemble_bytecode(z, func_obj, _as_finish_debug_dump_fn, stderr);
-    zis_debug_log(TRACE, "Asm", "dump of the new function ^^^");
-#endif // ZIS_DEBUG_LOGGING
+    zis_debug_log_1(DUMP, "Asm", "zis_disassemble_bytecode()", fp, {
+        zis_disassemble_bytecode(z, func_obj, _as_finish_debug_dump_fn, fp);
+    });
     return func_obj;
 }
 
