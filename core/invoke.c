@@ -265,7 +265,7 @@ zis_hot_fn static int exec_bytecode(
 #pragma GCC diagnostic ignored "-Wpointer-arith" // &&label1 - &&label0
 
     static const int _op_dispatch_table[] = {
-#define E(CODE, NAME) [CODE] = && OP_LABEL(NAME) - && OP_LABEL(NOP),
+#define E(CODE, NAME, TYPE) [CODE] = && OP_LABEL(NAME) - && OP_LABEL(NOP),
         ZIS_OP_LIST_FULL
 #undef E
     };

@@ -109,6 +109,9 @@ zis_static_force_inline bool zis_array_obj_set(
     return true;
 }
 
+/// Delete all elements.
+void zis_array_obj_clear(struct zis_array_obj *self);
+
 /// Get vector of elements.
 zis_static_force_inline struct zis_object *const *
 zis_array_obj_data(const struct zis_array_obj *self) {

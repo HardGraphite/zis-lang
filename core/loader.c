@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <stddef.h>
 
+#include "assembly.h"
 #include "attributes.h"
 #include "compat.h"
 #include "context.h"
@@ -19,8 +20,8 @@
 #include "exceptobj.h"
 #include "mapobj.h"
 #include "moduleobj.h"
-#include "ndefutil.h"
 #include "pathobj.h"
+#include "streamobj.h"
 #include "symbolobj.h"
 
 #include "zis_config.h"
@@ -74,7 +75,7 @@ static const struct zis_native_module_def *find_embedded_module(const char *name
     do {
         const size_t index_m = index_l + (index_r - index_l) / 2;
         const struct zis_native_module_def *const def = embedded_module_list[index_m];
-        const int diff = strcmp(name, def->name);
+        const int diff = strcmp(def->name, name);
         if (diff == 0)
             return def;
         if (diff < 0)
@@ -140,6 +141,7 @@ enum module_loader_module_file_type {
     MOD_FILE_NOT_FOUND,
     MOD_FILE_SRC,
     MOD_FILE_NDL,
+    MOD_FILE_ASM,
     MOD_FILE_DIR,
 };
 
@@ -179,17 +181,26 @@ static int _module_loader_search_fn(const zis_path_char_t *mod_name, void *_arg)
 
         enum zis_fs_filetype file_type;
 
+#if ZIS_FEATURE_SRC
         FILL_BUF_EXT(SRC)
         file_type = zis_fs_filetype(buffer);
         if (file_type == ZIS_FS_FT_REG)
             return (int)MOD_FILE_SRC;
         else if (file_type == ZIS_FS_FT_DIR)
             return (int)MOD_FILE_DIR;
+#endif // ZIS_FEATURE_SRC
 
         FILL_BUF_EXT(NDL)
         file_type = zis_fs_filetype(buffer);
         if (file_type == ZIS_FS_FT_REG)
             return (int)MOD_FILE_NDL;
+
+#if ZIS_FEATURE_ASM
+        FILL_BUF_EXT(ASM)
+        file_type = zis_fs_filetype(buffer);
+        if (file_type == ZIS_FS_FT_REG)
+            return (int)MOD_FILE_ASM;
+#endif // ZIS_FEATURE_ASM
 
 #undef FILL_BUF_EXT
     }
@@ -237,6 +248,7 @@ module_loader_load_guess_file_type(const zis_path_char_t *path) {
         return MOD_FILE_NOT_FOUND;
     zis_path_extension(ext_buf, path);
 
+#if ZIS_FEATURE_SRC
     if (zis_path_compare(ext_buf, ZIS_PATH_STR(ZIS_FILENAME_EXTENSION_SRC)) == 0) {
         const enum zis_fs_filetype file_type = zis_fs_filetype(path);
         if (file_type == ZIS_FS_FT_REG)
@@ -245,6 +257,7 @@ module_loader_load_guess_file_type(const zis_path_char_t *path) {
             return MOD_FILE_DIR;
         return MOD_FILE_NOT_FOUND;
     }
+#endif // ZIS_FEATURE_SRC
 
     if (zis_path_compare(ext_buf, ZIS_PATH_STR(ZIS_FILENAME_EXTENSION_NDL)) == 0) {
         const enum zis_fs_filetype file_type = zis_fs_filetype(path);
@@ -252,6 +265,15 @@ module_loader_load_guess_file_type(const zis_path_char_t *path) {
             return MOD_FILE_NDL;
         return MOD_FILE_NOT_FOUND;
     }
+
+#if ZIS_FEATURE_ASM
+    if (zis_path_compare(ext_buf, ZIS_PATH_STR(ZIS_FILENAME_EXTENSION_ASM)) == 0) {
+        const enum zis_fs_filetype file_type = zis_fs_filetype(path);
+        if (file_type == ZIS_FS_FT_REG)
+            return MOD_FILE_ASM;
+        return MOD_FILE_NOT_FOUND;
+    }
+#endif // ZIS_FEATURE_ASM
 
     return MOD_FILE_NOT_FOUND;
 }
@@ -322,6 +344,21 @@ static bool module_loader_load_from_file(
         // zis_dl_close(lib); // CAN NOT close library here!!
         return true;
     }
+
+#if ZIS_FEATURE_ASM
+    case MOD_FILE_ASM: {
+        struct zis_assembler *const as = zis_assembler_create(z);
+        const int ff = ZIS_STREAM_OBJ_MODE_IN | ZIS_STREAM_OBJ_TEXT | ZIS_STREAM_OBJ_UTF8;
+        struct zis_stream_obj *f = zis_stream_obj_new_file(z, file, ff);
+        struct zis_exception_obj *exc = zis_assembler_module_from_text(z, as, f, module);
+        zis_assembler_destroy(as, z);
+        if (exc) {
+            d->temp_var = zis_object_from(exc);
+            return false;
+        }
+        return true;
+    }
+#endif // ZIS_FEATURE_ASM
 
     default:
         zis_context_panic(z, ZIS_CONTEXT_PANIC_ABORT); // Not implemented.

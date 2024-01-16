@@ -198,8 +198,8 @@ static int32_t _stream_obj_peek_char_slow_impl(
             );
             if (n == (size_t)-1)
                 return -1;
-            self->_b_cur = self->_b_buf;
             self->_b_end = self->_b_buf + rest_size + n;
+            self->_b_cur = self->_b_end;
             self->_c_cur = self->_b_buf;
             self->_c_end = self->_b_end;
         } else {
@@ -215,10 +215,10 @@ static int32_t _stream_obj_peek_char_slow_impl(
         self->_c_cur++;
     }
     const size_t n = zis_u8char_to_code(&c, (const zis_char8_t *)self->_c_cur, (const zis_char8_t *)self->_c_end);
-    if (n == 0)
-        return -1; // TODO: use a different status code from IO error.
     if (char_len)
         *char_len = n;
+    if (n == 0)
+        return -1; // TODO: use a different status code from IO error.
     return (int32_t)c;
 }
 
@@ -255,6 +255,33 @@ bool _zis_stream_obj_write_char_slow(struct zis_stream_obj *restrict self, int32
         return false;
     self->_c_cur += n;
     return true;
+}
+
+size_t zis_stream_obj_read_line(
+    struct zis_stream_obj *restrict self, char *restrict buffer, size_t size
+) {
+    // TODO: read the buffer directly instead of reading characters one by one.
+
+    assert(size >= 4);
+    size_t i = 0;
+    while (i < size - 3) {
+        const int32_t c = zis_stream_obj_read_char(self);
+        if (!(c & 0x80)) {
+            buffer[i] = (char)c;
+            i++;
+            if (zis_unlikely(c == '\n'))
+                break;
+        } else {
+            if (zis_unlikely(c == -1))
+                break;
+            zis_char8_t b[4];
+            const size_t n = zis_u8char_from_code(c, b);
+            assert(n);
+            memcpy(buffer, b, n);
+            i += n;
+        }
+    }
+    return i;
 }
 
 ZIS_NATIVE_TYPE_DEF(

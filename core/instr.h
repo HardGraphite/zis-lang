@@ -16,6 +16,20 @@ enum zis_opcode {
 #undef E
 };
 
+/// Instruction type (operands type).
+enum zis_op_type {
+    ZIS_OP_X,
+    ZIS_OP_Aw,
+    ZIS_OP_Asw,
+    ZIS_OP_ABw,
+    ZIS_OP_ABsw,
+    ZIS_OP_ABC,
+    ZIS_OP_ABsCs,
+};
+
+#define zis_instr_make_Aw(OP, Aw) \
+    ((uint32_t)(OP) | (uint32_t)(Aw) << 7)
+
 #define zis_instr_make_Asw(OP, Asw) \
     ((uint32_t)(OP) | (int32_t)(Asw) << 7)
 
@@ -33,6 +47,11 @@ enum zis_opcode {
 
 #define zis_instr_extract_opcode(I) \
     ((I) & 0x7f)
+
+#define zis_instr_extract_operands_Aw(I, Aw) \
+do {                                         \
+    Aw = (uint32_t)(I) >> 7;                 \
+} while (0)
 
 #define zis_instr_extract_operands_Asw(I, Asw) \
 do {                                           \

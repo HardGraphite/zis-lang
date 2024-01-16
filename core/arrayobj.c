@@ -131,6 +131,11 @@ struct zis_array_obj *zis_array_obj_new2(
     return self;
 }
 
+void zis_array_obj_clear(struct zis_array_obj *self) {
+    zis_object_vec_zero(self->_data->_data, self->length);
+    self->length = 0;
+}
+
 void zis_array_obj_append(
     struct zis_context *z, struct zis_array_obj *self, struct zis_object *v
 ) {

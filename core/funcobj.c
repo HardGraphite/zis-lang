@@ -61,7 +61,7 @@ struct zis_func_obj *zis_func_obj_new_bytecode(
     struct zis_func_obj_meta meta,
     const zis_func_obj_bytecode_word_t *code, size_t code_len
 ) {
-    struct zis_func_obj *const self = func_obj_alloc(z, 0);
+    struct zis_func_obj *const self = func_obj_alloc(z, code_len);
     self->meta = meta;
     self->native = NULL;
     const size_t code_sz = code_len * sizeof code[0];
@@ -78,6 +78,11 @@ void zis_func_obj_set_module(
     assert(self->_module == z->globals->val_common_top_module);
     self->_module = mod;
     zis_object_assert_no_write_barrier_2(self, zis_object_from(mod));
+}
+
+size_t zis_func_obj_bytecode_length(const struct zis_func_obj *self) {
+    assert(self->_bytes_size >= FUN_OBJ_BYTES_FIXED_SIZE);
+    return (self->_bytes_size - FUN_OBJ_BYTES_FIXED_SIZE) / sizeof(zis_func_obj_bytecode_word_t);
 }
 
 ZIS_NATIVE_TYPE_DEF_XB(

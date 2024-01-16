@@ -32,6 +32,11 @@ int zis_str_icmp(const char *s1, const char *s2) {
 #endif
 }
 
+void zis_str_toupper(char *restrict s, size_t n) {
+    for (size_t i = 0; i < n; i++)
+        s[i] = (char)toupper(s[i]);
+}
+
 size_t zis_u8char_from_code(
     zis_wchar_t code, zis_char8_t utf8_char_buf[ZIS_PARAMARRAY_STATIC 4]
 ) {

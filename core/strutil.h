@@ -20,6 +20,9 @@ typedef uint32_t zis_wchar_t;
 /// Compare two string, ignoring the letter cases.
 int zis_str_icmp(const char *s1, const char *s2);
 
+/// Convert characters to uppercase.
+void zis_str_toupper(char *restrict s, size_t n);
+
 /* ----- UTF-8 support ------------------------------------------------------ */
 
 /// Convert Unicode code point to UTF-8 character. Return character length.

@@ -6,7 +6,7 @@ See [oplist.txt](../core/oplist.txt).
 
 ## Binary formats
 
-Type `Asw`:
+Type `Aw`/`Asw`:
 
 ```text
 31               7 6   0
@@ -26,7 +26,7 @@ Type `ABw`/`ABsw`:
 |<    16   >|< 9 >|< 7>|
 ```
 
-Type `ABC`:
+Type `ABC`/`ABsCs`:
 
 ```text
 31  24 23 16 15  7 6   0

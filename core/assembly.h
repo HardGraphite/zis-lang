@@ -1,0 +1,118 @@
+/// The assembly code support.
+
+#pragma once
+
+#include "zis_config.h" // ZIS_FEATURE_ASM, ZIS_FEATURE_DIS, ZIS_FEATURE_SRC
+
+#include <stdint.h>
+
+#include "instr.h"
+
+struct zis_context;
+struct zis_func_obj;
+struct zis_func_obj_meta;
+struct zis_module_obj;
+struct zis_stream_obj;
+
+/* ----- function assembler ------------------------------------------------- */
+
+#if ZIS_FEATURE_ASM || ZIS_FEATURE_SRC
+
+/// The function bytecode assembler.
+struct zis_assembler;
+
+/// Create an assembler.
+struct zis_assembler *zis_assembler_create(struct zis_context *z);
+
+/// Delete an assembler.
+void zis_assembler_destroy(struct zis_assembler *as, struct zis_context *z);
+
+/// Clear the assembling data and reset the assembler.
+void zis_assembler_clear(struct zis_assembler *as);
+
+/// Finish the assembling and output the generated function.
+/// `zis_assembler_clear()` will be called.
+struct zis_func_obj *zis_assembler_finish(struct zis_assembler *as, struct zis_context *z);
+
+/// Get or update the function meta. `m` is optional.
+const struct zis_func_obj_meta *zis_assembler_func_meta(
+    struct zis_assembler *as, const struct zis_func_obj_meta *restrict m
+);
+
+/// Allocate a label for jump targets. Returns the label ID.
+int zis_assembler_alloc_label(struct zis_assembler *as);
+
+/// Set the location of the label and return `id`.
+/// The label must not be placed before.
+int zis_assembler_place_label(struct zis_assembler *as, int id);
+
+/// Deallocate a label. `zis_assembler_clear()` also deletes tables.
+void zis_assembler_free_label(struct zis_assembler *as, int id);
+
+/// Append an instruction.
+void zis_assembler_append(struct zis_assembler *as, zis_instr_word_t instr);
+
+void zis_assembler_append_Aw(
+    struct zis_assembler *as, enum zis_opcode opcode,
+    uint32_t Aw
+);
+
+void zis_assembler_append_Asw(
+    struct zis_assembler *as, enum zis_opcode opcode,
+    int32_t Asw
+);
+
+void zis_assembler_append_ABw(
+    struct zis_assembler *as, enum zis_opcode opcode,
+    uint32_t A, uint32_t Bw
+);
+
+void zis_assembler_append_ABsw(
+    struct zis_assembler *as, enum zis_opcode opcode,
+    uint32_t A, int32_t Bsw
+);
+
+void zis_assembler_append_ABC(
+    struct zis_assembler *as, enum zis_opcode opcode,
+    uint32_t A, uint32_t B, uint32_t C
+);
+
+void zis_assembler_append_ABsCs(
+    struct zis_assembler *as, enum zis_opcode opcode,
+    uint32_t A, int32_t Bs, int32_t Cs
+);
+
+#endif // ZIS_FEATURE_ASM || ZIS_FEATURE_SRC
+
+/* ----- module assembler --------------------------------------------------- */
+
+#if ZIS_FEATURE_ASM
+
+/// Generate a module from assemble text.
+struct zis_exception_obj *zis_assembler_module_from_text(
+    struct zis_context *z, struct zis_assembler *as,
+    struct zis_stream_obj *input, struct zis_module_obj *output
+);
+
+#endif // ZIS_FEATURE_ASM
+
+/* ----- function disassembler ---------------------------------------------- */
+
+#if ZIS_FEATURE_DIS
+
+/// Disassemble result of one instruction.
+struct zis_disassemble_result {
+    unsigned int      address; ///< Instruction index.
+    zis_instr_word_t  instr;   ///< The instruction.
+    enum zis_opcode   opcode;  ///< Opcode.
+    const char       *op_name; ///< Operation name.
+    int32_t           operands[3]; ///< Operands. Unused ones are assigned with INT32_MIN.
+};
+
+/// Disassemble the bytecode function.
+int zis_disassemble_bytecode(
+    struct zis_context *z, const struct zis_func_obj *func_obj,
+    int (*fn)(const struct zis_disassemble_result *, void *), void *fn_arg
+);
+
+#endif // ZIS_FEATURE_DIS

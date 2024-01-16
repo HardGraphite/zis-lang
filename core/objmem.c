@@ -158,6 +158,7 @@ static void mem_span_set_init(struct mem_span_set *set) {
 
 /// Finalize the set.
 static void mem_span_set_fini(struct mem_span_set *set) {
+    assert(!set->_nodes);
     mem_span_set_foreach_node(set, node, { zis_mem_free(node); });
     set->_nodes = NULL;
 }

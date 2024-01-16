@@ -2,6 +2,10 @@
 ##### Options and configurations #####
 ######################################
 
+option(ZIS_FEATURE_ASM       "Enable the assembly code support."             ON)
+option(ZIS_FEATURE_DIS       "Enable the disassembling support."             ON)
+option(ZIS_FEATURE_SRC       "Enable the source code support."               ON)
+
 set(ZIS_MALLOC_INCLUDE "" CACHE FILEPATH
     "Path to a file to include, which defines malloc(), realloc(), and free().")
 set(ZIS_MALLOC_LINK "" CACHE FILEPATH
@@ -45,6 +49,9 @@ file(CONFIGURE OUTPUT "${zis_core_conf_header_dir}/zis_config.h" @ONLY CONTENT [
 #cmakedefine01  ZIS_USE_COMPUTED_GOTO
 #cmakedefine01  ZIS_DEBUG
 #cmakedefine01  ZIS_DEBUG_LOGGING
+#cmakedefine01  ZIS_FEATURE_ASM
+#cmakedefine01  ZIS_FEATURE_DIS
+#cmakedefine01  ZIS_FEATURE_SRC
 ]==])
 
 add_custom_command(

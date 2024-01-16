@@ -102,6 +102,7 @@ bool zis_stream_obj_write_bytes(
     const void *restrict data, size_t size
 );
 
+/// Write data from output buffer to the associated backend.
 bool zis_stream_obj_flush_chars(struct zis_stream_obj *restrict self);
 
 int32_t _zis_stream_obj_peek_char_slow(struct zis_stream_obj *restrict self);
@@ -148,7 +149,7 @@ bool _zis_stream_obj_write_char_slow(struct zis_stream_obj *restrict self, int32
 
 /// Write a character (Unicode point) to the stream. No mode check.
 /// Returns whether successful.
-zis_static_force_inline bool zis_stream_obj_write_chars(
+zis_static_force_inline bool zis_stream_obj_write_char(
     struct zis_stream_obj *restrict self, int32_t c
 ) {
     assert(self->_ops && zis_stream_obj_flag_writeable(self) && zis_stream_obj_flag_text(self));
@@ -164,3 +165,6 @@ zis_static_force_inline bool zis_stream_obj_write_chars(
 
     return _zis_stream_obj_write_char_slow(self, c);
 }
+
+/// Read characters to the buffer until an end-of-line char (including) or end of buffer.
+size_t zis_stream_obj_read_line(struct zis_stream_obj *restrict self, char *restrict buffer, size_t size);

@@ -90,3 +90,6 @@ zis_static_force_inline struct zis_object *
 zis_func_obj_constant(const struct zis_func_obj *self, size_t id) {
     return zis_array_slots_obj_get(self->_constants, id);
 }
+
+/// Get the number of instructions in the bytecode sequence.
+size_t zis_func_obj_bytecode_length(const struct zis_func_obj *self);
