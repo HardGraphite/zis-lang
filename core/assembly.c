@@ -426,11 +426,11 @@ static enum tas_parse_line_status tas_parse_line(
         if (!line_len) {
             return TAS_PARSE_EOF;
         }
+        tas->line_number++;
         if (line_buffer[line_len - 1] != '\n') {
             tas_record_error(tas, "the line is too long");
             return TAS_PARSE_ERROR;
         }
-        tas->line_number++;
         line_buffer[line_len - 1] = 0;
 
         const char *const spaces = " \t\v";
@@ -448,7 +448,6 @@ static enum tas_parse_line_status tas_parse_line(
         if (op_name[0] == '.') {
             const int opcode = pseudo_from_name(op_name + 1);
             if (opcode == -1) {
-                tas->line_number--;
                 tas_record_error(tas, "unrecognized pseudo operation name");
                 return TAS_PARSE_ERROR;
             }
@@ -459,21 +458,28 @@ static enum tas_parse_line_status tas_parse_line(
 
         const int opcode = opcode_from_name(op_name);
         if (opcode == -1) {
-            tas->line_number--;
-                tas_record_error(tas, "unrecognized operation name");
+            tas_record_error(tas, "unrecognized operation name");
             return TAS_PARSE_ERROR;
         }
         res->instr.opcode = (enum zis_opcode)opcode;
+        int scan_len[3] = { 0, 0, 0 };
         const int scan_ret = sscanf(
-            p, "%" SCNi32 ",%" SCNi32 ",%" SCNi32,
-            res->instr.operands + 0, res->instr.operands + 1, res->instr.operands + 2
+            p, "%" SCNi32 "%n,%" SCNi32 "%n,%" SCNi32 "%n",
+            res->instr.operands + 0, scan_len + 0,
+            res->instr.operands + 1, scan_len + 1,
+            res->instr.operands + 2, scan_len + 2
         );
         if (scan_ret <= 0) {
-            tas->line_number--;
-                tas_record_error(tas, "illegal operands");
+            tas_record_error(tas, "illegal operands");
             return TAS_PARSE_ERROR;
         }
         res->instr.operand_count = (size_t)scan_ret;
+        assert(scan_ret <= 3);
+        p += strspn(p + scan_len[scan_ret - 1], spaces) + scan_len[scan_ret - 1];
+        if (*p && *p != '#') {
+            tas_record_error(tas, "unexpected trailing junk");
+            return TAS_PARSE_ERROR;
+        }
         return TAS_PARSE_INSTR;
     }
 }
@@ -491,7 +497,6 @@ static struct zis_func_obj *tas_parse_func(
             &func_meta.na, (signed char *)&func_meta.no, &func_meta.nr
         ) != 3
     ) {
-        tas->line_number--;
         tas_record_error(tas, "illegal operands");
         return NULL;
     }
@@ -550,7 +555,7 @@ static struct zis_func_obj *tas_parse_func(
             case ZIS_OP_ABsCs:
                 if (line_result.instr.operand_count != 3)
                     goto bad_operands;
-                zis_assembler_append_ABC(
+                zis_assembler_append_ABsCs(
                     tas->as, line_result.instr.opcode,
                     (uint32_t)line_result.instr.operands[0],
                     line_result.instr.operands[1],
@@ -589,7 +594,7 @@ struct zis_exception_obj *zis_assembler_module_from_text(
         .z = z,
         .as = as,
         .input = input,
-        .line_number = 1,
+        .line_number = 0,
     };
 
     struct zis_exception_obj *exc_obj = NULL;
@@ -614,7 +619,6 @@ struct zis_exception_obj *zis_assembler_module_from_text(
             break;
         }
         if (line_result.pseudo.opcode == PSEUDO_FUNC) {
-            context.line_number++;
             struct zis_func_obj *func_obj = tas_parse_func(&context, line_result.pseudo.operands);
             if (!func_obj) {
                 exc_obj = tas_error_exception(&context);
