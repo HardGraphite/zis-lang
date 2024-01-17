@@ -12,7 +12,9 @@ struct zis_context;
 struct zis_func_obj;
 struct zis_func_obj_meta;
 struct zis_module_obj;
+struct zis_object;
 struct zis_stream_obj;
+struct zis_symbol_obj;
 
 /* ----- function assembler ------------------------------------------------- */
 
@@ -37,6 +39,16 @@ struct zis_func_obj *zis_assembler_finish(struct zis_assembler *as, struct zis_c
 /// Get or update the function meta. `m` is optional.
 const struct zis_func_obj_meta *zis_assembler_func_meta(
     struct zis_assembler *as, const struct zis_func_obj_meta *restrict m
+);
+
+/// Register or find a function-scope constant. Returns the ID.
+unsigned int zis_assembler_func_constant(
+    struct zis_assembler *as, struct zis_context *z, struct zis_object *v
+);
+
+/// Register or find a function-scope symbol. Returns the ID.
+unsigned int zis_assembler_func_symbol(
+    struct zis_assembler *as, struct zis_context *z, struct zis_symbol_obj *v
 );
 
 /// Allocate a label for jump targets. Returns the label ID.

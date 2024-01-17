@@ -1,6 +1,7 @@
 #include "assembly.h"
 
 #include <assert.h>
+#include <ctype.h>
 #include <inttypes.h>
 #include <limits.h>
 #include <stddef.h>
@@ -57,6 +58,9 @@ static const uint8_t op_names_sorted_code_table[] = {
 static const char *const pseudo_names[] = {
     "END",
     "FUNC",
+    "TYPE",
+    "CONST",
+    "SYM",
 };
 
 #pragma pack(pop)
@@ -65,6 +69,8 @@ enum pseudo_opcode {
     PSEUDO_END,
     PSEUDO_FUNC,
     PSEUDO_TYPE,
+    PSEUDO_CONST,
+    PSEUDO_SYM,
 };
 
 /// Find opcode by its uppercase name. Returns -1 if not found.
@@ -113,6 +119,7 @@ static int pseudo_from_name(const char *name_upper) {
 
 #include "arrayobj.h"
 #include "funcobj.h"
+#include "mapobj.h"
 
 struct instr_buffer {
     zis_instr_word_t *data;
@@ -213,7 +220,8 @@ static void label_table_clear(struct label_table *lt) {
 struct zis_assembler {
 #define AS_OBJ_MEMBER_BEGIN func_constants
     struct zis_array_obj *func_constants;
-    struct zis_array_obj *func_symbols;
+    struct zis_map_obj *func_symbols; // { symbol -> id }
+    struct zis_object  *temp_object; // nil when not in use
 #define AS_OBJ_MEMBER_END instr_buffer
     struct instr_buffer instr_buffer;
     struct label_table  label_table;
@@ -232,14 +240,15 @@ struct zis_assembler *zis_assembler_create(struct zis_context *z) {
     struct zis_assembler *const as = zis_mem_alloc(sizeof(struct zis_assembler));
 
     as->func_constants = zis_object_cast(z->globals->val_nil, struct zis_array_obj);
-    as->func_symbols = zis_object_cast(z->globals->val_nil, struct zis_array_obj);
+    as->func_symbols = zis_object_cast(z->globals->val_nil, struct zis_map_obj);
+    as->temp_object = zis_object_from(z->globals->val_nil);
     instr_buffer_init(&as->instr_buffer);
     label_table_init(&as->label_table);
     as->func_meta.na = 0, as->func_meta.no = 0, as->func_meta.nr = 0;
 
     zis_objmem_add_gc_root(z, as, assembler_gc_visitor);
     as->func_constants = zis_array_obj_new(z, NULL, 0);
-    as->func_symbols = zis_array_obj_new(z, NULL, 0);
+    as->func_symbols = zis_map_obj_new_r(z, (struct zis_object **)&as->func_symbols, 1.5f, 0);
 
     return as;
 }
@@ -253,10 +262,19 @@ void zis_assembler_destroy(struct zis_assembler *as, struct zis_context *z) {
 
 void zis_assembler_clear(struct zis_assembler *as) {
     zis_array_obj_clear(as->func_constants);
-    zis_array_obj_clear(as->func_symbols);
+    zis_map_obj_clear(as->func_symbols);
     instr_buffer_clear(&as->instr_buffer);
     label_table_clear(&as->label_table);
     as->func_meta.na = 0, as->func_meta.no = 0, as->func_meta.nr = 0;
+}
+
+static int _as_finish_id_map_to_slots(struct zis_object *k, struct zis_object *v, void *_slots) {
+    struct zis_array_slots_obj *slots = _slots;
+    assert(zis_object_is_smallint(v));
+    const zis_smallint_t id = zis_smallint_from_ptr(v);
+    assert(id >= 0 && (size_t)id < zis_array_slots_obj_length(slots));
+    zis_array_slots_obj_set(slots, (size_t)id, k);
+    return 0;
 }
 
 #if ZIS_DEBUG_LOGGING
@@ -288,10 +306,37 @@ struct zis_func_obj *zis_assembler_finish(struct zis_assembler *as, struct zis_c
     struct zis_func_obj *func_obj = zis_func_obj_new_bytecode(
         z, as->func_meta, as->instr_buffer.data, as->instr_buffer.length
     );
+
+    assert(as->temp_object == zis_object_from(z->globals->val_nil));
+    as->temp_object = zis_object_from(func_obj);
+    if (zis_array_obj_length(as->func_constants)) {
+        struct zis_array_slots_obj *const tbl =
+            zis_array_slots_obj_new2(z, zis_array_obj_length(as->func_constants), as->func_constants->_data);
+        if ((void *)func_obj != (void *)as->temp_object)
+            func_obj = zis_object_cast(as->temp_object, struct zis_func_obj);
+        func_obj->_constants = tbl;
+        zis_object_write_barrier(func_obj, tbl);
+    }
+    if (zis_map_obj_length(as->func_symbols)) {
+        struct zis_array_slots_obj *const tbl =
+            zis_array_slots_obj_new(z, NULL, zis_map_obj_length(as->func_symbols));
+        if ((void *)func_obj != (void *)as->temp_object)
+            func_obj = zis_object_cast(as->temp_object, struct zis_func_obj);
+        func_obj->_symbols = tbl;
+        zis_object_write_barrier(func_obj, tbl);
+        zis_map_obj_foreach(z, as->func_symbols, _as_finish_id_map_to_slots, tbl);
+        assert(tbl == func_obj->_symbols);
+    }
+    if ((void *)func_obj != (void *)as->temp_object)
+        func_obj = zis_object_cast(as->temp_object, struct zis_func_obj);
+    as->temp_object = zis_object_from(z->globals->val_nil);
+
     zis_assembler_clear(as);
+
     zis_debug_log_1(DUMP, "Asm", "zis_disassemble_bytecode()", fp, {
         zis_disassemble_bytecode(z, func_obj, _as_finish_debug_dump_fn, fp);
     });
+
     return func_obj;
 }
 
@@ -302,6 +347,42 @@ const struct zis_func_obj_meta *zis_assembler_func_meta(
         as->func_meta.na = m->na, as->func_meta.no = m->no, as->func_meta.nr = m->nr;
     }
     return &as->func_meta;
+}
+
+unsigned int zis_assembler_func_constant(
+    struct zis_assembler *as, struct zis_context *z, struct zis_object *v
+) {
+    // TODO: check whether the constant has been added.
+
+    const size_t n = zis_array_obj_length(as->func_constants);
+    zis_array_obj_append(z, as->func_constants, v);
+    assert(n <= UINT_MAX);
+    return (unsigned int)n;
+}
+
+unsigned int zis_assembler_func_symbol(
+    struct zis_assembler *as, struct zis_context *z, struct zis_symbol_obj *v
+) {
+    assert(as->temp_object == zis_object_from(z->globals->val_nil));
+    as->temp_object = zis_object_from(v);
+    struct zis_object *id_o = zis_map_obj_sym_get(as->func_symbols, v);
+    unsigned int id;
+    if (id_o) {
+        assert(zis_object_is_smallint(id_o));
+        const zis_smallint_t id_smi = zis_smallint_from_ptr(id_o);
+        assert(id_smi >= 0 && id_smi <= UINT_MAX);
+        id = (unsigned int)id_smi;
+    } else {
+        if ((void *)v != (void *)as->temp_object)
+            v = zis_object_cast(as->temp_object, struct zis_symbol_obj);
+        const size_t n = zis_map_obj_length(as->func_symbols);
+        assert(n <= ZIS_SMALLINT_MAX);
+        zis_map_obj_sym_set(z, as->func_symbols, v, zis_smallint_to_ptr((zis_smallint_t)n));
+        assert(n <= UINT_MAX);
+        id = (unsigned int)n;
+    }
+    as->temp_object = zis_object_from(z->globals->val_nil);
+    return id;
 }
 
 int zis_assembler_alloc_label(struct zis_assembler *as) {
@@ -382,9 +463,14 @@ void zis_assembler_append_ABsCs(
 #include "stack.h"
 #include "strutil.h"
 
+#include "arrayobj.h"
 #include "exceptobj.h"
+#include "floatobj.h"
+#include "intobj.h"
 #include "moduleobj.h"
 #include "streamobj.h"
+#include "stringobj.h"
+#include "symbolobj.h"
 
 struct tas_context {
     struct zis_context *z;
@@ -569,9 +655,37 @@ static struct zis_func_obj *tas_parse_func(
                 return NULL;
             }
         } else if (line_status == TAS_PARSE_PSEUDO) {
-            if (line_result.pseudo.opcode == PSEUDO_END) {
+            struct zis_object *v;
+            switch (line_result.pseudo.opcode) {
+            case PSEUDO_END:
+                goto finish;
+            case PSEUDO_CONST:
+                if (line_result.pseudo.operands[1] != ':')
+                    goto pseudo_bad_operand;
+                switch (toupper(line_result.pseudo.operands[0])) {
+                case 'I':
+                    v = zis_smallint_or_int_obj(tas->z, (zis_smallint_t)atoll(line_result.pseudo.operands + 2));
+                    break;
+                case 'F':
+                    v = zis_object_from(zis_float_obj_new(tas->z, atof(line_result.pseudo.operands + 2)));
+                    break;
+                case 'S':
+                    v = zis_object_from(zis_string_obj_new(tas->z, line_result.pseudo.operands + 2, (size_t)-1));
+                    break;
+                default:
+                pseudo_bad_operand:
+                    tas_record_error(tas, "illegal operands");
+                    return NULL;
+                }
+                zis_assembler_func_constant(tas->as, tas->z, v);
                 break;
-            } else {
+            case PSEUDO_SYM:
+                zis_assembler_func_symbol(
+                    tas->as, tas->z,
+                    zis_symbol_registry_get(tas->z, line_result.pseudo.operands, (size_t)-1)
+                );
+                break;
+            default:
                 tas_record_error(tas, "unexpected pseudo operation");
                 return NULL;
             }
@@ -581,6 +695,7 @@ static struct zis_func_obj *tas_parse_func(
             return NULL;
         }
     }
+finish:
     return zis_assembler_finish(tas->as, tas->z);
 }
 
@@ -645,6 +760,7 @@ struct zis_exception_obj *zis_assembler_module_from_text(
         assert(zis_object_type(tmp_regs[0]) == z->globals->type_Module);
         output = zis_object_cast(tmp_regs[0], struct zis_module_obj);
         output->_functions = tbl;
+        zis_object_write_barrier(output, tbl);
     }
 
     zis_callstack_frame_free_temp(z, tmp_regs_n);

@@ -450,6 +450,23 @@ void zis_map_obj_sym_set(
     assert(status == ZIS_OK);
 }
 
+int zis_map_obj_foreach(
+    struct zis_context *z, struct zis_map_obj *self,
+    int (*fn)(struct zis_object *key, struct zis_object *val, void *arg), void *fn_arg
+) {
+    int fn_ret = 0;
+    struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 2);
+    tmp_regs[0] = zis_object_from(self->_buckets);
+    zis_hashmap_buckets_foreach_node_r(tmp_regs[0], tmp_regs[1], node, {
+        fn_ret = fn(node->_key, node->_value, fn_arg);
+        if (fn_ret)
+            goto break_loop;
+    });
+break_loop:
+    zis_callstack_frame_free_temp(z, 2);
+    return fn_ret;
+}
+
 ZIS_NATIVE_TYPE_DEF(
     Map,
     struct zis_map_obj,

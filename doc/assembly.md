@@ -29,3 +29,22 @@ See [oplist.txt](../core/oplist.txt).
 ```
 
 See `struct zis_func_obj_meta` for details about the operands `<NA>,<NO>,<NR>`.
+
+### Define a constant
+
+```
+# Integer
+.CONST I:123
+
+# Floating-point
+.CONST F:12.3
+
+# String
+.CONST S:abc
+```
+
+### Define a symbol
+
+```
+.SYM abc
+```
