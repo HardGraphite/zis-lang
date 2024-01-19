@@ -383,7 +383,7 @@ static struct zis_module_obj *module_loader_try_load_from_embedded(
         return NULL;
 
     struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 2);
-    struct zis_module_obj *module = zis_module_obj_new_r(z, tmp_regs);
+    struct zis_module_obj *module = zis_module_obj_new_r(z, tmp_regs, true);
     zis_module_obj_load_native_def(z, module, mod_def);
     assert(zis_object_type(tmp_regs[0]) == z->globals->type_Module);
     module = zis_object_cast(tmp_regs[0], struct zis_module_obj);
@@ -582,7 +582,7 @@ static struct zis_module_obj *_module_loader_load_top(
     // Load module from the found file.
     if (!top_module) {
         struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 2);
-        top_module = zis_module_obj_new_r(z, tmp_regs);
+        top_module = zis_module_obj_new_r(z, tmp_regs, true);
         zis_callstack_frame_free_temp(z, 2);
     }
     d->temp_var = zis_object_from(top_module);
@@ -620,12 +620,9 @@ struct zis_module_obj *zis_module_loader_import(
 ) {
     struct module_loader_data *const d = &z->module_loader->data;
 
-    if (module)
-        flags = 0;
-
     // Check whether the module has been loaded.
     bool found_in_loaded = false;
-    if (flags & ZIS_MOD_LDR_SEARCH_LOADED) {
+    if (flags & ZIS_MOD_LDR_SEARCH_LOADED && !module) {
         assert(!module);
         module = zis_module_loader_get_loaded(z, module_name);
         if (module) {
@@ -715,7 +712,7 @@ struct zis_module_obj *zis_module_loader_import_file(
     if (!module) {
         d->temp_var = zis_object_from(file);
         struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 2);
-        module = zis_module_obj_new_r(z, tmp_regs);
+        module = zis_module_obj_new_r(z, tmp_regs, true);
         zis_callstack_frame_free_temp(z, 2);
         file = zis_object_cast(d->temp_var, struct zis_path_obj);
     }

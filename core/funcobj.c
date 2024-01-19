@@ -42,7 +42,7 @@ static struct zis_func_obj *func_obj_alloc(
     );
     self->_symbols = z->globals->val_empty_array_slots;
     self->_constants = z->globals->val_empty_array_slots;
-    self->_module = z->globals->val_common_top_module;
+    self->_module = z->globals->val_mod_unnamed;
     return self;
 }
 
@@ -75,7 +75,7 @@ void zis_func_obj_set_module(
     struct zis_func_obj *self, struct zis_module_obj *mod
 ) {
     zis_unused_var(z);
-    assert(self->_module == z->globals->val_common_top_module);
+    assert(self->_module == z->globals->val_mod_unnamed);
     self->_module = mod;
     zis_object_assert_no_write_barrier_2(self, zis_object_from(mod));
 }

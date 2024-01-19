@@ -15,7 +15,8 @@
 
 struct zis_module_obj *zis_module_obj_new_r(
     struct zis_context *z,
-    struct zis_object *regs[ZIS_PARAMARRAY_STATIC 2]
+    struct zis_object *regs[ZIS_PARAMARRAY_STATIC 2],
+    bool parent_prelude
 ) {
     // ~~ regs[0] = module, regs[1] = tmp ~~
 
@@ -29,7 +30,7 @@ struct zis_module_obj *zis_module_obj_new_r(
     self->_variables = empty_array_slots;
     self->_functions = empty_array_slots;
     zis_object_write_barrier(self, empty_array_slots);
-    self->_parent = zis_smallint_to_ptr(0);
+    self->_parent = parent_prelude ? zis_object_from(z->globals->val_mod_prelude) : zis_smallint_to_ptr(0);
 
     self->_name_map = zis_object_cast(zis_smallint_to_ptr(0), struct zis_map_obj);
     struct zis_map_obj *name_map = zis_map_obj_new_r(z, regs + 1, 0.0f, 0);

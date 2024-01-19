@@ -20,3 +20,8 @@ for example:
 //%% name = hello
 //%% default-enabled = NO
 ```
+
+Modules whose `force-embedded` option is true
+will have the project root directory added to the include path list.
+That means, you can use "`#include <core/xxx.h>`"
+to include core headers in such module source files.

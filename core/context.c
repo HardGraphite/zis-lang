@@ -10,16 +10,32 @@
 #include "globals.h"
 #include "loader.h"
 #include "memory.h"
+#include "ndefutil.h"
 #include "objmem.h"
 #include "stack.h"
 #include "symbolobj.h"
 #include "zis.h" // ZIS_PANIC_*
 
+#include "moduleobj.h"
 #include "pathobj.h"
 
 #include "zis_config.h"
 
-static void context_read_environ_path(struct zis_context *z) {
+/* ----- init: load essential builtin modules ------------------------------- */
+
+extern const struct zis_native_module_def ZIS_NATIVE_MODULE_VARNAME(prelude);
+
+zis_cold_fn static void context_load_builtin_modules(struct zis_context *z) {
+    int status;
+
+    zis_module_obj_load_native_def(z, z->globals->val_mod_prelude, &ZIS_NATIVE_MODULE_VARNAME(prelude));
+    status = zis_module_obj_do_init(z, z->globals->val_mod_prelude);
+    zis_unused_var(status), assert(status == ZIS_OK);
+}
+
+/* ----- init: read environment variables ----------------------------------- */
+
+zis_cold_fn static void context_read_environ_path(struct zis_context *z) {
 #ifdef ZIS_ENVIRON_NAME_PATH
 
 #if ZIS_SYSTEM_WINDOWS
@@ -56,7 +72,7 @@ static void context_read_environ_path(struct zis_context *z) {
 #endif // ZIS_ENVIRON_NAME_PATH
 }
 
-static void context_read_environ_mems(
+zis_cold_fn static void context_read_environ_mems(
     size_t *restrict stack_size,
     struct zis_objmem_options *restrict objmem_opts
 ) {
@@ -92,6 +108,8 @@ static void context_read_environ_mems(
 #endif // ZIS_ENVIRON_NAME_MEMS
 }
 
+/* ----- public functions --------------------------------------------------- */
+
 zis_nodiscard struct zis_context *zis_context_create(void) {
     zis_debug_try_init();
 
@@ -112,6 +130,7 @@ zis_nodiscard struct zis_context *zis_context_create(void) {
     z->globals = zis_context_globals_create(z);
     z->module_loader = zis_module_loader_create(z);
 
+    context_load_builtin_modules(z);
     context_read_environ_path(z);
 
     zis_callstack_leave(z->callstack);

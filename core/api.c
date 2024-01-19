@@ -1018,11 +1018,12 @@ ZIS_API int zis_make_module(zis_t z, unsigned int reg, const struct zis_native_m
     if (zis_unlikely(!obj_ref))
         return ZIS_E_IDX;
     struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 2);
-    struct zis_module_obj *const mod_obj = zis_module_obj_new_r(z, tmp_regs);
+    struct zis_module_obj *mod_obj = zis_module_obj_new_r(z, tmp_regs, true);
     zis_callstack_frame_free_temp(z, 2);
     *obj_ref = zis_object_from(mod_obj);
     zis_module_obj_load_native_def(z, mod_obj, def);
-    return ZIS_OK;
+    mod_obj = zis_object_cast(*obj_ref, struct zis_module_obj);
+    return zis_module_obj_do_init(z, mod_obj);
 }
 
 ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) {

@@ -49,7 +49,7 @@ struct zis_module_obj *zis_module_loader_get_loaded(
 
 /// Import (load and initialize) a module by its name.
 /// Parameters `module` and `sub_module_name` are optional.
-/// When `module` is given, data is loaded into it and the flags are ignored.
+/// When `module` is given, data is loaded into it and the flag `ZIS_MOD_LDR_SEARCH_LOADED` is ignored.
 /// On failure, puts an exception in REG-0 and returns NULL.
 struct zis_module_obj *zis_module_loader_import(
     struct zis_context *z, struct zis_module_obj *module /* = NULL */,

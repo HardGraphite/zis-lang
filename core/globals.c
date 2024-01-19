@@ -21,8 +21,9 @@
 #include "typeobj.h"
 
 #define E(NAME)  extern const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR(NAME);
-_ZIS_BUILTIN_TYPE_LIST
-E(Type)
+_ZIS_BUILTIN_TYPE_LIST0
+_ZIS_BUILTIN_TYPE_LIST1
+_ZIS_BUILTIN_TYPE_LIST2
 #undef E
 
 /// Alloc types. See `_zis_type_obj_bootstrap_alloc()`.
@@ -44,7 +45,8 @@ zis_cold_fn static void _init_types_0(
 #define E(NAME) \
     g->type_##NAME = _zis_type_obj_bootstrap_alloc(z, &ZIS_NATIVE_TYPE_VAR(NAME));
 
-    _ZIS_BUILTIN_TYPE_LIST
+    _ZIS_BUILTIN_TYPE_LIST1
+    _ZIS_BUILTIN_TYPE_LIST2
 
 #undef E
 }
@@ -57,8 +59,9 @@ zis_cold_fn static void _init_types_1(
 #define E(NAME) \
     _zis_type_obj_bootstrap_init_r(z, g->type_##NAME, tmp_regs);
 
-    E(Type)
-    _ZIS_BUILTIN_TYPE_LIST
+    _ZIS_BUILTIN_TYPE_LIST0
+    _ZIS_BUILTIN_TYPE_LIST1
+    _ZIS_BUILTIN_TYPE_LIST2
 
 #undef E
 }
@@ -70,8 +73,9 @@ zis_cold_fn static void _init_types_2(
 #define E(NAME) \
     zis_type_obj_load_native_def(z, g->type_##NAME, &ZIS_NATIVE_TYPE_VAR(NAME));
 
-    E(Type)
-    _ZIS_BUILTIN_TYPE_LIST
+    _ZIS_BUILTIN_TYPE_LIST0
+    _ZIS_BUILTIN_TYPE_LIST1
+    _ZIS_BUILTIN_TYPE_LIST2
 
 #undef E
 }
@@ -94,7 +98,8 @@ zis_cold_fn static void _init_values_1(
     struct zis_context_globals *g, struct zis_context *z,
     struct zis_object *tmp_regs[ZIS_PARAMARRAY_STATIC 3]
 ) {
-    g->val_common_top_module = zis_module_obj_new_r(z, tmp_regs);
+    g->val_mod_prelude = zis_module_obj_new_r(z, tmp_regs, false);
+    g->val_mod_unnamed = zis_module_obj_new_r(z, tmp_regs, true);
 }
 
 /// Initialize symbols.
