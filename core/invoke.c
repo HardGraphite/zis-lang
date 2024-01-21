@@ -504,6 +504,8 @@ _interp_loop:
 
     OP_DEFINE(RETNIL) {
         ip = invocation_leave(z, zis_object_from(g->val_nil));
+        if (zis_unlikely(!ip))
+            return ZIS_OK;
         FUNC_CHANGED;
         IP_ADVANCE;
         OP_DISPATCH;
@@ -515,6 +517,8 @@ _interp_loop:
         struct zis_object **ret_p = bp + ret;
         BOUND_CHECK_REG(ret_p);
         ip = invocation_leave(z, *ret_p);
+        if (zis_unlikely(!ip))
+            return ZIS_OK;
         FUNC_CHANGED;
         IP_ADVANCE;
         OP_DISPATCH;
