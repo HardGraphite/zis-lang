@@ -127,7 +127,7 @@ void zis_callstack_destroy(struct zis_callstack *cs, struct zis_context *z) {
     zis_vmem_free(cs, callstack_struct_size(cs));
 }
 
-void zis_callstack_enter(struct zis_callstack *cs, size_t frame_size, void *return_ip) {
+void zis_callstack_enter(struct zis_callstack *cs, size_t frame_size, void *caller_ip, struct zis_object **ret_val_reg) {
     struct zis_object **const old_sp = cs->top, **const old_fp = cs->frame;
     struct zis_object **const new_sp = old_sp + frame_size, **const new_fp = old_sp + 1;
     if (zis_unlikely((size_t)(cs->_data_end - old_sp) < frame_size))
@@ -135,7 +135,8 @@ void zis_callstack_enter(struct zis_callstack *cs, size_t frame_size, void *retu
     struct zis_callstack_frame_info *const fi = fi_list_push(&cs->_fi_list);
     fi->frame_top = new_sp;
     fi->prev_frame = old_fp;
-    fi->return_ip = return_ip;
+    fi->caller_ip = caller_ip;
+    fi->ret_val_reg = ret_val_reg;
     cs->top = new_sp, cs->frame = new_fp;
     callstack_clear_range(new_fp, frame_size);
     zis_debug_log(TRACE, "Stack", "enter frame @%ti~+%zu", new_fp - cs->_data, frame_size);

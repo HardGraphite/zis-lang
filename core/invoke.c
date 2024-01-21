@@ -61,7 +61,8 @@ struct invocation_info {
 /// On error, make an exception (REG-0) and returns false.
 zis_static_force_inline bool invocation_enter(
     struct zis_context *z,
-    void *return_ip,
+    zis_instr_word_t *caller_ip,
+    struct zis_object **ret_val_reg,
     struct invocation_info *info
 ) {
     struct zis_object **caller_frame = z->callstack->frame;
@@ -82,7 +83,7 @@ zis_static_force_inline bool invocation_enter(
     }
 
     /// New frame.
-    zis_callstack_enter(z->callstack, callee_frame_size, return_ip);
+    zis_callstack_enter(z->callstack, callee_frame_size, caller_ip, ret_val_reg);
 
     return true;
 }
@@ -130,6 +131,46 @@ zis_static_force_inline bool invocation_pass_args_vec(
             arg_list[argc_min] = zis_object_from(va_list_);
         }
     }
+
+    return true;
+}
+
+/// Pass arguments (packed).
+zis_static_force_inline bool invocation_pass_args_pac(
+    struct zis_context *z,
+    struct zis_object *packed_args, size_t argc,
+    struct invocation_info *info
+) {
+    assert(
+        zis_object_type(packed_args) == z->globals->type_Tuple ||
+        zis_object_type(packed_args) == z->globals->type_Array_Slots
+    );
+    static_assert(
+        offsetof(struct zis_tuple_obj, _data) ==
+            offsetof(struct zis_array_slots_obj, _data),
+        "");
+    struct zis_object **argv =
+        zis_object_cast(packed_args, struct zis_tuple_obj)->_data;
+    assert(zis_tuple_obj_length(zis_object_cast(packed_args, struct zis_tuple_obj)) >= argc);
+    assert(zis_array_slots_obj_length(zis_object_cast(packed_args, struct zis_array_slots_obj)) >= argc);
+
+    const struct zis_func_obj_meta func_meta = info->func_meta;
+    if (zis_likely(argc <= func_meta.na || func_meta.no != (unsigned char)-1)) {
+        // No object allocation. No need to worry about `packed_args` been moved.
+        return invocation_pass_args_vec(z, argv, argc, info);
+    }
+
+    const size_t argc_min = func_meta.na;
+    struct zis_object **const arg_list = z->callstack->frame + 1;
+    assert(argc > argc_min || func_meta.no != (unsigned char)-1);
+    zis_object_vec_copy(arg_list, argv, argc_min);
+    const size_t rest_n = argc - argc_min;
+    arg_list[argc_min] = zis_object_from(packed_args); // Protect it!
+    struct zis_tuple_obj *const va_list_ = zis_tuple_obj_new(z, NULL, rest_n);
+    argv = zis_object_cast(arg_list[argc_min], struct zis_tuple_obj)->_data;
+    arg_list[argc_min] = zis_object_from(va_list_);
+    zis_object_vec_copy(va_list_->_data, argv + argc_min, rest_n);
+    zis_object_assert_no_write_barrier(va_list_);
 
     return true;
 }
@@ -194,17 +235,22 @@ zis_static_force_inline bool invocation_pass_args_dis(
     return true;
 }
 
-/// Leave the frame. Returns the function return value.
-zis_static_force_inline void *invocation_leave(
+/// Leave the frame. Returns the caller ip.
+zis_static_force_inline zis_instr_word_t *invocation_leave(
     struct zis_context *z,
-    void **return_ip
+    struct zis_object *ret_val
 ) {
+    assert(ret_val != NULL);
     struct zis_callstack *const stack = z->callstack;
-    struct zis_object *const ret_val = stack->frame[0];
-    if (return_ip)
-        *return_ip = zis_callstack_frame_info(stack)->return_ip;
+    zis_instr_word_t *caller_ip;
+    {
+        const struct zis_callstack_frame_info *const fi =
+            zis_callstack_frame_info(stack);
+        caller_ip = fi->caller_ip;
+        *fi->ret_val_reg = ret_val;
+    }
     zis_callstack_leave(stack);
-    return ret_val;
+    return caller_ip;
 }
 
 /* ----- bytecode execution ------------------------------------------------- */
@@ -214,7 +260,7 @@ zis_hot_fn static int exec_bytecode(
 ) {
 #define OP_DISPATCH_USE_COMPUTED_GOTO ZIS_USE_COMPUTED_GOTO
 
-    const zis_instr_word_t *ip = func_obj->bytecode; // The instruction pointer.
+    zis_instr_word_t *ip = func_obj->bytecode; // The instruction pointer.
     zis_instr_word_t this_instr = *ip;
 
 #define IP_ADVANCE     (this_instr = *++ip)
@@ -245,6 +291,14 @@ zis_hot_fn static int exec_bytecode(
         struct zis_object *p = zis_callstack_frame_info(stack)->prev_frame[0]; \
         assert(zis_object_type(p) == g->type_Function);                        \
         func_obj = zis_object_cast(p, struct zis_func_obj);                    \
+        func_sym_count = (uint32_t)zis_func_obj_symbol_count(func_obj);        \
+        func_const_count = (uint32_t)zis_func_obj_constant_count(func_obj);    \
+    } while (0)
+#define FUNC_CHANGED_TO(NEW_FUNC) \
+    do {                          \
+        func_obj = (NEW_FUNC);    \
+        assert((void *)func_obj == (void *)zis_callstack_frame_info(stack)->prev_frame[0]); \
+        assert(zis_object_type((struct zis_object *)func_obj) == g->type_Function);         \
         func_sym_count = (uint32_t)zis_func_obj_symbol_count(func_obj);        \
         func_const_count = (uint32_t)zis_func_obj_constant_count(func_obj);    \
     } while (0)
@@ -439,17 +493,100 @@ _interp_loop:
     }
 
     OP_DEFINE(RETNIL) {
-        bp[0] = zis_object_from(g->val_nil);
-        this_instr = 0; // RET 0
-#if !OP_DISPATCH_USE_COMPUTED_GOTO
-        zis_fallthrough;
-#endif // !OP_DISPATCH_USE_COMPUTED_GOTO
+        ip = invocation_leave(z, zis_object_from(g->val_nil));
+        FUNC_CHANGED;
+        IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(RET) {
-        goto panic_ill; // TODO: return.
+        uint32_t ret;
+        zis_instr_extract_operands_Aw(this_instr, ret);
+        struct zis_object **ret_p = bp + ret;
+        BOUND_CHECK_REG(ret_p);
+        ip = invocation_leave(z, *ret_p);
+        FUNC_CHANGED;
         IP_ADVANCE;
         OP_DISPATCH;
+    }
+
+    OP_DEFINE(CALL) {
+        uint32_t ret, argc;
+        ret = this_instr >> 27;
+        argc = (this_instr >> 25) & 3;
+        struct zis_object **ret_p = bp + ret;
+        BOUND_CHECK_REG(ret_p);
+        struct invocation_info ii;
+        if (zis_unlikely(!invocation_enter(z, ip, ret_p, &ii)))
+            THROW_REG0;
+        FUNC_CHANGED_TO(zis_object_cast(ii.caller_frame[0], struct zis_func_obj));
+        unsigned int indices[3];
+        for (uint32_t i = 0; i < argc; i++) {
+            const unsigned int idx = (this_instr >> (7 + 6 * i)) & 63;
+            BOUND_CHECK_REG(ii.caller_frame + idx);
+            indices[i] = idx;
+        }
+        if (zis_unlikely(!invocation_pass_args_dis(z, indices, argc, &ii)))
+            THROW_REG0;
+    } {
+    _do_call_func_obj:
+        if (func_obj->native) {
+            const int status = func_obj->native(z);
+            if (zis_unlikely(status == ZIS_THR))
+                THROW_REG0;
+            assert(status == ZIS_OK);
+            zis_instr_word_t *ip0 = invocation_leave(z, bp[0]);
+            assert(ip0 == ip), zis_unused_var(ip0);
+            FUNC_CHANGED;
+            IP_ADVANCE;
+        } else {
+            assert(zis_func_obj_bytecode_length(func_obj));
+            IP_JUMP_TO(func_obj->bytecode);
+        }
+        OP_DISPATCH;
+    }
+
+    OP_DEFINE(CALLV) {
+        uint32_t ret, arg_start, arg_count;
+        zis_instr_extract_operands_ABC(this_instr, ret, arg_start, arg_count);
+        struct zis_object **ret_p = bp + ret, **arg_p = bp + arg_start;
+        BOUND_CHECK_REG(ret_p);
+        BOUND_CHECK_REG(arg_p + arg_count - 1);
+        struct invocation_info ii;
+        if (zis_unlikely(!invocation_enter(z, ip, ret_p, &ii)))
+            THROW_REG0;
+        FUNC_CHANGED_TO(zis_object_cast(ii.caller_frame[0], struct zis_func_obj));
+        if (zis_unlikely(!invocation_pass_args_vec(z, arg_p, arg_count, &ii)))
+            THROW_REG0;
+        goto _do_call_func_obj;
+    }
+
+    OP_DEFINE(CALLP) {
+        uint32_t ret, args;
+        zis_instr_extract_operands_ABw(this_instr, ret, args);
+        struct zis_object **ret_p = bp + ret, **arg_p = bp + args;
+        BOUND_CHECK_REG(ret_p);
+        BOUND_CHECK_REG(arg_p);
+        struct zis_object *a = *arg_p;
+        struct zis_type_obj *t = zis_object_type(a);
+        size_t argc;
+        if (t == z->globals->type_Tuple) {
+            argc = zis_tuple_obj_length(zis_object_cast(a, struct zis_tuple_obj));
+        } else if (t == z->globals->type_Array) {
+            struct zis_array_slots_obj *v = zis_object_cast(a, struct zis_array_obj)->_data;
+            *arg_p = zis_object_from(v);
+            argc = zis_array_slots_obj_length(v);
+        } else {
+            zis_debug_log(FATAL, "Interp", "CALLP: wrong arg pack type");
+            goto panic_ill;
+        }
+        struct invocation_info ii;
+        if (zis_unlikely(!invocation_enter(z, ip, ret_p, &ii)))
+            THROW_REG0;
+        FUNC_CHANGED_TO(zis_object_cast(ii.caller_frame[0], struct zis_func_obj));
+        if (zis_unlikely(!invocation_pass_args_pac(z, *arg_p, argc, &ii)))
+            THROW_REG0;
+        goto _do_call_func_obj;
     }
 
     OP_UNDEFINED {
@@ -491,6 +628,7 @@ panic_ill:
 
 #undef FUNC_ENSURE
 #undef FUNC_CHANGED
+#undef FUNC_CHANGED_TO
 
 #undef OP_DISPATCH_USE_COMPUTED_GOTO
 }
@@ -503,56 +641,17 @@ struct zis_func_obj *zis_invoke_prepare_va(
 ) {
     struct invocation_info ii;
     z->callstack->frame[0] = callable;
-    if (zis_unlikely(!invocation_enter(z, NULL, &ii))) {
+    if (zis_unlikely(!invocation_enter(z, NULL, z->callstack->frame, &ii))) {
         return NULL;
     }
     assert(!argv || argv > ii.caller_frame);
     if (zis_unlikely(!invocation_pass_args_vec(z, argv, argc, &ii))) {
         // TODO: add to traceback.
-        ii.caller_frame[0] = invocation_leave(z, NULL);
+        invocation_leave(z, z->callstack->frame[0]);
         return NULL;
     }
     assert(zis_object_type(ii.caller_frame[0]) == z->globals->type_Function);
     return zis_object_cast(ii.caller_frame[0], struct zis_func_obj);
-}
-
-static bool _zis_invoke_prepare_pa_pass_args(
-    struct zis_context *z,
-    struct zis_object *packed_args, size_t argc,
-    struct invocation_info *info
-) {
-    assert(
-        zis_object_type(packed_args) == z->globals->type_Tuple ||
-        zis_object_type(packed_args) == z->globals->type_Array_Slots
-    );
-    static_assert(
-        offsetof(struct zis_tuple_obj, _data) ==
-            offsetof(struct zis_array_slots_obj, _data),
-        "");
-    struct zis_object **argv =
-        zis_object_cast(packed_args, struct zis_tuple_obj)->_data;
-    assert(zis_tuple_obj_length(zis_object_cast(packed_args, struct zis_tuple_obj)) >= argc);
-    assert(zis_array_slots_obj_length(zis_object_cast(packed_args, struct zis_array_slots_obj)) >= argc);
-
-    const struct zis_func_obj_meta func_meta = info->func_meta;
-    if (zis_likely(argc <= func_meta.na || func_meta.no != (unsigned char)-1)) {
-        // No object allocation. No need to worry about `packed_args` been moved.
-        return invocation_pass_args_vec(z, argv, argc, info);
-    }
-
-    const size_t argc_min = func_meta.na;
-    struct zis_object **const arg_list = z->callstack->frame + 1;
-    assert(argc > argc_min || func_meta.no != (unsigned char)-1);
-    zis_object_vec_copy(arg_list, argv, argc_min);
-    const size_t rest_n = argc - argc_min;
-    arg_list[argc_min] = zis_object_from(packed_args); // Protect it!
-    struct zis_tuple_obj *const va_list_ = zis_tuple_obj_new(z, NULL, rest_n);
-    argv = zis_object_cast(arg_list[argc_min], struct zis_tuple_obj)->_data;
-    arg_list[argc_min] = zis_object_from(va_list_);
-    zis_object_vec_copy(va_list_->_data, argv + argc_min, rest_n);
-    zis_object_assert_no_write_barrier(va_list_);
-
-    return true;
 }
 
 struct zis_func_obj *zis_invoke_prepare_pa(
@@ -561,13 +660,13 @@ struct zis_func_obj *zis_invoke_prepare_pa(
 ) {
     struct invocation_info ii;
     z->callstack->frame[0] = callable;
-    if (zis_unlikely(!invocation_enter(z, NULL, &ii))) {
+    if (zis_unlikely(!invocation_enter(z, NULL, z->callstack->frame, &ii))) {
         return NULL;
     }
     assert(packed_args != ii.caller_frame[0]);
-    if (zis_unlikely(!_zis_invoke_prepare_pa_pass_args(z, packed_args, argc, &ii))) {
+    if (zis_unlikely(!invocation_pass_args_pac(z, packed_args, argc, &ii))) {
         // TODO: add to traceback.
-        ii.caller_frame[0] = invocation_leave(z, NULL);
+        invocation_leave(z, z->callstack->frame[0]);
         return NULL;
     }
     assert(zis_object_type(ii.caller_frame[0]) == z->globals->type_Function);
@@ -580,12 +679,12 @@ struct zis_func_obj *zis_invoke_prepare_da(
 ) {
     struct invocation_info ii;
     z->callstack->frame[0] = callable;
-    if (zis_unlikely(!invocation_enter(z, NULL, &ii))) {
+    if (zis_unlikely(!invocation_enter(z, NULL, z->callstack->frame, &ii))) {
         return NULL;
     }
     if (zis_unlikely(!invocation_pass_args_dis(z, arg_regs, argc, &ii))) {
         // TODO: add to traceback.
-        ii.caller_frame[0] = invocation_leave(z, NULL);
+        invocation_leave(z, z->callstack->frame[0]);
         return NULL;
     }
     assert(zis_object_type(ii.caller_frame[0]) == z->globals->type_Function);
@@ -593,14 +692,10 @@ struct zis_func_obj *zis_invoke_prepare_da(
 }
 
 struct zis_object *zis_invoke_cleanup(struct zis_context *z) {
-#ifdef NDEBUG
-    return invocation_leave(z, NULL);
-#else // !NDEBUG
-    void *ret_ip;
-    struct zis_object *const ret_val = invocation_leave(z, &ret_ip);
-    assert(!ret_ip);
+    struct zis_object *ret_val = z->callstack->frame[0];
+    void *ret_ip = invocation_leave(z, zis_smallint_to_ptr(0));
+    assert(!ret_ip), zis_unused_var(ret_ip);
     return ret_val;
-#endif // NDEBUG
 }
 
 int zis_invoke_func(struct zis_context *z, struct zis_func_obj *func) {

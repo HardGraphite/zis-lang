@@ -2,7 +2,7 @@
 
 #pragma once
 
-#define ZIS_OP_LIST_LEN  14
+#define ZIS_OP_LIST_LEN  17
 
 #define ZIS_OP_LIST_MAX_LEN  (127 + 1)
 
@@ -22,11 +22,17 @@
     E(0x10, THR     ) \
     E(0x11, RETNIL  ) \
     E(0x12, RET     ) \
+    E(0x13, CALL    ) \
+    E(0x15, CALLV   ) \
+    E(0x16, CALLP   ) \
 // ^^^ ZIS_OP_LIST ^^^
 
 /// List of ops (sorted by names, undefined ones included).
 #define ZIS_OP_LIST_FULL \
     E(0x01, ARG     , Aw   ) \
+    E(0x13, CALL    , Aw   ) \
+    E(0x16, CALLP   , ABw  ) \
+    E(0x15, CALLV   , ABC  ) \
     E(0x05, LDBLN   , ABw  ) \
     E(0x06, LDCON   , ABw  ) \
     E(0x04, LDNIL   , ABw  ) \
@@ -45,10 +51,7 @@
     E(0x0d,         , X    ) \
     E(0x0e,         , X    ) \
     E(0x0f,         , X    ) \
-    E(0x13,         , X    ) \
     E(0x14,         , X    ) \
-    E(0x15,         , X    ) \
-    E(0x16,         , X    ) \
     E(0x17,         , X    ) \
     E(0x18,         , X    ) \
     E(0x19,         , X    ) \

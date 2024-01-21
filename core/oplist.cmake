@@ -1,7 +1,7 @@
 ## Generate "oplist.h" from "oplist.txt"
 
 set(zis_oplist_line_regex
-    "^(0x[0-9a-f][0-9a-f])[ \t]+([A-Z]+)[ \t]+([a-zA-Z0-9_:,]+)[ \t]+#(.+)$")
+    "^(0x[0-9a-f][0-9a-f])[ \t]+([A-Z0-9]+)[ \t]+([a-zA-Z0-9_:,]+)[ \t]+#(.+)$")
 #    OPCODE                    OP-NAME       OPERANDS             DESCRIPTION
 
 set(zis_oplist_max_code 127)
