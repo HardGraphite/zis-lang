@@ -141,7 +141,8 @@ void zis_objmem_print_usage(struct zis_objmem_context *ctx, void *FILE_ptr);
 enum zis_objmem_alloc_type {
     ZIS_OBJMEM_ALLOC_AUTO, ///< Decide automatically.
     ZIS_OBJMEM_ALLOC_SURV, ///< Assume the object has survived from a few GCs.
-    ZIS_OBJMEM_ALLOC_HUGE, ///< Treat object as a large object.
+    ZIS_OBJMEM_ALLOC_HUGE, ///< Treat object as a large object. See also: ZIS_OBJMEM_ALLOC_NOMV.
+#define ZIS_OBJMEM_ALLOC_NOMV ZIS_OBJMEM_ALLOC_HUGE ///< Make object pinned (do not move it).
 };
 
 /// Allocate memory for an object. Only the head of the object is initialized.

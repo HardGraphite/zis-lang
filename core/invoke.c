@@ -278,12 +278,10 @@ zis_hot_fn static int exec_bytecode(
     uint32_t func_const_count = (uint32_t)zis_func_obj_constant_count(func_obj);
 
 #define FUNC_ENSURE \
-    do {            \
-        struct zis_object *p = zis_callstack_frame_info(stack)->prev_frame[0]; \
-        assert(zis_object_type(p) == g->type_Function);                        \
-        if (zis_unlikely((void *)func_obj != (void *)p))                       \
-            func_obj = zis_object_cast(p, struct zis_func_obj);                \
-        assert((size_t)func_sym_count == zis_func_obj_symbol_count(func_obj)); \
+    do {  /* func_obj shall not be moved */ \
+        assert((void *)func_obj == (void *)zis_callstack_frame_info(stack)->prev_frame[0]); \
+        assert(zis_object_type((struct zis_object *)func_obj) == g->type_Function);         \
+        assert((size_t)func_sym_count == zis_func_obj_symbol_count(func_obj));     \
         assert((size_t)func_const_count == zis_func_obj_constant_count(func_obj)); \
     } while (0)
 #define FUNC_CHANGED \

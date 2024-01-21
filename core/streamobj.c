@@ -38,7 +38,7 @@ static void stream_obj_zero(struct zis_stream_obj *self) {
 
 struct zis_stream_obj *zis_stream_obj_new(struct zis_context *z) {
     struct zis_stream_obj *self = zis_object_cast(
-        zis_objmem_alloc_ex(z, ZIS_OBJMEM_ALLOC_HUGE, z->globals->type_Stream, 0, 0),
+        zis_objmem_alloc_ex(z, ZIS_OBJMEM_ALLOC_NOMV, z->globals->type_Stream, 0, 0),
         struct zis_stream_obj
     );
     stream_obj_zero(self);

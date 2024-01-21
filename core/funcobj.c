@@ -33,9 +33,11 @@ bool zis_func_obj_meta_conv(
 static struct zis_func_obj *func_obj_alloc(
     struct zis_context *z, size_t bytecode_len
 ) {
+    const enum zis_objmem_alloc_type alloc_type =
+        bytecode_len ? ZIS_OBJMEM_ALLOC_NOMV : ZIS_OBJMEM_ALLOC_SURV;
     struct zis_func_obj *const self = zis_object_cast(
         zis_objmem_alloc_ex(
-            z, ZIS_OBJMEM_ALLOC_SURV, z->globals->type_Function,
+            z, alloc_type, z->globals->type_Function,
             0U, FUN_OBJ_BYTES_FIXED_SIZE + sizeof(zis_func_obj_bytecode_word_t) * bytecode_len
         ),
         struct zis_func_obj

@@ -29,6 +29,7 @@ zis_nodiscard bool zis_func_obj_meta_conv(
 );
 
 /// The `Function` object. The basic callable object.
+/// Functions with bytecode will not be moved by the GC system.
 struct zis_func_obj {
     ZIS_OBJECT_HEAD
     // --- SLOTS ---
