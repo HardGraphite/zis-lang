@@ -889,26 +889,36 @@ ZIS_API int zis_make_exception(
     return ZIS_OK;
 }
 
-ZIS_API int zis_read_exception(
-    zis_t z, unsigned int reg,
-    unsigned int reg_type, unsigned int reg_data, unsigned int reg_what
-) {
+ZIS_API int zis_read_exception(zis_t z, unsigned int reg, int flag, unsigned int reg_out) {
     struct zis_object *obj = api_get_local(z, reg);
     if (zis_unlikely(!obj))
         return ZIS_E_IDX;
     if (zis_unlikely(zis_object_is_smallint(obj) || zis_object_type(obj) != z->globals->type_Exception))
         return ZIS_E_TYPE;
     struct zis_exception_obj *const exc_obj = zis_object_cast(obj, struct zis_exception_obj);
-
-    struct zis_object **type_obj_ref = api_ref_local(z, reg_type);
-    struct zis_object **data_obj_ref = api_ref_local(z, reg_data);
-    struct zis_object **what_obj_ref = api_ref_local(z, reg_what);
-    if (!(type_obj_ref && data_obj_ref && what_obj_ref))
+    struct zis_object **out_obj_ref = api_ref_local(z, reg_out);
+    if (zis_unlikely(!obj))
         return ZIS_E_IDX;
 
-    *type_obj_ref = exc_obj->type;
-    *data_obj_ref = exc_obj->data;
-    *what_obj_ref = exc_obj->what;
+    switch (flag) {
+    case ZIS_RDE_TEST:
+        break;
+    case ZIS_RDE_TYPE:
+        *out_obj_ref = exc_obj->type;
+        break;
+    case ZIS_RDE_DATA:
+        *out_obj_ref = exc_obj->data;
+        break;
+    case ZIS_RDE_WHAT:
+        *out_obj_ref = exc_obj->what;
+        break;
+    case ZIS_RDE_DUMP:
+        zis_exception_obj_print(z, exc_obj, NULL);
+        break;
+    default:
+        return ZIS_E_ARG;
+    }
+
     return ZIS_OK;
 }
 
@@ -1175,14 +1185,8 @@ static int api_import_call_main(zis_t z, struct zis_object **res_ref) {
     }
     if (func_obj) {
         assert(zis_object_from(func_obj) == main_fn);
-        if (zis_invoke_func(z, func_obj) == ZIS_THR) {
-            // TODO: add to traceback.
-            zis_invoke_cleanup(z);
-            status = ZIS_THR;
-        } else {
-            zis_invoke_cleanup(z);
-            status = ZIS_OK;
-        }
+        status = zis_invoke_func(z, func_obj);
+        zis_invoke_cleanup(z);
     } else {
         status = ZIS_THR;
     }

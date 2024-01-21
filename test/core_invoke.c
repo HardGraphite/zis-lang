@@ -103,15 +103,16 @@ static void check_exception(zis_t z) {
     char buffer[128];
     size_t size;
 
-    status = zis_read_exception(z, 0, REG_MAX - 3, REG_MAX - 2, REG_MAX - 1);
+    status = zis_read_exception(z, 0, ZIS_RDE_TYPE, REG_MAX - 3);
     zis_test_assert_eq(status, ZIS_OK);
-
     size = sizeof buffer;
     status = zis_read_symbol(z, REG_MAX - 3, buffer, &size);
     zis_test_assert_eq(status, ZIS_OK);
     zis_test_assert_eq(size, 4);
     zis_test_assert_eq(memcmp(buffer, "type", 4), 0);
 
+    status = zis_read_exception(z, 0, ZIS_RDE_WHAT, REG_MAX - 1);
+    zis_test_assert_eq(status, ZIS_OK);
     size = sizeof buffer;
     status = zis_read_string(z, REG_MAX - 1, buffer, &size);
     zis_test_assert_eq(status, ZIS_OK);

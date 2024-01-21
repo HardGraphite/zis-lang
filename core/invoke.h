@@ -37,11 +37,13 @@ struct zis_func_obj *zis_invoke_prepare_da(
     const unsigned int arg_regs[], size_t argc
 );
 
-/// Clean up a frame created with `zis_invoke_prepare()` and get the return value.
+/// Clean up a frame created with `zis_invoke_prepare()`
+/// and get the return value (also in REG-0).
 struct zis_object *zis_invoke_cleanup(struct zis_context *z);
 
 /// Call a function object.
 /// `zis_invoke_prepare_*() should be called before calling this function;
 /// `zis_invoke_cleanup()` should be called after calling this function.
 /// The function `func` shall have been stored in the REG-0 in caller's frame.
+/// If an exception is thrown, the stack trace will be updated.
 int zis_invoke_func(struct zis_context *z, struct zis_func_obj *func);

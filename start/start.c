@@ -102,11 +102,7 @@ static int start(zis_t z, void *_args) {
         zis_make_int(z, 1, (int64_t)args->rest_args_num);
         zis_make_int(z, 2, (intptr_t)args->rest_args);
         if (zis_import(z, 0, module, imp_flags) == ZIS_THR) {
-            char msg[64];
-            size_t msg_sz = sizeof msg;
-            zis_read_exception(z, 0, 0, 0, 0);
-            if (zis_read_string(z, 0, msg, &msg_sz) == ZIS_OK)
-                fprintf(stderr, ZIS_DISPLAY_NAME ": error: %.*s\n", (int)msg_sz, msg);
+            zis_read_exception(z, 0, ZIS_RDE_DUMP, 0);
             exit_status = EXIT_FAILURE;
         }
     }

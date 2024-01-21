@@ -133,9 +133,12 @@ void zis_type_obj_load_native_def(
 
         tmp_regs[1] = zis_object_from(self->_name_map);
         for (size_t i = 0; i < field_count; i++) {
+            const char *const field_name = fields[i];
+            if (!field_name)
+                continue;
             assert(i <= ZIS_SMALLINT_MAX);
             struct zis_object *idx = zis_smallint_to_ptr((zis_smallint_t)i);
-            struct zis_symbol_obj *sym = zis_symbol_registry_get(z, fields[i], (size_t)-1);
+            struct zis_symbol_obj *sym = zis_symbol_registry_get(z, field_name, (size_t)-1);
             assert(zis_object_type(tmp_regs[1]) == z->globals->type_Map);
             zis_map_obj_sym_set(z, zis_object_cast(tmp_regs[1], struct zis_map_obj), sym, idx);
         }

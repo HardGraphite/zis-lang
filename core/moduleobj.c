@@ -314,13 +314,9 @@ int zis_module_obj_do_init(
     int status;
     if (!zis_invoke_prepare_va(z, zis_object_from(mod_init_fn), NULL, 0)) {
         status = ZIS_THR;
-    } else if (zis_invoke_func(z, mod_init_fn) == ZIS_THR) {
-        // TODO: add to traceback.
-        zis_invoke_cleanup(z);
-        status = ZIS_THR;
     } else {
+        status = zis_invoke_func(z, mod_init_fn);
         zis_invoke_cleanup(z);
-        status = ZIS_OK;
     }
     return status;
 }

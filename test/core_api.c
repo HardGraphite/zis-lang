@@ -259,9 +259,8 @@ zis_test_define(test_exception, z) {
     status = zis_make_exception(z, 0, type, 0, "%s", what);
     zis_test_assert_eq(status, ZIS_OK);
 
-    status = zis_read_exception(z, 0, 1, 2, 3);
+    status = zis_read_exception(z, 0, ZIS_RDE_TYPE, 1);
     zis_test_assert_eq(status, ZIS_OK);
-
     size = sizeof buffer;
     status = zis_read_symbol(z, 1, buffer, &size);
     zis_test_assert_eq(status, ZIS_OK);
@@ -269,11 +268,15 @@ zis_test_define(test_exception, z) {
     zis_test_assert_eq(size, type_strlen);
     zis_test_assert_eq(memcmp(buffer, type, type_strlen), 0);
 
+    status = zis_read_exception(z, 0, ZIS_RDE_DATA, 2);
+    zis_test_assert_eq(status, ZIS_OK);
     v_bool = false;
     status = zis_read_bool(z, 2, &v_bool);
     zis_test_assert_eq(status, ZIS_OK);
     zis_test_assert_eq(v_bool, true);
 
+    status = zis_read_exception(z, 0, ZIS_RDE_WHAT, 3);
+    zis_test_assert_eq(status, ZIS_OK);
     size = sizeof buffer;
     status = zis_read_string(z, 3, buffer, &size);
     zis_test_assert_eq(status, ZIS_OK);
@@ -546,9 +549,8 @@ static void do_test_function__check_exception(zis_t z, unsigned reg, const char 
     char buffer[128];
     size_t size;
 
-    status = zis_read_exception(z, reg, REG_MAX - 3, REG_MAX - 2, REG_MAX - 1);
+    status = zis_read_exception(z, reg, ZIS_RDE_TYPE, REG_MAX - 3);
     zis_test_assert_eq(status, ZIS_OK);
-
     size = sizeof buffer;
     status = zis_read_symbol(z, REG_MAX - 3, buffer, &size);
     zis_test_assert_eq(status, ZIS_OK);
@@ -556,6 +558,8 @@ static void do_test_function__check_exception(zis_t z, unsigned reg, const char 
     zis_test_assert_eq(size, type_strlen);
     zis_test_assert_eq(memcmp(buffer, type, type_strlen), 0);
 
+    status = zis_read_exception(z, reg, ZIS_RDE_WHAT, REG_MAX - 1);
+    zis_test_assert_eq(status, ZIS_OK);
     size = sizeof buffer;
     status = zis_read_string(z, REG_MAX - 1, buffer, &size);
     zis_test_assert_eq(status, ZIS_OK);

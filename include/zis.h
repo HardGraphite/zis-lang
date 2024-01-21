@@ -451,20 +451,23 @@ ZIS_API int zis_make_exception(
     const char *type, unsigned int reg_data, const char *msg_fmt, ...
     ) ZIS_NOEXCEPT;
 
+#define ZIS_RDE_TEST     0x00 ///< `zis_read_exception()`: do nothing.
+#define ZIS_RDE_TYPE     0x01 ///< `zis_read_exception()`: get the `type` field.
+#define ZIS_RDE_DATA     0x02 ///< `zis_read_exception()`: get the `data` field.
+#define ZIS_RDE_WHAT     0x03 ///< `zis_read_exception()`: get the `what` field.
+#define ZIS_RDE_DUMP     0x04 ///< `zis_read_exception()`: print this exception.
+
 /**
  * Read contents of an `Exception` object.
  *
  * @param z zis instance
  * @param reg register index where the exception is
- * @param reg_type register to store the exception type
- * @param reg_data register to store the exception data
- * @param reg_what register to store the exception message
- * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index), `ZIS_E_TYPE` (wrong type of `reg`).
+ * @param flag `ZIS_RDE_*`
+ * @param reg_out register to store the result
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (invalid `flag`),
+ * `ZIS_E_TYPE` (wrong type of `reg`).
  */
-ZIS_API int zis_read_exception(
-    zis_t z, unsigned int reg,
-    unsigned int reg_type, unsigned int reg_data, unsigned int reg_what
-);
+ZIS_API int zis_read_exception(zis_t z, unsigned int reg, int flag, unsigned int reg_out) ZIS_NOEXCEPT;
 
 #define ZIS_STREAM_FILE    0x01 ///< `zis_make_stream()` type: file stream
 
