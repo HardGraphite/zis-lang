@@ -340,7 +340,7 @@ _interp_loop:
 #define THROW_REG0 \
     do {           \
         this_instr = 0; \
-        goto op_THR;    \
+        goto _do_throw; \
     } while (0)
 #define BOUND_CHECK_REG(PTR) \
     do {                     \
@@ -485,21 +485,30 @@ _interp_loop:
         OP_DISPATCH;
     }
 
-    op_THR:
+    _do_throw:
     OP_DEFINE(THR) {
         uint32_t val;
         zis_instr_extract_operands_Aw(this_instr, val);
         struct zis_object **val_p = bp + val;
         BOUND_CHECK_REG(val_p);
+        const bool val_is_exc =
+            !zis_object_is_smallint(*val_p) && zis_object_type(*val_p) == g->type_Exception;
         FUNC_ENSURE;
-        if (!zis_object_is_smallint(*val_p) && zis_object_type(*val_p) == z->globals->type_Exception) {
-            struct zis_exception_obj *exc_obj =
-                zis_object_cast(*val_p, struct zis_exception_obj);
-            zis_exception_obj_stack_trace(z, exc_obj, func_obj, ip);
+        while (true) {
+            if (val_is_exc) {
+                assert(zis_object_type(*val_p) == g->type_Exception);
+                struct zis_exception_obj *exc = zis_object_cast(*val_p, struct zis_exception_obj);
+                zis_exception_obj_stack_trace(z, exc, func_obj, ip);
+            }
+            // TODO: check if caught.
+            struct zis_object **new_val_p = zis_callstack_frame_info(stack)->ret_val_reg;
+            ip = invocation_leave(z, *val_p);
+            if (zis_unlikely(!ip))
+                return ZIS_THR;
+            FUNC_CHANGED;
+            assert(*new_val_p == *val_p);
+            val_p = new_val_p;
         }
-        goto panic_ill; // TODO: throw.
-        IP_ADVANCE;
-        OP_DISPATCH;
     }
 
     OP_DEFINE(RETNIL) {
@@ -584,9 +593,9 @@ _interp_loop:
         struct zis_object *a = *arg_p;
         struct zis_type_obj *t = zis_object_type(a);
         size_t argc;
-        if (t == z->globals->type_Tuple) {
+        if (t == g->type_Tuple) {
             argc = zis_tuple_obj_length(zis_object_cast(a, struct zis_tuple_obj));
-        } else if (t == z->globals->type_Array) {
+        } else if (t == g->type_Array) {
             struct zis_array_slots_obj *v = zis_object_cast(a, struct zis_array_obj)->_data;
             *arg_p = zis_object_from(v);
             argc = zis_array_slots_obj_length(v);
