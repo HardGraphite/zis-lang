@@ -126,7 +126,7 @@ ZIS_API int zis_native_block(zis_t z, size_t reg_max, int(*fn)(zis_t, void *), v
 
         struct zis_object *func = api_get_current_func_or(z, zis_object_from(z->globals->val_nil));
         struct zis_object **base_frame = z->callstack->frame;
-        zis_callstack_enter(z->callstack, frame_size, NULL, NULL);
+        zis_callstack_enter(z->callstack, frame_size, NULL, z->callstack->frame);
         struct zis_object **this_frame = z->callstack->frame;
         this_frame[0] = base_frame[0];
         base_frame[0] = func;
@@ -139,7 +139,7 @@ ZIS_API int zis_native_block(zis_t z, size_t reg_max, int(*fn)(zis_t, void *), v
         assert(zis_callstack_frame_info(z->callstack)->caller_ip == NULL);
         assert(zis_callstack_frame_info(z->callstack)->ret_val_reg == NULL);
         zis_callstack_leave(z->callstack);
-        z->callstack->frame[0] = ret_obj;
+        assert(z->callstack->frame[0] == ret_obj), zis_unused_var(ret_obj);
     }
 
     return ret_val;

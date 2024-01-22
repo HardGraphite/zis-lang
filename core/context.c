@@ -125,7 +125,7 @@ zis_nodiscard struct zis_context *zis_context_create(void) {
 
     // Allow use of `zis_callstack_frame_alloc_temp()` and `zis_callstack_frame_free_temp()`.
     // See `zis_native_block()`.
-    zis_callstack_enter(z->callstack, 1, NULL, NULL);
+    zis_callstack_enter(z->callstack, 1, NULL, z->callstack->frame);
 
     z->globals = zis_context_globals_create(z);
     z->module_loader = zis_module_loader_create(z);

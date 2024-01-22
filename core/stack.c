@@ -128,6 +128,7 @@ void zis_callstack_destroy(struct zis_callstack *cs, struct zis_context *z) {
 }
 
 void zis_callstack_enter(struct zis_callstack *cs, size_t frame_size, void *caller_ip, struct zis_object **ret_val_reg) {
+    assert(ret_val_reg);
     struct zis_object **const old_sp = cs->top, **const old_fp = cs->frame;
     struct zis_object **const new_sp = old_sp + frame_size, **const new_fp = old_sp + 1;
     if (zis_unlikely((size_t)(cs->_data_end - old_sp) < frame_size))
