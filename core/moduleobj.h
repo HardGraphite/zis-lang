@@ -20,7 +20,6 @@ struct zis_module_obj {
     // --- SLOTS ---
     struct zis_map_obj *_name_map; // { name (Symbol) -> var_index (smallint) }
     struct zis_array_slots_obj *_variables; // { variable }
-    struct zis_array_slots_obj *_functions; // { function (Function|smallint{0}) }; the first is the initializer
     struct zis_object *_parent; // smallint{0} / Module / Array[Module]
 };
 
@@ -33,7 +32,8 @@ struct zis_module_obj *zis_module_obj_new_r(
 );
 
 /// Load a native module definition.
-void zis_module_obj_load_native_def(
+/// Returns the initializer function if exists.
+zis_nodiscard struct zis_func_obj *zis_module_obj_load_native_def(
     struct zis_context *z,
     struct zis_module_obj *self,
     const struct zis_native_module_def *def
@@ -92,15 +92,8 @@ struct zis_object *zis_module_obj_get(
     struct zis_symbol_obj *name
 );
 
-/// Visit module function table by index with bounds checking.
-/// Returns NULL if fails.
-struct zis_func_obj *zis_module_obj_function(
-    const struct zis_module_obj *self, size_t index
-);
-
-/// Call module initializer function if given. Returns `ZIS_OK` or `ZIS_THR`.
-/// The thrown object, if there is one, is in REG-0.
+/// Call module initializer function.
 int zis_module_obj_do_init(
     struct zis_context *z,
-    struct zis_module_obj *self
+    struct zis_func_obj *initializer /* = NULL */
 );

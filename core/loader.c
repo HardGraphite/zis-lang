@@ -18,6 +18,7 @@
 
 #include "arrayobj.h"
 #include "exceptobj.h"
+#include "funcobj.h"
 #include "mapobj.h"
 #include "moduleobj.h"
 #include "pathobj.h"
@@ -83,8 +84,6 @@ static const struct zis_native_module_def *find_embedded_module(const char *name
         else
             index_r = index_m - 1;
     } while ((_ssize_t)index_l <= (_ssize_t)index_r);
-
-    return NULL;
 
 #else // !ZIS_EMBEDDED_MODULE_LIST_SORTED
 
@@ -316,8 +315,7 @@ static bool module_loader_load_from_file(
         mod_name, file
     );
 
-    assert(zis_object_type(d->temp_var) == z->globals->type_Module);
-    struct zis_module_obj *module = zis_object_cast(d->temp_var, struct zis_module_obj);
+    struct zis_func_obj *init_func;
 
     switch (file_type) {
     case MOD_FILE_NDL: {
@@ -340,9 +338,11 @@ static bool module_loader_load_from_file(
             ));
             return false;
         }
-        zis_module_obj_load_native_def(z, module, mod_def);
         // zis_dl_close(lib); // CAN NOT close library here!!
-        return true;
+        assert(zis_object_type(d->temp_var) == z->globals->type_Module);
+        struct zis_module_obj *module = zis_object_cast(d->temp_var, struct zis_module_obj);
+        init_func = zis_module_obj_load_native_def(z, module, mod_def);
+        break;
     }
 
 #if ZIS_FEATURE_ASM
@@ -350,19 +350,28 @@ static bool module_loader_load_from_file(
         struct zis_assembler *const as = zis_assembler_create(z);
         const int ff = ZIS_STREAM_OBJ_MODE_IN | ZIS_STREAM_OBJ_TEXT | ZIS_STREAM_OBJ_UTF8;
         struct zis_stream_obj *f = zis_stream_obj_new_file(z, file, ff);
-        struct zis_exception_obj *exc = zis_assembler_module_from_text(z, as, f, module);
+        init_func = zis_assembler_func_from_text(z, as, f);
         zis_assembler_destroy(as, z);
-        if (exc) {
-            d->temp_var = zis_object_from(exc);
+        if (!init_func) {
+            d->temp_var = z->callstack->frame[0];
             return false;
         }
-        return true;
+        assert(zis_object_type(d->temp_var) == z->globals->type_Module);
+        struct zis_module_obj *module = zis_object_cast(d->temp_var, struct zis_module_obj);
+        zis_func_obj_set_module(z, init_func, module);
+        break;
     }
 #endif // ZIS_FEATURE_ASM
 
     default:
         zis_context_panic(z, ZIS_CONTEXT_PANIC_ABORT); // Not implemented.
     }
+
+    if (zis_module_obj_do_init(z, init_func) == ZIS_THR) {
+        d->temp_var = z->callstack->frame[0];
+        return false;
+    }
+    return true;
 }
 
 /// Try to Load an embedded module.
@@ -384,9 +393,12 @@ static struct zis_module_obj *module_loader_try_load_from_embedded(
 
     struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 2);
     struct zis_module_obj *module = zis_module_obj_new_r(z, tmp_regs, true);
-    zis_module_obj_load_native_def(z, module, mod_def);
-    assert(zis_object_type(tmp_regs[0]) == z->globals->type_Module);
-    module = zis_object_cast(tmp_regs[0], struct zis_module_obj);
+    int init_status = zis_module_obj_do_init(z, zis_module_obj_load_native_def(z, module, mod_def));
+    assert(init_status == ZIS_OK), zis_unused_var(init_status);
+    if (zis_unlikely((void *)tmp_regs[0] != (void *)module)) {
+        assert(zis_object_type(tmp_regs[0]) == z->globals->type_Module);
+        module = zis_object_cast(tmp_regs[0], struct zis_module_obj);
+    }
     zis_callstack_frame_free_temp(z, 2);
     return module;
 }
@@ -669,13 +681,6 @@ struct zis_module_obj *zis_module_loader_import(
         PULL_REG_VARS();
     }
 
-    // Initialize the module.
-    if (!found_in_loaded) {
-        if (zis_module_obj_do_init(z, module) == ZIS_THR)
-            goto do_return;
-        PULL_REG_VARS();
-    }
-
     // Load sub-module.
     if (sub_module_name && !zis_module_obj_get(module, sub_module_name)) {
         if (!_module_loader_load_sub(z, module, module_name, sub_module_name, flags)) {
@@ -722,12 +727,6 @@ struct zis_module_obj *zis_module_loader_import_file(
         assert(zis_object_type(d->temp_var) == z->globals->type_Exception);
         z->callstack->frame[0] = d->temp_var;
         module_loader_data_clear_temp(d);
-        return NULL;
-    }
-
-    assert(zis_object_type(d->temp_var) == z->globals->type_Module);
-    module = zis_object_cast(d->temp_var, struct zis_module_obj);
-    if (zis_module_obj_do_init(z, module) == ZIS_THR) {
         return NULL;
     }
 

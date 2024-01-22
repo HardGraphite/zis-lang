@@ -11,7 +11,6 @@
 struct zis_context;
 struct zis_func_obj;
 struct zis_func_obj_meta;
-struct zis_module_obj;
 struct zis_object;
 struct zis_stream_obj;
 struct zis_symbol_obj;
@@ -100,10 +99,11 @@ void zis_assembler_append_ABsCs(
 
 #if ZIS_FEATURE_ASM
 
-/// Generate a module from assemble text.
-struct zis_exception_obj *zis_assembler_module_from_text(
+/// Generate a function from the assemble text stream.
+/// On failure, formats an exception (REG-0) and returns NULL.
+struct zis_func_obj *zis_assembler_func_from_text(
     struct zis_context *z, struct zis_assembler *as,
-    struct zis_stream_obj *input, struct zis_module_obj *output
+    struct zis_stream_obj *input
 );
 
 #endif // ZIS_FEATURE_ASM

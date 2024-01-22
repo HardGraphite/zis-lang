@@ -1031,9 +1031,7 @@ ZIS_API int zis_make_module(zis_t z, unsigned int reg, const struct zis_native_m
     struct zis_module_obj *mod_obj = zis_module_obj_new_r(z, tmp_regs, true);
     zis_callstack_frame_free_temp(z, 2);
     *obj_ref = zis_object_from(mod_obj);
-    zis_module_obj_load_native_def(z, mod_obj, def);
-    mod_obj = zis_object_cast(*obj_ref, struct zis_module_obj);
-    return zis_module_obj_do_init(z, mod_obj);
+    return zis_module_obj_do_init(z, zis_module_obj_load_native_def(z, mod_obj, def));
 }
 
 ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) {

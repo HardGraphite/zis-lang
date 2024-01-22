@@ -28,8 +28,13 @@ extern const struct zis_native_module_def ZIS_NATIVE_MODULE_VARNAME(prelude);
 zis_cold_fn static void context_load_builtin_modules(struct zis_context *z) {
     int status;
 
-    zis_module_obj_load_native_def(z, z->globals->val_mod_prelude, &ZIS_NATIVE_MODULE_VARNAME(prelude));
-    status = zis_module_obj_do_init(z, z->globals->val_mod_prelude);
+    status = zis_module_obj_do_init(
+        z,
+        zis_module_obj_load_native_def(
+            z, z->globals->val_mod_prelude,
+            &ZIS_NATIVE_MODULE_VARNAME(prelude)
+        )
+    );
     zis_unused_var(status), assert(status == ZIS_OK);
 }
 

@@ -304,6 +304,15 @@ static int _as_finish_debug_dump_fn(const struct zis_disassemble_result *dis, vo
 #endif // ZIS_DEBUG_LOGGING
 
 struct zis_func_obj *zis_assembler_finish(struct zis_assembler *as, struct zis_context *z) {
+    do {
+        if (as->instr_buffer.length)
+            break;
+        enum zis_opcode last_op = (enum zis_opcode)
+            zis_instr_extract_opcode(as->instr_buffer.data[as->instr_buffer.length - 1]);
+        if (last_op != ZIS_OPC_RET && last_op != ZIS_OPC_RETNIL)
+            zis_assembler_append_Aw(as, ZIS_OPC_RETNIL, 0);
+    } while (false);
+
     struct zis_func_obj *func_obj = zis_func_obj_new_bytecode(
         z, as->func_meta, as->instr_buffer.data, as->instr_buffer.length
     );
@@ -573,7 +582,8 @@ static enum tas_parse_line_status tas_parse_line(
 
 static struct zis_func_obj *tas_parse_func(
     struct tas_context *restrict tas,
-    const char *pseudo_func_operands
+    const char *pseudo_func_operands,
+    bool maybe_no_end
 ) {
     zis_assembler_clear(tas->as);
 
@@ -660,6 +670,12 @@ static struct zis_func_obj *tas_parse_func(
             switch (line_result.pseudo.opcode) {
             case PSEUDO_END:
                 goto finish;
+            case PSEUDO_FUNC:
+                v = zis_object_from(tas_parse_func(tas, line_result.pseudo.operands, false));
+                if (!v)
+                    return NULL;
+                zis_assembler_func_constant(tas->as, tas->z, v);
+                break;
             case PSEUDO_CONST:
                 if (line_result.pseudo.operands[1] != ':')
                     goto pseudo_bad_operand;
@@ -691,8 +707,11 @@ static struct zis_func_obj *tas_parse_func(
                 return NULL;
             }
         } else {
-            if (line_status == TAS_PARSE_EOF)
+            if (line_status == TAS_PARSE_EOF) {
+                if (maybe_no_end)
+                    goto finish;
                 tas_record_error(tas, "unexpected EOF");
+            }
             return NULL;
         }
     }
@@ -700,9 +719,9 @@ finish:
     return zis_assembler_finish(tas->as, tas->z);
 }
 
-struct zis_exception_obj *zis_assembler_module_from_text(
+struct zis_func_obj *zis_assembler_func_from_text(
     struct zis_context *z, struct zis_assembler *as,
-    struct zis_stream_obj *input, struct zis_module_obj *output
+    struct zis_stream_obj *input
 ) {
     // NOTE: `input`(zis_stream_obj) won't be moved during GC.
 
@@ -715,58 +734,21 @@ struct zis_exception_obj *zis_assembler_module_from_text(
 
     struct zis_exception_obj *exc_obj = NULL;
 
-    // ~~~ tmp_regs = { [0] = output_module, [1] = func_arr } ~~
-    size_t tmp_regs_n = 2;
-    struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, tmp_regs_n);
-    tmp_regs[0] = zis_object_from(output);
-    tmp_regs[1] = zis_object_from(zis_array_obj_new(z, NULL, 0));
-
-    while (true) {
-        union tas_parse_line_result line_result;
-        enum tas_parse_line_status line_status = tas_parse_line(&context, &line_result);
-        if (line_status == TAS_PARSE_EOF)
-            break;
-        if (
-            line_status != TAS_PARSE_PSEUDO ||
-            !(line_result.pseudo.opcode == PSEUDO_FUNC || line_result.pseudo.opcode == PSEUDO_TYPE)
-        ) {
-            tas_record_error(&context, "expecting .FUNC or .TYPE");
-            exc_obj = tas_error_exception(&context);
-            break;
-        }
-        if (line_result.pseudo.opcode == PSEUDO_FUNC) {
-            struct zis_func_obj *func_obj = tas_parse_func(&context, line_result.pseudo.operands);
-            if (!func_obj) {
-                exc_obj = tas_error_exception(&context);
-                break;
-            }
-            assert(zis_object_type(tmp_regs[1]) == z->globals->type_Array);
-            struct zis_array_obj *arr = zis_object_cast(tmp_regs[1], struct zis_array_obj);
-            zis_array_obj_append(z, arr, zis_object_from(func_obj));
-        } else {
-            // TODO: .TYPE ...
-            tas_record_error(&context, "not implemented");
-            exc_obj = tas_error_exception(&context);
-            break;
-        }
+    union tas_parse_line_result line_result;
+    enum tas_parse_line_status line_status = tas_parse_line(&context, &line_result);
+    if (line_status != TAS_PARSE_PSEUDO || line_result.pseudo.opcode != PSEUDO_FUNC) {
+        tas_record_error(&context, "expecting .FUNC");
+        exc_obj = tas_error_exception(&context);
+    } else {
+        struct zis_func_obj *func_obj =
+            tas_parse_func(&context, line_result.pseudo.operands, true);
+        if (func_obj)
+            return func_obj;
+        exc_obj = tas_error_exception(&context);
     }
 
-    if (!exc_obj) {
-        struct zis_array_obj *arr;
-        struct zis_array_slots_obj *tbl;
-
-        assert(zis_object_type(tmp_regs[1]) == z->globals->type_Array);
-        arr = zis_object_cast(tmp_regs[1], struct zis_array_obj);
-        tbl = zis_array_slots_obj_new2(z, arr->length, arr->_data);
-        assert(zis_object_type(tmp_regs[0]) == z->globals->type_Module);
-        output = zis_object_cast(tmp_regs[0], struct zis_module_obj);
-        output->_functions = tbl;
-        zis_object_write_barrier(output, tbl);
-    }
-
-    zis_callstack_frame_free_temp(z, tmp_regs_n);
-
-    return exc_obj;
+    z->callstack->frame[0] = zis_object_from(exc_obj);
+    return NULL;
 }
 
 #endif // ZIS_FEATURE_ASM
