@@ -137,9 +137,8 @@ ZIS_API int zis_native_block(zis_t z, size_t reg_max, int(*fn)(zis_t, void *), v
     { // leave the frame
         struct zis_object *ret_obj = z->callstack->frame[0];
         assert(zis_callstack_frame_info(z->callstack)->caller_ip == NULL);
-        assert(zis_callstack_frame_info(z->callstack)->ret_val_reg == NULL);
         zis_callstack_leave(z->callstack);
-        assert(z->callstack->frame[0] == ret_obj), zis_unused_var(ret_obj);
+        z->callstack->frame[0] = ret_obj;
     }
 
     return ret_val;
@@ -1070,7 +1069,7 @@ ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) {
                 goto packed_args_obj_wrong_type;
             }
         }
-        func_obj = zis_invoke_prepare_pa(z, callable_obj, packed_args_obj, argc);
+        func_obj = zis_invoke_prepare_pa(z, callable_obj, ret_val_ref, packed_args_obj, argc);
         if (zis_unlikely(!func_obj))
             return ZIS_THR;
     } else {
@@ -1079,21 +1078,19 @@ ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) {
             struct zis_object **const argv = z->callstack->frame + index;
             if (zis_unlikely(argv + argc - 1 > z->callstack->top))
                 return ZIS_E_IDX;
-            func_obj = zis_invoke_prepare_va(z, callable_obj, argv, argc);
+            func_obj = zis_invoke_prepare_va(z, callable_obj, ret_val_ref, argv, argc);
             if (zis_unlikely(!func_obj))
                 return ZIS_THR;
         } else { // --- one by one ---
             // FIXME: validate reg indices.
-            func_obj = zis_invoke_prepare_da(z, callable_obj, regs + 2, argc);
+            func_obj = zis_invoke_prepare_da(z, callable_obj, ret_val_ref, regs + 2, argc);
             if (zis_unlikely(!func_obj))
                 return ZIS_THR;
         }
     }
 
-    // call + cleanup.
-    const int status = zis_invoke_func(z, func_obj);
-    *ret_val_ref = zis_invoke_cleanup(z);
-    return status;
+    // call.
+    return zis_invoke_func(z, func_obj);
 }
 
 static int api_import_by_name(zis_t z, struct zis_object **res_ref, const char *name) {
@@ -1155,7 +1152,7 @@ static int api_import_call_main(zis_t z, struct zis_object **res_ref) {
     const struct zis_func_obj_meta func_meta = zis_object_cast(main_fn, struct zis_func_obj)->meta;
     struct zis_func_obj *func_obj;
     if (!func_meta.na && !func_meta.no) {
-        func_obj = zis_invoke_prepare_va(z, main_fn, NULL, 0);
+        func_obj = zis_invoke_prepare_va(z, main_fn, NULL, NULL, 0);
     } else {
         int64_t argc_i64, argv_i64;
         status = zis_read_int(z, 1, &argc_i64);
@@ -1181,12 +1178,11 @@ static int api_import_call_main(zis_t z, struct zis_object **res_ref) {
             zis_array_obj_set(args_obj, (size_t)i, zis_object_from(arg));
         }
 
-        func_obj = zis_invoke_prepare_va(z, main_fn, tmp_regs, 1);
+        func_obj = zis_invoke_prepare_va(z, main_fn, NULL, tmp_regs, 1);
     }
     if (func_obj) {
         assert(zis_object_from(func_obj) == main_fn);
         status = zis_invoke_func(z, func_obj);
-        zis_invoke_cleanup(z);
     } else {
         status = ZIS_THR;
     }

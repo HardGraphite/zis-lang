@@ -255,7 +255,9 @@ zis_static_force_inline zis_instr_word_t *invocation_leave(
 
 /* ----- bytecode execution ------------------------------------------------- */
 
-zis_hot_fn static int exec_bytecode(
+/// Run the bytecode in the function object.
+/// Then pop the current frame and handles the return value.
+zis_hot_fn static int invoke_bytecode_func(
     struct zis_context *z, struct zis_func_obj *func_obj
 ) {
 #define OP_DISPATCH_USE_COMPUTED_GOTO ZIS_USE_COMPUTED_GOTO
@@ -673,11 +675,11 @@ static void invoke_prepare_xx_pass_args_fail_cleanup(
 
 struct zis_func_obj *zis_invoke_prepare_va(
     struct zis_context *z, struct zis_object *callable,
-    struct zis_object **argv, size_t argc
+    struct zis_object **ret_to /* = NULL */, struct zis_object **argv, size_t argc
 ) {
     struct invocation_info ii;
     z->callstack->frame[0] = callable;
-    if (zis_unlikely(!invocation_enter(z, NULL, z->callstack->frame, &ii))) {
+    if (zis_unlikely(!invocation_enter(z, NULL, ret_to ? ret_to : z->callstack->frame, &ii))) {
         return NULL;
     }
     assert(!argv || argv > ii.caller_frame);
@@ -691,11 +693,11 @@ struct zis_func_obj *zis_invoke_prepare_va(
 
 struct zis_func_obj *zis_invoke_prepare_pa(
     struct zis_context *z, struct zis_object *callable,
-    struct zis_object *packed_args, size_t argc
+    struct zis_object **ret_to /* = NULL */, struct zis_object *packed_args, size_t argc
 ) {
     struct invocation_info ii;
     z->callstack->frame[0] = callable;
-    if (zis_unlikely(!invocation_enter(z, NULL, z->callstack->frame, &ii))) {
+    if (zis_unlikely(!invocation_enter(z, NULL, ret_to ? ret_to : z->callstack->frame, &ii))) {
         return NULL;
     }
     assert(packed_args != ii.caller_frame[0]);
@@ -709,11 +711,11 @@ struct zis_func_obj *zis_invoke_prepare_pa(
 
 struct zis_func_obj *zis_invoke_prepare_da(
     struct zis_context *z, struct zis_object *callable,
-    const unsigned int arg_regs[], size_t argc
+    struct zis_object **ret_to /* = NULL */, const unsigned int arg_regs[], size_t argc
 ) {
     struct invocation_info ii;
     z->callstack->frame[0] = callable;
-    if (zis_unlikely(!invocation_enter(z, NULL, z->callstack->frame, &ii))) {
+    if (zis_unlikely(!invocation_enter(z, NULL, ret_to ? ret_to : z->callstack->frame, &ii))) {
         return NULL;
     }
     if (zis_unlikely(!invocation_pass_args_dis(z, arg_regs, argc, &ii))) {
@@ -722,13 +724,6 @@ struct zis_func_obj *zis_invoke_prepare_da(
     }
     assert(zis_object_type(ii.caller_frame[0]) == z->globals->type_Function);
     return zis_object_cast(ii.caller_frame[0], struct zis_func_obj);
-}
-
-struct zis_object *zis_invoke_cleanup(struct zis_context *z) {
-    struct zis_object *ret_val = z->callstack->frame[0];
-    void *ret_ip = invocation_leave(z, ret_val);
-    assert(!ret_ip), zis_unused_var(ret_ip);
-    return ret_val;
 }
 
 int zis_invoke_func(struct zis_context *z, struct zis_func_obj *func) {
@@ -749,7 +744,9 @@ int zis_invoke_func(struct zis_context *z, struct zis_func_obj *func) {
             assert(func_obj->native == c_func);
             zis_exception_obj_stack_trace(z, exc_obj, func_obj, NULL);
         }
+        void *ret_ip = invocation_leave(z, z->callstack->frame[0]);
+        assert(!ret_ip), zis_unused_var(ret_ip);
         return status;
     }
-    return exec_bytecode(z, func);
+    return invoke_bytecode_func(z, func);
 }
