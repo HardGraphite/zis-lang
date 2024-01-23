@@ -227,17 +227,21 @@ struct zis_assembler {
     struct instr_buffer instr_buffer;
     struct label_table  label_table;
     struct zis_func_obj_meta func_meta;
+    struct zis_assembler *_as_list_next;
 };
 
 /// GC objects visitor. See `zis_objmem_object_visitor_t`.
 static void assembler_gc_visitor(void *_as, enum zis_objmem_obj_visit_op op) {
-    struct zis_assembler *const as = _as;
-    void *begin = (char *)as + offsetof(struct zis_assembler, AS_OBJ_MEMBER_BEGIN);
-    void *end   = (char *)as + offsetof(struct zis_assembler, AS_OBJ_MEMBER_END);
-    zis_objmem_visit_object_vec(begin, end, op);
+    for (struct zis_assembler *as = _as; as; as = as->_as_list_next) {
+        void *begin = (char *)as + offsetof(struct zis_assembler, AS_OBJ_MEMBER_BEGIN);
+        void *end   = (char *)as + offsetof(struct zis_assembler, AS_OBJ_MEMBER_END);
+        zis_objmem_visit_object_vec(begin, end, op);
+    }
 }
 
-struct zis_assembler *zis_assembler_create(struct zis_context *z) {
+struct zis_assembler *zis_assembler_create(
+    struct zis_context *z, struct zis_assembler *parent /* = NULL */
+) {
     struct zis_assembler *const as = zis_mem_alloc(sizeof(struct zis_assembler));
 
     as->func_constants = zis_object_cast(z->globals->val_nil, struct zis_array_obj);
@@ -246,16 +250,33 @@ struct zis_assembler *zis_assembler_create(struct zis_context *z) {
     instr_buffer_init(&as->instr_buffer);
     label_table_init(&as->label_table);
     as->func_meta.na = 0, as->func_meta.no = 0, as->func_meta.nr = 0;
+    as->_as_list_next = NULL;
 
-    zis_objmem_add_gc_root(z, as, assembler_gc_visitor);
+    if (parent) {
+        assert(!parent->_as_list_next);
+        parent->_as_list_next = as;
+    } else {
+        zis_objmem_add_gc_root(z, as, assembler_gc_visitor);
+    }
+
     as->func_constants = zis_array_obj_new(z, NULL, 0);
     as->func_symbols = zis_map_obj_new_r(z, (struct zis_object **)&as->func_symbols, 1.5f, 0);
 
     return as;
 }
 
-void zis_assembler_destroy(struct zis_assembler *as, struct zis_context *z) {
-    zis_objmem_remove_gc_root(z, as);
+void zis_assembler_destroy(
+    struct zis_assembler *as,
+    struct zis_context *z, struct zis_assembler *parent /* = NULL */
+) {
+    assert(as->_as_list_next == NULL);
+    if (parent) {
+        assert(parent->_as_list_next == as);
+        parent->_as_list_next = NULL;
+    } else {
+        zis_objmem_remove_gc_root(z, as);
+    }
+
     instr_buffer_fini(&as->instr_buffer);
     label_table_fini(&as->label_table);
     zis_mem_free(as);
@@ -305,12 +326,14 @@ static int _as_finish_debug_dump_fn(const struct zis_disassemble_result *dis, vo
 
 struct zis_func_obj *zis_assembler_finish(struct zis_assembler *as, struct zis_context *z) {
     do {
-        if (as->instr_buffer.length)
-            break;
-        enum zis_opcode last_op = (enum zis_opcode)
-            zis_instr_extract_opcode(as->instr_buffer.data[as->instr_buffer.length - 1]);
-        if (last_op != ZIS_OPC_RET && last_op != ZIS_OPC_RETNIL)
-            zis_assembler_append_Aw(as, ZIS_OPC_RETNIL, 0);
+        if (as->instr_buffer.length) {
+            enum zis_opcode last_op = (enum zis_opcode)zis_instr_extract_opcode(
+                as->instr_buffer.data[as->instr_buffer.length - 1]
+            );
+            if (last_op == ZIS_OPC_RET || last_op == ZIS_OPC_RETNIL)
+                break;
+        }
+        zis_assembler_append_Aw(as, ZIS_OPC_RETNIL, 0);
     } while (false);
 
     struct zis_func_obj *func_obj = zis_func_obj_new_bytecode(
@@ -484,7 +507,6 @@ void zis_assembler_append_ABsCs(
 
 struct tas_context {
     struct zis_context *z;
-    struct zis_assembler *as;
     struct zis_stream_obj *input;
     unsigned int line_number;
     char line_buffer[128];
@@ -583,10 +605,8 @@ static enum tas_parse_line_status tas_parse_line(
 static struct zis_func_obj *tas_parse_func(
     struct tas_context *restrict tas,
     const char *pseudo_func_operands,
-    bool maybe_no_end
+    struct zis_assembler *restrict as
 ) {
-    zis_assembler_clear(tas->as);
-
     struct zis_func_obj_meta func_meta;
     if (
         sscanf(
@@ -597,7 +617,7 @@ static struct zis_func_obj *tas_parse_func(
         tas_record_error(tas, "illegal operands");
         return NULL;
     }
-    zis_assembler_func_meta(tas->as, &func_meta);
+    zis_assembler_func_meta(as, &func_meta);
 
     while (true) {
         union tas_parse_line_result line_result;
@@ -609,7 +629,7 @@ static struct zis_func_obj *tas_parse_func(
                 if (line_result.instr.operand_count != 1)
                     goto bad_operands;
                 zis_assembler_append_Aw(
-                    tas->as, line_result.instr.opcode,
+                    as, line_result.instr.opcode,
                     (uint32_t)line_result.instr.operands[0]
                 );
                 break;
@@ -617,7 +637,7 @@ static struct zis_func_obj *tas_parse_func(
                 if (line_result.instr.operand_count != 1)
                     goto bad_operands;
                 zis_assembler_append_Asw(
-                    tas->as, line_result.instr.opcode,
+                    as, line_result.instr.opcode,
                     line_result.instr.operands[0]
                 );
                 break;
@@ -625,7 +645,7 @@ static struct zis_func_obj *tas_parse_func(
                 if (line_result.instr.operand_count != 2)
                     goto bad_operands;
                 zis_assembler_append_ABw(
-                    tas->as, line_result.instr.opcode,
+                    as, line_result.instr.opcode,
                     (uint32_t)line_result.instr.operands[0],
                     (uint32_t)line_result.instr.operands[1]
                 );
@@ -634,7 +654,7 @@ static struct zis_func_obj *tas_parse_func(
                 if (line_result.instr.operand_count != 2)
                     goto bad_operands;
                 zis_assembler_append_ABsw(
-                    tas->as, line_result.instr.opcode,
+                    as, line_result.instr.opcode,
                     (uint32_t)line_result.instr.operands[0],
                     line_result.instr.operands[1]
                 );
@@ -643,7 +663,7 @@ static struct zis_func_obj *tas_parse_func(
                 if (line_result.instr.operand_count != 3)
                     goto bad_operands;
                 zis_assembler_append_ABC(
-                    tas->as, line_result.instr.opcode,
+                    as, line_result.instr.opcode,
                     (uint32_t)line_result.instr.operands[0],
                     (uint32_t)line_result.instr.operands[1],
                     (uint32_t)line_result.instr.operands[2]
@@ -653,7 +673,7 @@ static struct zis_func_obj *tas_parse_func(
                 if (line_result.instr.operand_count != 3)
                     goto bad_operands;
                 zis_assembler_append_ABsCs(
-                    tas->as, line_result.instr.opcode,
+                    as, line_result.instr.opcode,
                     (uint32_t)line_result.instr.operands[0],
                     line_result.instr.operands[1],
                     line_result.instr.operands[2]
@@ -666,39 +686,51 @@ static struct zis_func_obj *tas_parse_func(
                 return NULL;
             }
         } else if (line_status == TAS_PARSE_PSEUDO) {
-            struct zis_object *v;
             switch (line_result.pseudo.opcode) {
             case PSEUDO_END:
                 goto finish;
-            case PSEUDO_FUNC:
-                v = zis_object_from(tas_parse_func(tas, line_result.pseudo.operands, false));
-                if (!v)
+            case PSEUDO_FUNC: {
+                struct zis_assembler *as1 = zis_assembler_create(tas->z, as);
+                struct zis_object *f = zis_object_from(
+                    tas_parse_func(tas, line_result.pseudo.operands, as1)
+                );
+                zis_assembler_destroy(as1, tas->z, as);
+                if (!f)
                     return NULL;
-                zis_assembler_func_constant(tas->as, tas->z, v);
+                zis_assembler_func_constant(as, tas->z, f);
                 break;
-            case PSEUDO_CONST:
+            }
+            case PSEUDO_CONST: {
                 if (line_result.pseudo.operands[1] != ':')
                     goto pseudo_bad_operand;
+                struct zis_object *v;
                 switch (toupper(line_result.pseudo.operands[0])) {
                 case 'I':
-                    v = zis_smallint_or_int_obj(tas->z, (zis_smallint_t)atoll(line_result.pseudo.operands + 2));
+                    v = zis_smallint_or_int_obj(
+                        tas->z, (zis_smallint_t)atoll(line_result.pseudo.operands + 2)
+                    );
                     break;
                 case 'F':
-                    v = zis_object_from(zis_float_obj_new(tas->z, atof(line_result.pseudo.operands + 2)));
+                    v = zis_object_from(zis_float_obj_new(
+                        tas->z, atof(line_result.pseudo.operands + 2)
+                    ));
                     break;
                 case 'S':
-                    v = zis_object_from(zis_string_obj_new(tas->z, line_result.pseudo.operands + 2, (size_t)-1));
+                    v = zis_object_from(zis_string_obj_new(
+                        tas->z, line_result.pseudo.operands + 2, (size_t)-1
+                    ));
                     break;
                 default:
                 pseudo_bad_operand:
                     tas_record_error(tas, "illegal operands");
                     return NULL;
                 }
-                zis_assembler_func_constant(tas->as, tas->z, v);
+                zis_assembler_func_constant(as, tas->z, v);
                 break;
+            }
             case PSEUDO_SYM:
                 zis_assembler_func_symbol(
-                    tas->as, tas->z,
+                    as, tas->z,
                     zis_symbol_registry_get(tas->z, line_result.pseudo.operands, (size_t)-1)
                 );
                 break;
@@ -707,27 +739,22 @@ static struct zis_func_obj *tas_parse_func(
                 return NULL;
             }
         } else {
-            if (line_status == TAS_PARSE_EOF) {
-                if (maybe_no_end)
-                    goto finish;
+            if (line_status == TAS_PARSE_EOF)
                 tas_record_error(tas, "unexpected EOF");
-            }
             return NULL;
         }
     }
 finish:
-    return zis_assembler_finish(tas->as, tas->z);
+    return zis_assembler_finish(as, tas->z);
 }
 
-struct zis_func_obj *zis_assembler_func_from_text(
-    struct zis_context *z, struct zis_assembler *as,
-    struct zis_stream_obj *input
+struct zis_func_obj *zis_assemble_func_from_text(
+    struct zis_context *z, struct zis_stream_obj *input
 ) {
     // NOTE: `input`(zis_stream_obj) won't be moved during GC.
 
     struct tas_context context = {
         .z = z,
-        .as = as,
         .input = input,
         .line_number = 0,
     };
@@ -740,8 +767,10 @@ struct zis_func_obj *zis_assembler_func_from_text(
         tas_record_error(&context, "expecting .FUNC");
         exc_obj = tas_error_exception(&context);
     } else {
+        struct zis_assembler *as = zis_assembler_create(z, NULL);
         struct zis_func_obj *func_obj =
-            tas_parse_func(&context, line_result.pseudo.operands, true);
+            tas_parse_func(&context, line_result.pseudo.operands, as);
+        zis_assembler_destroy(as, z, NULL);
         if (func_obj)
             return func_obj;
         exc_obj = tas_error_exception(&context);

@@ -347,11 +347,9 @@ static bool module_loader_load_from_file(
 
 #if ZIS_FEATURE_ASM
     case MOD_FILE_ASM: {
-        struct zis_assembler *const as = zis_assembler_create(z);
         const int ff = ZIS_STREAM_OBJ_MODE_IN | ZIS_STREAM_OBJ_TEXT | ZIS_STREAM_OBJ_UTF8;
         struct zis_stream_obj *f = zis_stream_obj_new_file(z, file, ff);
-        init_func = zis_assembler_func_from_text(z, as, f);
-        zis_assembler_destroy(as, z);
+        init_func = zis_assemble_func_from_text(z, f);
         if (!init_func) {
             d->temp_var = z->callstack->frame[0];
             return false;

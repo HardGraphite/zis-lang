@@ -22,11 +22,19 @@ struct zis_symbol_obj;
 /// The function bytecode assembler.
 struct zis_assembler;
 
-/// Create an assembler.
-struct zis_assembler *zis_assembler_create(struct zis_context *z);
+/// Create an assembler. The parameter `parent` is optional but recommended.
+/// One assembler can have at most one child.
+struct zis_assembler *zis_assembler_create(
+    struct zis_context *z, struct zis_assembler *parent /* = NULL */
+);
 
-/// Delete an assembler.
-void zis_assembler_destroy(struct zis_assembler *as, struct zis_context *z);
+/// Delete an assembler. The parameter `parent` must be the same with
+/// that passed to `zis_assembler_create()`. One assembler must have no child
+/// when being destroyed.
+void zis_assembler_destroy(
+    struct zis_assembler *as,
+    struct zis_context *z, struct zis_assembler *parent /* = NULL */
+);
 
 /// Clear the assembling data and reset the assembler.
 void zis_assembler_clear(struct zis_assembler *as);
@@ -101,9 +109,8 @@ void zis_assembler_append_ABsCs(
 
 /// Generate a function from the assemble text stream.
 /// On failure, formats an exception (REG-0) and returns NULL.
-struct zis_func_obj *zis_assembler_func_from_text(
-    struct zis_context *z, struct zis_assembler *as,
-    struct zis_stream_obj *input
+struct zis_func_obj *zis_assemble_func_from_text(
+    struct zis_context *z, struct zis_stream_obj *input
 );
 
 #endif // ZIS_FEATURE_ASM
