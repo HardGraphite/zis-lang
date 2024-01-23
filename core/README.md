@@ -22,6 +22,7 @@ Source code for the runtime core.
   - [`loader.h`](loader.h), [`loader.c`](loader.c)
   - [`stack.h`](stack.h), [`stack.c`](stack.c)
 + object system support (`obj*.*`)
+  - [`locals.h`](locals.h), [`locals.c`](locals.c)
   - [`ndefutil.h`](ndefutil.h)
   - [`object.h`](object.h), [`object.c`](object.c)
   - [`objmem.h`](objmem.h), [`objmem.c`](objmem.c)
@@ -74,6 +75,31 @@ and the pointers then became dangling ones.
 An easy solution is to put the pointers to objects onto the runtime callstack before creating objects
 and update the local variables from the callstack after that.
 
+#### Native function local references
+
+The **locals** mechanism is available
+to *protect* the references stored in local variables.
+
+Here is an example:
+
+```c
+struct xyz_obj *xyz_obj_add(zis_context *z, struct xyz_obj *_a, struct xyz_obj *_b) {
+    zis_locals_decl(
+        z, var,
+        struct xyz_obj *a, *b;
+    ); // Declare local references.
+    // zis_locals_zero(z, var); // This line is not needed here.
+    var.a = _a. var.b = _b; // Initialize the variables.
+    struct xyz_adder_obj *adder = xyz_adder_obj_new(z); // Create object.
+    struct xyz_obj *y = xyz_adder_obj_add(adder, var.a, var.b);
+    zis_locals_drop(z, var); // Drop the references.
+    return y;
+}
+```
+
+Considering that this method can slightly impact performance,
+do not use it in unnecessary situations or paths.
+
 #### Temporary callstack registers
 
 If the function cannot access the callstack directly,
@@ -93,8 +119,9 @@ struct xyz_obj *xyz_obj_add(zis_context *z, struct xyz_obj *a, struct xyz_obj *b
 }
 ```
 
-Considering that this method can slightly impact performance,
-do not use it in unnecessary situations or paths.
+Compared with the **locals** mechanism,
+this method is slightly slower and less convenient for reference keeping.
+However, this is the only way to allocate slots of arbitrary size from the stack.
 
 #### Callstack registers as arguments
 

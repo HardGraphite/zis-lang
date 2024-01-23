@@ -127,6 +127,7 @@ zis_nodiscard struct zis_context *zis_context_create(void) {
     z->objmem_context = zis_objmem_context_create(&objmem_options);
     z->callstack = zis_callstack_create(z, stack_size);
     z->symbol_registry = zis_symbol_registry_create(z);
+    _zis_locals_root_init(&z->locals_root, z);
 
     // Allow use of `zis_callstack_frame_alloc_temp()` and `zis_callstack_frame_free_temp()`.
     // See `zis_native_block()`.
@@ -149,6 +150,7 @@ zis_nodiscard struct zis_context *zis_context_create(void) {
 
 void zis_context_destroy(struct zis_context *z) {
     zis_debug_log(INFO, "Context", "deleting context @%p", (void *)z);
+    _zis_locals_root_fini(&z->locals_root, z);
     zis_module_loader_destroy(z->module_loader, z);
     zis_context_globals_destroy(z->globals, z);
     zis_symbol_registry_destroy(z->symbol_registry, z);
