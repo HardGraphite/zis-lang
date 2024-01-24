@@ -3,9 +3,9 @@
 #include "context.h"
 #include "debug.h"
 #include "globals.h"
+#include "locals.h"
 #include "ndefutil.h"
 #include "objmem.h"
-#include "stack.h"
 
 #include "arrayobj.h"
 #include "funcobj.h"
@@ -22,7 +22,7 @@ static struct zis_type_obj *type_obj_alloc(struct zis_context *z) {
 zis_cold_fn struct zis_type_obj *_zis_type_obj_bootstrap_alloc(
     struct zis_context *z, const struct zis_native_type_def *restrict def
 ) {
-    // See `zis_type_obj_new_r()` and `zis_type_obj_load_native_def()`.
+    // See `zis_type_obj_new()` and `zis_type_obj_load_native_def()`.
 
     struct zis_type_obj *self = type_obj_alloc(z);
 
@@ -38,31 +38,25 @@ zis_cold_fn struct zis_type_obj *_zis_type_obj_bootstrap_alloc(
     return self;
 }
 
-zis_cold_fn void _zis_type_obj_bootstrap_init_r(
-    struct zis_context *z, struct zis_type_obj *self,
-    struct zis_object *regs[ZIS_PARAMARRAY_STATIC 2]
+zis_cold_fn void _zis_type_obj_bootstrap_init(
+    struct zis_context *z, struct zis_type_obj *self
 ) {
-    // See `zis_type_obj_new_r()`.
+    // See `zis_type_obj_new()`.
 
     self->_methods = z->globals->val_empty_array_slots;
     zis_object_write_barrier(self, self->_methods);
 
-    regs[0] = zis_object_from(self);
-    struct zis_map_obj *map_obj;
-    map_obj = zis_map_obj_new_r(z, regs + 1, 0.0f, 0);
-    assert(zis_object_type(regs[0]) == z->globals->type_Type);
-    self = zis_object_cast(regs[0], struct zis_type_obj);
-    self->_name_map = map_obj;
-    map_obj = zis_map_obj_new_r(z, regs + 1, 0.0f, 0);
-    assert(zis_object_type(regs[0]) == z->globals->type_Type);
-    self = zis_object_cast(regs[0], struct zis_type_obj);
-    self->_statics = map_obj;
+    zis_locals_decl_1(z, var, struct zis_type_obj *self);
+    var.self = self;
+
+    var.self->_name_map = zis_map_obj_new(z, 0.0f, 0);
+    var.self->_statics = zis_map_obj_new(z, 0.0f, 0);
+
+    self = var.self;
+    zis_locals_drop(z, var);
 }
 
-struct zis_type_obj *zis_type_obj_new_r(
-    struct zis_context *z,
-    struct zis_object *regs[ZIS_PARAMARRAY_STATIC 2]
-) {
+struct zis_type_obj *zis_type_obj_new(struct zis_context *z) {
     struct zis_type_obj *self = type_obj_alloc(z);
 
     self->_methods   = z->globals->val_empty_array_slots;
@@ -73,16 +67,14 @@ struct zis_type_obj *zis_type_obj_new_r(
     self->_bytes_len = 0;
     self->_obj_size  = 0;
 
-    regs[0] = zis_object_from(self);
-    struct zis_map_obj *map_obj;
-    map_obj = zis_map_obj_new_r(z, regs + 1, 0.0f, 0);
-    assert(zis_object_type(regs[0]) == z->globals->type_Type);
-    self = zis_object_cast(regs[0], struct zis_type_obj);
-    self->_name_map = map_obj;
-    map_obj = zis_map_obj_new_r(z, regs + 1, 0.0f, 0);
-    assert(zis_object_type(regs[0]) == z->globals->type_Type);
-    self = zis_object_cast(regs[0], struct zis_type_obj);
-    self->_statics = map_obj;
+    zis_locals_decl_1(z, var, struct zis_type_obj *self);
+    var.self = self;
+
+    var.self->_name_map = zis_map_obj_new(z, 0.0f, 0);
+    var.self->_statics = zis_map_obj_new(z, 0.0f, 0);
+
+    self = var.self;
+    zis_locals_drop(z, var);
 
     return self;
 }
@@ -97,33 +89,32 @@ zis_noinline static size_t _func_def_arr_len(const struct zis_native_func_def *a
 
 void zis_type_obj_load_native_def(
     struct zis_context *z,
-    struct zis_type_obj *self, const struct zis_native_type_def *restrict def
+    struct zis_type_obj *_self, const struct zis_native_type_def *restrict def
 ) {
-    self->_slots_num = def->slots_num;
-    self->_bytes_len = def->bytes_size;
-    const bool extendable = self->_slots_num == (size_t)-1 || self->_bytes_len == (size_t)-1;
-    self->_obj_size = extendable ? 0 : ZIS_OBJECT_HEAD_SIZE + self->_slots_num * sizeof(void *) + self->_bytes_len;
+    _self->_slots_num = def->slots_num;
+    _self->_bytes_len = def->bytes_size;
+    const bool extendable = _self->_slots_num == (size_t)-1 || _self->_bytes_len == (size_t)-1;
+    _self->_obj_size = extendable ? 0 : ZIS_OBJECT_HEAD_SIZE + _self->_slots_num * sizeof(void *) + _self->_bytes_len;
 
-    assert(self->_methods == z->globals->val_empty_array_slots);
+    assert(_self->_methods == z->globals->val_empty_array_slots);
 
     const size_t field_count = def->fields ? def->slots_num : 0;
     const size_t method_count = _func_def_arr_len(def->methods);
     const size_t static_count = _func_def_arr_len(def->statics);
     const size_t name_map_reserve = field_count + method_count;
 
-    const size_t tmp_regs_n = 5;
-    struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, tmp_regs_n);
+    zis_locals_decl(
+        z, var,
+        struct zis_type_obj *self;
+        struct zis_map_obj *name_map;
+        struct zis_array_slots_obj *method_table;
+        struct zis_map_obj *statics_map;
+    );
+    zis_locals_zero(z, var);
+    var.self = _self;
 
-    // ~~ tmp_regs[0] = self, tmp_regs[1..4] = tmp ~~
-
-    tmp_regs[0] = zis_object_from(self);
-
-    if (name_map_reserve) {
-        tmp_regs[1] = zis_object_from(self->_name_map);
-        zis_map_obj_reserve_r(z, tmp_regs + 1, name_map_reserve);
-        assert(zis_object_type(tmp_regs[0]) == z->globals->type_Type);
-        self = zis_object_cast(tmp_regs[0], struct zis_type_obj);
-    }
+    if (name_map_reserve)
+        zis_map_obj_reserve(z, var.self->_name_map, name_map_reserve);
 
     // ~~ tmp_regs[0] = self, tmp_regs[1] = name_map / statics_map, tmp_regs[2] = method_table ~~
 
@@ -131,7 +122,8 @@ void zis_type_obj_load_native_def(
         const char *const *const fields = def->fields;
         assert(fields);
 
-        tmp_regs[1] = zis_object_from(self->_name_map);
+        var.name_map = var.self->_name_map;
+
         for (size_t i = 0; i < field_count; i++) {
             const char *const field_name = fields[i];
             if (!field_name)
@@ -139,27 +131,19 @@ void zis_type_obj_load_native_def(
             assert(i <= ZIS_SMALLINT_MAX);
             struct zis_object *idx = zis_smallint_to_ptr((zis_smallint_t)i);
             struct zis_symbol_obj *sym = zis_symbol_registry_get(z, field_name, (size_t)-1);
-            assert(zis_object_type(tmp_regs[1]) == z->globals->type_Map);
-            zis_map_obj_sym_set(z, zis_object_cast(tmp_regs[1], struct zis_map_obj), sym, idx);
+            zis_map_obj_sym_set(z, var.name_map, sym, idx);
         }
-
-        assert(zis_object_type(tmp_regs[0]) == z->globals->type_Type);
-        self = zis_object_cast(tmp_regs[0], struct zis_type_obj);
     }
 
     if (method_count) {
         const struct zis_native_func_def *const methods = def->methods;
         assert(methods);
 
-        struct zis_array_slots_obj *method_table =
-            zis_array_slots_obj_new(z, NULL, method_count);
-        assert(zis_object_type(tmp_regs[0]) == z->globals->type_Type);
-        self = zis_object_cast(tmp_regs[0], struct zis_type_obj);
-        self->_methods = method_table;
-        zis_object_write_barrier(self, method_table);
+        var.name_map = var.self->_name_map;
+        var.method_table = zis_array_slots_obj_new(z, NULL, method_count);
+        var.self->_methods = var.method_table;
+        zis_object_write_barrier(var.self, var.method_table);
 
-        tmp_regs[2] = zis_object_from(method_table);
-        tmp_regs[1] = zis_object_from(self->_name_map);
         for (size_t i = 0; i < method_count; i++) {
             const struct zis_native_func_def *const func_def = &methods[i];
             struct zis_func_obj_meta func_obj_meta;
@@ -171,31 +155,25 @@ void zis_type_obj_load_native_def(
                 );
                 continue;
             }
-            struct zis_func_obj *func_obj =
-                zis_func_obj_new_native(z, func_obj_meta, func_def->code);
-            assert(zis_object_type(tmp_regs[2]) == z->globals->type_Array_Slots);
             zis_array_slots_obj_set(
-                zis_object_cast(tmp_regs[2], struct zis_array_slots_obj),
-                i, zis_object_from(func_obj)
+                var.method_table, i,
+                zis_object_from(zis_func_obj_new_native(z, func_obj_meta, func_def->code))
             );
             if (func_def->name) {
                 assert(i <= ZIS_SMALLINT_MAX);
                 struct zis_object *idx = zis_smallint_to_ptr(-1 - (zis_smallint_t)i);
                 struct zis_symbol_obj *sym = zis_symbol_registry_get(z, func_def->name, (size_t)-1);
-                assert(zis_object_type(tmp_regs[1]) == z->globals->type_Map);
-                zis_map_obj_sym_set(z, zis_object_cast(tmp_regs[1], struct zis_map_obj), sym, idx);
+                zis_map_obj_sym_set(z, var.name_map, sym, idx);
             }
         }
-
-        assert(zis_object_type(tmp_regs[0]) == z->globals->type_Type);
-        self = zis_object_cast(tmp_regs[0], struct zis_type_obj);
     }
 
     if (static_count) {
         const struct zis_native_func_def *const statics = def->statics;
         assert(statics);
 
-        tmp_regs[1] = zis_object_from(self->_statics);
+        var.statics_map = var.self->_statics;
+
         for (size_t i = 0; i < static_count; i++) {
             const struct zis_native_func_def *const func_def = &statics[i];
             if (!func_def->name)
@@ -209,17 +187,13 @@ void zis_type_obj_load_native_def(
                 );
                 continue;
             }
-            tmp_regs[2] = zis_object_from(zis_func_obj_new_native(z, func_obj_meta, func_def->code));
+            struct zis_func_obj *func = zis_func_obj_new_native(z, func_obj_meta, func_def->code);
             struct zis_symbol_obj *sym = zis_symbol_registry_get(z, func_def->name, (size_t)-1);
-            assert(zis_object_type(tmp_regs[1]) == z->globals->type_Map);
-            zis_map_obj_sym_set(z, zis_object_cast(tmp_regs[1], struct zis_map_obj), sym, tmp_regs[2]);
+            zis_map_obj_sym_set(z, var.statics_map, sym, zis_object_from(func));
         }
-
-        assert(zis_object_type(tmp_regs[0]) == z->globals->type_Type);
-        self = zis_object_cast(tmp_regs[0], struct zis_type_obj);
     }
 
-    zis_callstack_frame_free_temp(z, tmp_regs_n);
+    zis_locals_drop(z, var);
 }
 
 size_t zis_type_obj_find_field(

@@ -4,9 +4,9 @@
 
 #include "context.h"
 #include "globals.h"
+#include "locals.h"
 #include "ndefutil.h"
 #include "objmem.h"
-#include "stack.h"
 
 #include "arrayobj.h"
 #include "funcobj.h"
@@ -18,33 +18,28 @@ struct zis_exception_obj *zis_exception_obj_new(
     struct zis_context *z,
     struct zis_object *type, struct zis_object *what, struct zis_object *data
 ) {
+    zis_locals_decl(
+        z, args,
+        struct zis_object *type, *what, *data;
+    );
     struct zis_object *const nil = zis_object_from(z->globals->val_nil);
-    struct zis_object **const tmp_regs = zis_callstack_frame_alloc_temp(z, 3);
-    tmp_regs[0] = type ? type : nil;
-    tmp_regs[1] = what ? what : nil;
-    tmp_regs[2] = data ? data : nil;
-    struct zis_exception_obj *self = zis_exception_obj_new_r(z, tmp_regs);
-    zis_callstack_frame_free_temp(z, 3);
-    return self;
-}
-
-struct zis_exception_obj *zis_exception_obj_new_r(
-    struct zis_context *z, struct zis_object *regs[ZIS_PARAMARRAY_STATIC 3]
-) {
-    // ~~ regs[0] = type, regs[1] = what, regs[2] = data ~~
+    args.type = type ? type : nil;
+    args.what = what ? what : nil;
+    args.data = data ? data : nil;
 
     struct zis_exception_obj *const self = zis_object_cast(
         zis_objmem_alloc(z, z->globals->type_Exception),
         struct zis_exception_obj
     );
-    self->type = regs[0];
-    self->what = regs[1];
-    self->data = regs[2];
+    self->type = args.type;
+    self->what = args.what;
+    self->data = args.data;
     self->_stack_trace = zis_object_from(z->globals->val_nil);
-    zis_object_write_barrier(self, regs[0]);
-    zis_object_write_barrier(self, regs[1]);
-    zis_object_write_barrier(self, regs[2]);
+    zis_object_write_barrier(self, args.type);
+    zis_object_write_barrier(self, args.what);
+    zis_object_write_barrier(self, args.data);
 
+    zis_locals_drop(z, args);
     return self;
 }
 
@@ -68,17 +63,20 @@ struct zis_exception_obj *zis_exception_obj_vformat(
 ) {
     // See `zis_exception_obj_new()`.
 
+    zis_locals_decl(
+        z, args,
+        struct zis_object *type, *what, *data;
+    );
     struct zis_object *const nil = zis_object_from(z->globals->val_nil);
-    struct zis_object **const tmp_regs = zis_callstack_frame_alloc_temp(z, 3);
-    tmp_regs[0] = nil; // type
-    tmp_regs[1] = nil; // what
-    tmp_regs[2] = data ? data : nil;
+    args.type = nil;
+    args.what = nil;
+    args.data = data ? data : nil;
 
     if (type) {
         struct zis_symbol_obj *const type_sym_obj =
             zis_symbol_registry_get(z, type, (size_t)-1);
         assert(type_sym_obj);
-        tmp_regs[0] = zis_object_from(type_sym_obj);
+        args.type = zis_object_from(type_sym_obj);
     }
 
     if (what_fmt) {
@@ -89,11 +87,13 @@ struct zis_exception_obj *zis_exception_obj_vformat(
         struct zis_string_obj *const what_str_obj =
             zis_string_obj_new(z, buffer, (size_t)n);
         assert(what_str_obj);
-        tmp_regs[1] = zis_object_from(what_str_obj);
+        args.what = zis_object_from(what_str_obj);
     }
 
-    struct zis_exception_obj *const self = zis_exception_obj_new_r(z, tmp_regs);
-    zis_callstack_frame_free_temp(z, 3);
+    struct zis_exception_obj *const self =
+        zis_exception_obj_new(z, args.type, args.what, args.data);
+    zis_locals_drop(z, args);
+
     return self;
 }
 
@@ -109,21 +109,27 @@ void zis_exception_obj_stack_trace(
     else
         ip_offset = (zis_func_obj_bytecode_word_t *)ip - func_p;
 
-    size_t tmp_regs_n = 3;
-    struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, tmp_regs_n);
-    tmp_regs[0] = zis_object_from(self), tmp_regs[1] = zis_object_from(func_obj),
-    tmp_regs[2] = zis_smallint_to_ptr((zis_smallint_t)ip_offset);
+    zis_locals_decl(
+        z, var,
+        struct zis_exception_obj *self;
+        struct zis_array_obj *stack_trace;
+        struct zis_func_obj *func_obj;
+    );
+    var.self = self;
+    var.stack_trace = zis_object_cast(self->_stack_trace, struct zis_array_obj);
+    var.func_obj = func_obj;
+
     if (zis_object_type(self->_stack_trace) != z->globals->type_Array) {
-        struct zis_object *x = zis_object_from(zis_array_obj_new(z, tmp_regs + 1, 2));
-        zis_object_cast(tmp_regs[0], struct zis_exception_obj)->_stack_trace = x;
-        zis_object_write_barrier(tmp_regs[0], x);
-    } else {
-        struct zis_array_obj *x = zis_object_cast(self->_stack_trace, struct zis_array_obj);
-        zis_array_obj_append(z, x, tmp_regs[1]);
-        x = zis_object_cast(zis_object_cast(tmp_regs[0], struct zis_exception_obj)->_stack_trace, struct zis_array_obj);
-        zis_array_obj_append(z, x, tmp_regs[2]);
+        struct zis_array_obj *x = zis_array_obj_new(z, NULL, 0);
+        var.stack_trace = x;
+        var.self->_stack_trace = zis_object_from(x);
+        zis_object_write_barrier(var.self, x);
     }
-    zis_callstack_frame_free_temp(z, tmp_regs_n);
+
+    zis_array_obj_append(z, var.stack_trace, zis_object_from(var.func_obj));
+    zis_array_obj_append(z, var.stack_trace, zis_smallint_to_ptr((zis_smallint_t)ip_offset));
+
+    zis_locals_drop(z, var);
 }
 
 size_t zis_exception_obj_stack_trace_length(
@@ -145,13 +151,14 @@ int zis_exception_obj_walk_stack_trace(
     const size_t n = zis_exception_obj_stack_trace_length(z, self);
     if (!n)
         return 0;
+
+    assert(zis_object_type(self->_stack_trace) == z->globals->type_Array);
+    zis_locals_decl_1(z, var, struct zis_array_obj *stack_trace);
+    var.stack_trace = zis_object_cast(self->_stack_trace, struct zis_array_obj);
+
     int fn_ret = 0;
-    struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 1);
-    tmp_regs[0] = self->_stack_trace;
     for (size_t i = 0; i < n; i++) {
-        assert(zis_object_type(tmp_regs[0]) == z->globals->type_Array);
-        struct zis_object *const *const v =
-            zis_array_obj_data(zis_object_cast(tmp_regs[0], struct zis_array_obj));
+        struct zis_object *const *const v = zis_array_obj_data(var.stack_trace);
         assert(zis_object_type(v[i * 2]) == z->globals->type_Function);
         assert(zis_object_is_smallint(v[i * 2 + 1]));
         fn_ret = fn(
@@ -163,7 +170,8 @@ int zis_exception_obj_walk_stack_trace(
         if (fn_ret)
             break;
     }
-    zis_callstack_frame_free_temp(z, 1);
+
+    zis_locals_drop(z, var);
     return fn_ret;
 }
 

@@ -9,6 +9,7 @@ struct zis_callstack;
 struct zis_context;
 struct zis_context_globals;
 struct zis_module_loader;
+struct zis_object;
 struct zis_objmem_context;
 struct zis_symbol_registry;
 
@@ -30,6 +31,12 @@ zis_nodiscard struct zis_context *zis_context_create(void);
 
 /// Delete a runtime context.
 void zis_context_destroy(struct zis_context *z);
+
+/// Store `v` to REG-0.
+void zis_context_set_reg0(struct zis_context *z, struct zis_object *v);
+
+/// Load the value in REG-0.
+struct zis_object *zis_context_get_reg0(struct zis_context *z);
 
 /// Panic reason. See `zis_context_panic()`.
 enum zis_context_panic_reason {

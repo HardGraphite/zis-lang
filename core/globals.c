@@ -51,13 +51,12 @@ zis_cold_fn static void _init_types_0(
 #undef E
 }
 
-/// Initialize type objects. See `_zis_type_obj_bootstrap_init_r()`.
+/// Initialize type objects. See `_zis_type_obj_bootstrap_init()`.
 zis_cold_fn static void _init_types_1(
-    struct zis_context_globals *g, struct zis_context *z,
-    struct zis_object *tmp_regs[ZIS_PARAMARRAY_STATIC 2]
+    struct zis_context_globals *g, struct zis_context *z
 ) {
 #define E(NAME) \
-    _zis_type_obj_bootstrap_init_r(z, g->type_##NAME, tmp_regs);
+    _zis_type_obj_bootstrap_init(z, g->type_##NAME);
 
     _ZIS_BUILTIN_TYPE_LIST0
     _ZIS_BUILTIN_TYPE_LIST1
@@ -95,11 +94,10 @@ zis_cold_fn static void _init_values_0(
 
 /// Initialize the rest values.
 zis_cold_fn static void _init_values_1(
-    struct zis_context_globals *g, struct zis_context *z,
-    struct zis_object *tmp_regs[ZIS_PARAMARRAY_STATIC 3]
+    struct zis_context_globals *g, struct zis_context *z
 ) {
-    g->val_mod_prelude = zis_module_obj_new_r(z, tmp_regs, false);
-    g->val_mod_unnamed = zis_module_obj_new_r(z, tmp_regs, true);
+    g->val_mod_prelude = zis_module_obj_new(z, false);
+    g->val_mod_unnamed = zis_module_obj_new(z, true);
 }
 
 /// Initialize symbols.
@@ -117,8 +115,6 @@ zis_cold_fn static void _init_symbols(
 
 /// Do initialization.
 zis_cold_fn static void globals_init(struct zis_context_globals *g, struct zis_context *z) {
-    const size_t tmp_regs_num = 3;
-    struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, tmp_regs_num);
     assert(!z->globals);
     z->globals = g;
 
@@ -131,11 +127,11 @@ zis_cold_fn static void globals_init(struct zis_context_globals *g, struct zis_c
     _init_values_0(g, z);
 
     // ## 3. Initialize type objects. They are complete now.
-    _init_types_1(g, z, tmp_regs);
+    _init_types_1(g, z);
 
     // ## 4. Create the rest global values. Some of them will be used when
     // loading type definitions of the type objects.
-    _init_values_1(g, z, tmp_regs);
+    _init_values_1(g, z);
 
     // ## 5. Load type definitions of the type objects.
     _init_types_2(g, z);
@@ -144,7 +140,6 @@ zis_cold_fn static void globals_init(struct zis_context_globals *g, struct zis_c
     _init_symbols(g, z);
 
     z->globals = NULL;
-    zis_callstack_frame_free_temp(z, tmp_regs_num);
 }
 
 /// GC visitor. See `zis_objmem_object_visitor_t`.

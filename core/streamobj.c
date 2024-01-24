@@ -5,7 +5,6 @@
 #include "globals.h"
 #include "ndefutil.h"
 #include "objmem.h"
-#include "stack.h"
 #include "strutil.h"
 
 #include "exceptobj.h"
@@ -84,7 +83,7 @@ struct zis_stream_obj *zis_stream_obj_new_file(
             z, "sys", zis_object_from(path_obj),
             "cannot open this file"
         );
-        z->callstack->frame[0] = zis_object_from(exc);
+        zis_context_set_reg0(z, zis_object_from(exc));
         return NULL;
     }
     zis_stream_obj_bind(self, &sop_file, data, flags);

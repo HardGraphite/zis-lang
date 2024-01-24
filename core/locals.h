@@ -32,6 +32,11 @@ do {                                           \
 } while (0)                                    \
 // ^^^ zis_locals_decl() ^^^
 
+/// Declare one local variable using `zis_locals_decl()`.
+#define zis_locals_decl_1(__z, __namespace, __decl_expr) \
+    zis_locals_decl(__z, __namespace, __decl_expr ; )    \
+// ^^^ zis_locals_decl_1() ^^^
+
 /// Initialize the references like `zis_object_vec_zero()`.
 #define zis_locals_zero(__z, __namespace) \
 do {                                      \

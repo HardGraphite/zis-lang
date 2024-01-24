@@ -10,11 +10,11 @@
 #include "debug.h"
 #include "fsutil.h"
 #include "globals.h"
+#include "locals.h"
 #include "memory.h"
 #include "ndefutil.h"
 #include "objmem.h"
 #include "platform.h" // ZIS_WORDSIZE
-#include "stack.h"
 
 #include "arrayobj.h"
 #include "exceptobj.h"
@@ -296,11 +296,11 @@ static void module_loader_path_to_mod_name(
     zis_path_with_temp_str_from_path(file_stem, _module_loader_path_to_mod_name_fn, buf);
 }
 
-/// Load module file. On failure, returns an exception or a thrown object.
-static struct zis_object *module_loader_load_from_file(
+/// Load module file. On failure, do thrown (REG-0) and returns false.
+static bool module_loader_load_from_file(
     struct zis_context *z,
     const zis_path_char_t *file, enum module_loader_module_file_type file_type,
-    struct zis_module_obj *module
+    struct zis_module_obj *_module
 ) {
     char mod_name[64]; // TODO: handles names longer than 64.
     module_loader_path_to_mod_name(mod_name, file);
@@ -310,7 +310,15 @@ static struct zis_object *module_loader_load_from_file(
         mod_name, file
     );
 
-    struct zis_func_obj *init_func;
+    zis_locals_decl(
+        z, var,
+        struct zis_module_obj *module;
+        struct zis_func_obj *init_func;
+    );
+    zis_locals_zero(z, var);
+    var.module = _module;
+
+    int status = ZIS_OK;
 
     switch (file_type) {
         // In each case, `init_func` shall be assigned, and the module of
@@ -335,26 +343,20 @@ static struct zis_object *module_loader_load_from_file(
             ));
         }
         // zis_dl_close(lib); // CAN NOT close library here!!
-        init_func = zis_module_obj_load_native_def(z, module, mod_def);
+        var.init_func = zis_module_obj_load_native_def(z, var.module, mod_def);
         break;
     }
 
 #if ZIS_FEATURE_ASM
     case MOD_FILE_ASM: {
-        struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 1);
-        tmp_regs[0] = zis_object_from(module);
         const int ff = ZIS_STREAM_OBJ_MODE_IN | ZIS_STREAM_OBJ_TEXT | ZIS_STREAM_OBJ_UTF8;
         struct zis_stream_obj *f = zis_stream_obj_new_file(z, file, ff);
-        init_func = zis_assemble_func_from_text(z, f);
-        if (!init_func) {
-            return z->callstack->frame[0];
+        var.init_func = zis_assemble_func_from_text(z, f);
+        if (!var.init_func) {
+            status = ZIS_THR;
+            break;
         }
-        if (zis_unlikely((void *)module != (void *)tmp_regs[0])) {
-            assert(zis_object_type(tmp_regs[0]) == z->globals->type_Module);
-            module = zis_object_cast(tmp_regs[0], struct zis_module_obj);
-        }
-        zis_callstack_frame_free_temp(z, 1);
-        zis_func_obj_set_module(z, init_func, module);
+        zis_func_obj_set_module(z, var.init_func, var.module);
         break;
     }
 #endif // ZIS_FEATURE_ASM
@@ -363,40 +365,35 @@ static struct zis_object *module_loader_load_from_file(
         zis_context_panic(z, ZIS_CONTEXT_PANIC_ABORT); // Not implemented.
     }
 
-    if (zis_module_obj_do_init(z, init_func) == ZIS_THR) {
-        return z->callstack->frame[0];
-    }
+    if (status == ZIS_OK)
+        status = zis_module_obj_do_init(z, var.init_func);
 
-    return NULL;
+    zis_locals_drop(z, var);
+    assert(status == ZIS_OK || status == ZIS_THR);
+    return status == ZIS_OK;
 }
 
 /// Try to Load an embedded module.
 /// Returns whether found and loaded.
-static struct zis_module_obj *module_loader_try_load_from_embedded(
+static bool module_loader_try_load_from_embedded(
     struct zis_context *z,
-    const struct zis_symbol_obj *name_sym
+    const struct zis_symbol_obj *name_sym,
+    struct zis_module_obj *module
 ) {
     char name_str[64];
     const size_t name_sz = zis_symbol_obj_data_size(name_sym);
     if (name_sz >= sizeof name_str)
-        return NULL; // TODO: handles names longer than 64.
+        return false; // TODO: handles names longer than 64.
     memcpy(name_str, zis_symbol_obj_data(name_sym), name_sz);
     name_str[name_sz] = 0;
 
     const struct zis_native_module_def *mod_def = find_embedded_module(name_str);
     if (!mod_def)
-        return NULL;
+        return false;
 
-    struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 2);
-    struct zis_module_obj *module = zis_module_obj_new_r(z, tmp_regs, true);
     int init_status = zis_module_obj_do_init(z, zis_module_obj_load_native_def(z, module, mod_def));
     assert(init_status == ZIS_OK), zis_unused_var(init_status);
-    if (zis_unlikely((void *)tmp_regs[0] != (void *)module)) {
-        assert(zis_object_type(tmp_regs[0]) == z->globals->type_Module);
-        module = zis_object_cast(tmp_regs[0], struct zis_module_obj);
-    }
-    zis_callstack_frame_free_temp(z, 2);
-    return module;
+    return true;
 }
 
 /* ----- public functions --------------------------------------------------- */
@@ -412,8 +409,7 @@ struct zis_module_loader *zis_module_loader_create(struct zis_context *z) {
     zis_objmem_add_gc_root(z, &ml->data, module_loader_data_gc_visitor);
 
     ml->data.search_path = zis_array_obj_new(z, NULL, 0);
-    ml->data.loaded_modules =
-        zis_map_obj_new_r(z, (struct zis_object **)&ml->data.loaded_modules, 0.0f, 8);
+    ml->data.loaded_modules = zis_map_obj_new(z, 0.0f, 8);
 
     zis_debug_log(TRACE, "Loader", "new module loader %p", (void *)ml);
     return ml;
@@ -483,38 +479,31 @@ void zis_module_loader_add_loaded(
                 sub_module_name, zis_object_from(module)
             );
         } else {
-            const size_t tmp_regs_n = 9;
-            struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, tmp_regs_n);
-            // ~~ tmp_regs[0] = name, tmp_regs[1] = sub_name, tmp_regs[2] = mod, tmp_regs[3] = map, tmp_regs[4..7] = tmp, tmp_regs[8] = old_entry ~~
-
-            tmp_regs[0] = zis_object_from(module_name),
-            tmp_regs[1] = zis_object_from(sub_module_name),
-            tmp_regs[2] = zis_object_from(module);
+            zis_locals_decl(
+                z, var,
+                struct zis_symbol_obj *module_name, *sub_module_name;
+                struct zis_module_obj *module;
+                struct zis_map_obj *map;
+                struct zis_object *old_entry;
+            );
+            var.module_name = module_name;
+            var.sub_module_name = sub_module_name;
+            var.module = module;
+            var.old_entry = zis_smallint_to_ptr(0);
 
             bool has_init = false;
             if (entry_type == g->type_Module) {
-                tmp_regs[8] = entry;
+                var.old_entry = entry;
                 has_init = true;
             }
 
-            zis_map_obj_new_r(z, &tmp_regs[3], 0.0f, 2);
-            if (has_init) {
-                tmp_regs[4] = tmp_regs[3],
-                tmp_regs[5] = zis_object_from(g->sym_init),
-                tmp_regs[6] = tmp_regs[8];
-                zis_map_obj_set_r(z, tmp_regs + 4);
-            }
-            tmp_regs[4] = tmp_regs[3],
-            tmp_regs[5] = tmp_regs[1],
-            tmp_regs[6] = tmp_regs[2];
-            zis_map_obj_set_r(z, tmp_regs + 4);
+            var.map = zis_map_obj_new(z, 0.0f, 2);
+            if (has_init)
+                zis_map_obj_set(z, var.map, zis_object_from(g->sym_init), var.old_entry);
+            zis_map_obj_set(z, var.map, zis_object_from(var.sub_module_name), zis_object_from(var.module));
+            zis_map_obj_set(z, d->loaded_modules, zis_object_from(var.module_name), zis_object_from(var.map));
 
-            tmp_regs[4] = zis_object_from(d->loaded_modules),
-            tmp_regs[5] = tmp_regs[0],
-            tmp_regs[6] = tmp_regs[3];
-            zis_map_obj_set_r(z, tmp_regs + 4);
-
-            zis_callstack_frame_free_temp(z, tmp_regs_n);
+            zis_locals_drop(z, var);
         }
     } else {
         if (entry_type == g->type_Map) {
@@ -555,59 +544,49 @@ struct zis_module_obj *zis_module_loader_get_loaded(
     return NULL;
 }
 
-static struct zis_module_obj *_module_loader_load_top(
+static bool _module_loader_load_top(
     struct zis_context *z,
-    struct zis_module_obj *top_module /* = NULL */,
-    struct zis_symbol_obj *module_name
+    struct zis_module_obj *_module,
+    struct zis_symbol_obj *_module_name
 ) {
     struct module_loader_data *const d = &z->module_loader->data;
 
-    // Maybe it is an embedded module.
-    {
-        struct zis_module_obj *mod =
-            module_loader_try_load_from_embedded(z, module_name);
-        // FIXME: load to `top_module` if given.
-        if (mod)
-            return mod;
-    }
+    zis_locals_decl(
+        z, var,
+        struct zis_module_obj *module;
+        struct zis_symbol_obj *module_name;
+    );
+    var.module = _module;
+    var.module_name = _module_name;
 
-    // Allocate a path buffer.
-    zis_path_char_t *path_buffer = zis_path_alloc(ZIS_PATH_MAX);
+    // Maybe it is an embedded module.
+    if (module_loader_try_load_from_embedded(z, var.module_name, var.module)) {
+        zis_locals_drop(z, var);
+        return var.module;
+    }
 
     // Search for the module file.
+    zis_path_char_t *path_buffer = zis_path_alloc(ZIS_PATH_MAX);
     const enum module_loader_module_file_type file_type =
-        module_loader_search(z, d, path_buffer, module_name);
+        module_loader_search(z, d, path_buffer, var.module_name);
     if (file_type == MOD_FILE_NOT_FOUND) {
-        z->callstack->frame[0] = zis_object_from(zis_exception_obj_format(
+        zis_context_set_reg0(z, zis_object_from(zis_exception_obj_format(
             z, "sys", NULL, "no module named `%.*s'",
-            (int)zis_symbol_obj_data_size(module_name),
-            zis_symbol_obj_data(module_name)
-        ));
-        return NULL;
+            (int)zis_symbol_obj_data_size(var.module_name),
+            zis_symbol_obj_data(var.module_name)
+        )));
+        zis_locals_drop(z, var);
+        return false;
     }
-    module_name = NULL; // DO NOT use it anymore!
 
     // Load module from the found file.
-    if (!top_module) {
-        struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 2);
-        top_module = zis_module_obj_new_r(z, tmp_regs, true);
-        zis_callstack_frame_free_temp(z, 2);
-    }
-    struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 1);
-    tmp_regs[0] = zis_object_from(top_module);
-    struct zis_object *err = module_loader_load_from_file(z, path_buffer, file_type, top_module);
-    assert(zis_object_type(tmp_regs[0]) == z->globals->type_Module);
-    top_module = zis_object_cast(tmp_regs[0], struct zis_module_obj);
-    zis_callstack_frame_free_temp(z, 1);
+    const bool ok = module_loader_load_from_file(z, path_buffer, file_type, var.module);
 
-    // Free the path buffer.
+    // Clean up.
     zis_mem_free(path_buffer);
+    zis_locals_drop(z, var);
 
-    if (err) {
-        z->callstack->frame[0] = err;
-        return NULL;
-    }
-    return top_module;
+    return ok;
 }
 
 static bool _module_loader_load_sub(
@@ -620,103 +599,81 @@ static bool _module_loader_load_sub(
 }
 
 struct zis_module_obj *zis_module_loader_import(
-    struct zis_context *z, struct zis_module_obj *module /* = NULL */,
-    struct zis_symbol_obj *module_name, struct zis_symbol_obj *sub_module_name /* = NULL */,
+    struct zis_context *z, struct zis_module_obj *_module /* = NULL */,
+    struct zis_symbol_obj *_module_name, struct zis_symbol_obj *_sub_module_name /* = NULL */,
     int flags
 ) {
     // Check whether the module has been loaded.
     bool found_in_loaded = false;
-    if (flags & ZIS_MOD_LDR_SEARCH_LOADED && !module) {
-        assert(!module);
-        module = zis_module_loader_get_loaded(z, module_name);
-        if (module) {
+    if (flags & ZIS_MOD_LDR_SEARCH_LOADED && !_module) {
+        _module = zis_module_loader_get_loaded(z, _module_name);
+        if (_module) {
             found_in_loaded = true;
-            if (!sub_module_name)
-                return module;
+            if (!_sub_module_name)
+                return _module;
         }
     }
 
-    // ~~ tmp_regs = { [0] = module, [1] = module_name, [2] = sub_module_name? } ~~
-    const size_t tmp_regs_n = 3;
-    struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, tmp_regs_n);
+    zis_locals_decl(
+        z, var,
+        struct zis_module_obj *module;
+        struct zis_symbol_obj *module_name, *sub_module_name;
+    );
+    zis_locals_zero(z, var);
+    var.module_name = _module_name;
+    if (_sub_module_name)
+        var.sub_module_name = _sub_module_name;
+    var.module = _module ? _module : zis_module_obj_new(z, true);
 
-    tmp_regs[1] = zis_object_from(module_name);
-    if (sub_module_name)
-        tmp_regs[2] = zis_object_from(sub_module_name);
+    bool ok;
 
-#define PULL_REG_VARS() \
-    do {                \
-        assert(zis_object_type(tmp_regs[0]) == z->globals->type_Module); \
-        module = zis_object_cast(tmp_regs[0], struct zis_module_obj);    \
-        assert(zis_object_type(tmp_regs[1]) == z->globals->type_Symbol); \
-        module_name = zis_object_cast(tmp_regs[1], struct zis_symbol_obj); \
-        if (sub_module_name) {                                           \
-            assert(zis_object_type(tmp_regs[2]) == z->globals->type_Symbol); \
-            sub_module_name = zis_object_cast(tmp_regs[2], struct zis_symbol_obj); \
-        }               \
-    } while (0)
-
-    /// Do load.
-    if (found_in_loaded) {
-        tmp_regs[0] = zis_object_from(module);
-    } else {
-        module = _module_loader_load_top(z, module, module_name);
-        if (!module)
+    // Load and save the module.
+    if (!found_in_loaded) {
+        ok = _module_loader_load_top(z, var.module, var.module_name);
+        if (!ok)
             goto do_return;
-        tmp_regs[0] = zis_object_from(module);
-        PULL_REG_VARS();
-    }
-
-    // Save the loaded module.
-    if (!found_in_loaded && (flags & ZIS_MOD_LDR_UPDATE_LOADED)) {
-        zis_module_loader_add_loaded(z, module_name, NULL, module);
-        PULL_REG_VARS();
+        if (flags & ZIS_MOD_LDR_UPDATE_LOADED) {
+            zis_module_loader_add_loaded(z, var.module_name, NULL, var.module);
+        }
     }
 
     // Load sub-module.
-    if (sub_module_name && !zis_module_obj_get(module, sub_module_name)) {
-        if (!_module_loader_load_sub(z, module, module_name, sub_module_name, flags))
+    if (_sub_module_name && !zis_module_obj_get(var.module, var.sub_module_name)) {
+        ok = _module_loader_load_sub(z, var.module, var.module_name, var.sub_module_name, flags);
+        if (!ok)
             goto do_return;
-        PULL_REG_VARS();
     }
 
 do_return:
-    zis_callstack_frame_free_temp(z, tmp_regs_n);
-    return module;
+    zis_locals_drop(z, var);
+    return ok ? var.module : NULL;
 }
 
 struct zis_module_obj *zis_module_loader_import_file(
-    struct zis_context *z, struct zis_module_obj *module /* = NULL */,
-    struct zis_path_obj *file
+    struct zis_context *z, struct zis_module_obj *_module /* = NULL */,
+    struct zis_path_obj *_file
 ) {
-    const zis_path_char_t *file_path = zis_path_obj_data(file);
     enum module_loader_module_file_type file_type =
-        module_loader_load_guess_file_type(file_path);
+        module_loader_load_guess_file_type(zis_path_obj_data(_file));
     if (file_type == MOD_FILE_NOT_FOUND) {
-        z->callstack->frame[0] = zis_object_from(zis_exception_obj_format(
-            z, "sys", NULL, "not a module file: %" ZIS_PATH_STR_PRI, file_path
-        ));
+        zis_context_set_reg0(z, zis_object_from(zis_exception_obj_format(
+            z, "sys", NULL, "not a module file: %" ZIS_PATH_STR_PRI, zis_path_obj_data(_file)
+        )));
         return NULL;
     }
 
-    if (!module) {
-        struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 3);
-        tmp_regs[2] = zis_object_from(file);
-        module = zis_module_obj_new_r(z, tmp_regs, true);
-        zis_callstack_frame_free_temp(z, 3);
-        file = zis_object_cast(tmp_regs[2], struct zis_path_obj);
-    }
+    zis_locals_decl(
+        z, var,
+        struct zis_path_obj *file;
+        struct zis_module_obj *module;
+    );
+    var.file = _file;
+    var.module = _module ? _module : zis_module_obj_new(z, true);
 
-    struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 1);
-    tmp_regs[0] = zis_object_from(module);
-    struct zis_object *err = module_loader_load_from_file(z, file_path, file_type, module);
-    assert(zis_object_type(tmp_regs[0]) == z->globals->type_Module);
-    module = zis_object_cast(tmp_regs[0], struct zis_module_obj);
-    zis_callstack_frame_free_temp(z, 1);
+    const bool ok = module_loader_load_from_file(
+        z, zis_path_obj_data(var.file), file_type, var.module
+    );
 
-    if (err) {
-        z->callstack->frame[0] = err;
-        return NULL;
-    }
-    return module;
+    zis_locals_drop(z, var);
+    return ok ? var.module : NULL;
 }

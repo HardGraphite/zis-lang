@@ -5,7 +5,6 @@
 #include <stdarg.h>
 
 #include "attributes.h"
-#include "compat.h"
 #include "object.h"
 
 struct zis_context;
@@ -26,13 +25,6 @@ struct zis_exception_obj {
 struct zis_exception_obj *zis_exception_obj_new(
     struct zis_context *z,
     struct zis_object *type, struct zis_object *what, struct zis_object *data
-);
-
-/// Create an `Exception` object.
-/// R = { [0] = type , [1] = what , [2] = data }.
-struct zis_exception_obj *zis_exception_obj_new_r(
-    struct zis_context *z,
-    struct zis_object *regs[ZIS_PARAMARRAY_STATIC 3]
 );
 
 /// Create an `Exception` with formatted string as field `what`.

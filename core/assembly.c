@@ -11,6 +11,7 @@
 
 #include "attributes.h"
 #include "debug.h"
+#include "locals.h"
 
 /* ----- constants and lookup-tables ---------------------------------------- */
 
@@ -260,7 +261,7 @@ struct zis_assembler *zis_assembler_create(
     }
 
     as->func_constants = zis_array_obj_new(z, NULL, 0);
-    as->func_symbols = zis_map_obj_new_r(z, (struct zis_object **)&as->func_symbols, 1.5f, 0);
+    as->func_symbols = zis_map_obj_new(z, 1.5f, 0);
 
     return as;
 }
@@ -776,7 +777,7 @@ struct zis_func_obj *zis_assemble_func_from_text(
         exc_obj = tas_error_exception(&context);
     }
 
-    z->callstack->frame[0] = zis_object_from(exc_obj);
+    zis_context_set_reg0(z, zis_object_from(exc_obj));
     return NULL;
 }
 
@@ -832,30 +833,24 @@ static void dump_instr(
 }
 
 int zis_disassemble_bytecode(
-    struct zis_context *z, const struct zis_func_obj *func_obj,
+    struct zis_context *z, const struct zis_func_obj *_func_obj,
     int (*fn)(const struct zis_disassemble_result *, void *), void *fn_arg
 ) {
     int fn_ret = 0;
     struct zis_disassemble_result dis_res;
 
-    size_t tmp_regs_n = 1;
-    struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, tmp_regs_n);
-    tmp_regs[0] = zis_object_from(func_obj);
+    zis_locals_decl_1(z, var, const struct zis_func_obj *func_obj);
+    var.func_obj = _func_obj;
 
-    for (size_t i = 0, n = zis_func_obj_bytecode_length(func_obj); i < n; i++) {
-        if ((void *)func_obj != (void *)tmp_regs[0]) {
-            assert(zis_object_type(tmp_regs[0]) != z->globals->type_Function);
-            func_obj = zis_object_cast(tmp_regs[0], struct zis_func_obj);
-        }
-        const zis_instr_word_t instr = func_obj->bytecode[i];
+    for (size_t i = 0, n = zis_func_obj_bytecode_length(var.func_obj); i < n; i++) {
+        const zis_instr_word_t instr = var.func_obj->bytecode[i];
         dump_instr(instr, &dis_res);
         dis_res.address = (unsigned int)i;
         if ((fn_ret = fn(&dis_res, fn_arg)))
             return fn_ret;
     }
 
-    zis_callstack_frame_free_temp(z, tmp_regs_n);
-
+    zis_locals_drop(z, var);
     return fn_ret;
 }
 

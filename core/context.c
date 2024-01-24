@@ -26,16 +26,13 @@
 extern const struct zis_native_module_def ZIS_NATIVE_MODULE_VARNAME(prelude);
 
 zis_cold_fn static void context_load_builtin_modules(struct zis_context *z) {
-    int status;
-
-    status = zis_module_obj_do_init(
-        z,
-        zis_module_obj_load_native_def(
-            z, z->globals->val_mod_prelude,
-            &ZIS_NATIVE_MODULE_VARNAME(prelude)
-        )
+    const int flags = ZIS_MOD_LDR_UPDATE_LOADED;
+    struct zis_module_obj *x;
+    x = zis_module_loader_import(
+        z, z->globals->val_mod_prelude,
+        zis_symbol_registry_get(z, "prelude", (size_t)-1), NULL, flags
     );
-    zis_unused_var(status), assert(status == ZIS_OK);
+    assert(x == z->globals->val_mod_prelude), zis_unused_var(x);
 }
 
 /* ----- init: read environment variables ----------------------------------- */
@@ -129,18 +126,11 @@ zis_nodiscard struct zis_context *zis_context_create(void) {
     z->symbol_registry = zis_symbol_registry_create(z);
     _zis_locals_root_init(&z->locals_root, z);
 
-    // Allow use of `zis_callstack_frame_alloc_temp()` and `zis_callstack_frame_free_temp()`.
-    // See `zis_native_block()`.
-    zis_callstack_enter(z->callstack, 1, NULL, z->callstack->frame);
-
     z->globals = zis_context_globals_create(z);
     z->module_loader = zis_module_loader_create(z);
 
     context_load_builtin_modules(z);
     context_read_environ_path(z);
-
-    zis_callstack_leave(z->callstack);
-    assert(zis_callstack_empty(z->callstack));
 
     assert(!z->panic_handler);
 
@@ -157,6 +147,14 @@ void zis_context_destroy(struct zis_context *z) {
     zis_callstack_destroy(z->callstack, z);
     zis_objmem_context_destroy(z->objmem_context);
     zis_mem_free(z);
+}
+
+void zis_context_set_reg0(struct zis_context *z, struct zis_object *v) {
+    z->callstack->frame[0] = v;
+}
+
+struct zis_object *zis_context_get_reg0(struct zis_context *z) {
+    return z->callstack->frame[0];
 }
 
 zis_noreturn void zis_context_panic(struct zis_context *z, enum zis_context_panic_reason r) {

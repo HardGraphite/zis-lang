@@ -125,6 +125,8 @@ However, this is the only way to allocate slots of arbitrary size from the stack
 
 #### Callstack registers as arguments
 
+**This approach has been deprecated. DO NOT use it if no necessary.**
+
 A function may accept a vector of callstack registers
 instead of allocated temporary ones.
 
@@ -140,6 +142,7 @@ void xyz_obj_add_r(zis_context *z, struct zis_object *regs[static 3]) {
     regs[2] = xyz_adder_obj_add(adder, a, b);
 }
 ```
+
 Do not forget the function name suffix "`_r`" and the "`R = {...}`" comment!
 Since some compilers do not support the `static` keyword in a parameter array declaration,
 you may need the macro `ZIS_PARAMARRAY_STATIC` in file "`compat.h`".

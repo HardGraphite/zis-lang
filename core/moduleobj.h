@@ -3,7 +3,6 @@
 #pragma once
 
 #include "attributes.h"
-#include "compat.h"
 #include "object.h"
 
 #include "arrayobj.h"
@@ -24,10 +23,8 @@ struct zis_module_obj {
 };
 
 /// Create an empty `Module` object.
-/// R: { [0] = out_module, [1] = tmp }
-struct zis_module_obj *zis_module_obj_new_r(
+struct zis_module_obj *zis_module_obj_new(
     struct zis_context *z,
-    struct zis_object *regs[ZIS_PARAMARRAY_STATIC 2],
     bool parent_prelude
 );
 

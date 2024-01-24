@@ -27,7 +27,7 @@ zis_noinline zis_cold_fn static void
 format_error_type(struct zis_context *z, struct zis_object *fn) {
     struct zis_exception_obj *exc =
         zis_exception_obj_format(z, "type", fn, "not callable");
-    z->callstack->frame[0] = zis_object_from(exc);
+    zis_context_set_reg0(z, zis_object_from(exc));
 }
 
 zis_noinline zis_cold_fn static void
@@ -47,7 +47,7 @@ format_error_argc(struct zis_context *z, struct zis_func_obj *fn, size_t argc) {
         "wrong number of arguments (given %zu, expected %s%zu)",
         argc, expected_prefix, expected_argc
     );
-    z->callstack->frame[0] = zis_object_from(exc);
+    zis_context_set_reg0(z, zis_object_from(exc));
 }
 
 struct invocation_info {
@@ -469,16 +469,14 @@ _interp_loop:
         struct zis_object **tgt_p = bp + tgt;
         struct zis_object **val_p = bp + val_start, **val_end_p = val_p + val_count * 2;
         BOUND_CHECK_REG(tgt_p);
-        zis_map_obj_new_r(z, tgt_p, 0.0f, val_count);
+        *tgt_p = zis_object_from(zis_map_obj_new(z, 0.0f, val_count));
         if (val_count) {
             BOUND_CHECK_REG(val_end_p - 1);
-            struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 4);
             for (; val_p < val_end_p; val_p += 2) {
-                tmp_regs[0] = *tgt_p, tmp_regs[1] = val_p[0], tmp_regs[2] = val_p[1];
-                if (zis_map_obj_set_r(z, tmp_regs) != ZIS_OK)
+                struct zis_map_obj *map = zis_object_cast(*tgt_p, struct zis_map_obj);
+                if (zis_map_obj_set(z, map, val_p[0], val_p[1]) != ZIS_OK)
                     THROW_REG0;
             }
-            zis_callstack_frame_free_temp(z, 4);
             assert(stack->top == sp);
         }
         IP_ADVANCE;
