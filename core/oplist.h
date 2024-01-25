@@ -2,7 +2,7 @@
 
 #pragma once
 
-#define ZIS_OP_LIST_LEN  17
+#define ZIS_OP_LIST_LEN  34
 
 #define ZIS_OP_LIST_MAX_LEN  (127 + 1)
 
@@ -10,6 +10,7 @@
 #define ZIS_OP_LIST \
     E(0x00, NOP     ) \
     E(0x01, ARG     ) \
+    E(0x03, BRK     ) \
     E(0x04, LDNIL   ) \
     E(0x05, LDBLN   ) \
     E(0x06, LDCON   ) \
@@ -25,16 +26,42 @@
     E(0x13, CALL    ) \
     E(0x15, CALLV   ) \
     E(0x16, CALLP   ) \
+    E(0x18, IMP     ) \
+    E(0x19, IMPSUB  ) \
+    E(0x1a, LDLOC   ) \
+    E(0x1b, STLOC   ) \
+    E(0x1c, LDGLB   ) \
+    E(0x1d, STGLB   ) \
+    E(0x1e, LDGLBX  ) \
+    E(0x1f, STGLBX  ) \
+    E(0x20, LDFLDY  ) \
+    E(0x21, STFLDY  ) \
+    E(0x22, LDFLDX  ) \
+    E(0x23, STFLDX  ) \
+    E(0x24, LDELM   ) \
+    E(0x25, STELM   ) \
+    E(0x26, LDELMI  ) \
+    E(0x27, STELMI  ) \
 // ^^^ ZIS_OP_LIST ^^^
 
 /// List of ops (sorted by names, undefined ones included).
 #define ZIS_OP_LIST_FULL \
     E(0x01, ARG     , Aw   ) \
+    E(0x03, BRK     , Aw   ) \
     E(0x13, CALL    , Aw   ) \
     E(0x16, CALLP   , ABw  ) \
     E(0x15, CALLV   , ABC  ) \
+    E(0x18, IMP     , ABw  ) \
+    E(0x19, IMPSUB  , ABw  ) \
     E(0x05, LDBLN   , ABw  ) \
     E(0x06, LDCON   , ABw  ) \
+    E(0x24, LDELM   , ABC  ) \
+    E(0x26, LDELMI  , AsBC ) \
+    E(0x22, LDFLDX  , ABC  ) \
+    E(0x20, LDFLDY  , ABC  ) \
+    E(0x1c, LDGLB   , ABw  ) \
+    E(0x1e, LDGLBX  , ABw  ) \
+    E(0x1a, LDLOC   , ABw  ) \
     E(0x04, LDNIL   , ABw  ) \
     E(0x07, LDSYM   , ABw  ) \
     E(0x0b, MKARR   , ABC  ) \
@@ -45,30 +72,20 @@
     E(0x00, NOP     , Aw   ) \
     E(0x12, RET     , Aw   ) \
     E(0x11, RETNIL  , Aw   ) \
+    E(0x25, STELM   , ABC  ) \
+    E(0x27, STELMI  , AsBC ) \
+    E(0x23, STFLDX  , ABC  ) \
+    E(0x21, STFLDY  , ABC  ) \
+    E(0x1d, STGLB   , ABw  ) \
+    E(0x1f, STGLBX  , ABw  ) \
+    E(0x1b, STLOC   , ABw  ) \
     E(0x10, THR     , Aw   ) \
     E(0x02,         , X    ) \
-    E(0x03,         , X    ) \
     E(0x0d,         , X    ) \
     E(0x0e,         , X    ) \
     E(0x0f,         , X    ) \
     E(0x14,         , X    ) \
     E(0x17,         , X    ) \
-    E(0x18,         , X    ) \
-    E(0x19,         , X    ) \
-    E(0x1a,         , X    ) \
-    E(0x1b,         , X    ) \
-    E(0x1c,         , X    ) \
-    E(0x1d,         , X    ) \
-    E(0x1e,         , X    ) \
-    E(0x1f,         , X    ) \
-    E(0x20,         , X    ) \
-    E(0x21,         , X    ) \
-    E(0x22,         , X    ) \
-    E(0x23,         , X    ) \
-    E(0x24,         , X    ) \
-    E(0x25,         , X    ) \
-    E(0x26,         , X    ) \
-    E(0x27,         , X    ) \
     E(0x28,         , X    ) \
     E(0x29,         , X    ) \
     E(0x2a,         , X    ) \

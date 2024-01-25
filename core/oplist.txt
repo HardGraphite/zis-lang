@@ -3,15 +3,16 @@
 ##
 
 # Syntax:
-#   <OPCODE>  <NAME>  <OPERAND>,<OPERAND>,... # <DESCRIPTION>
+#   <OPCODE>  <MNEMONIC>  <OPERAND>,<OPERAND>,... # <DESCRIPTION>
 #   # Comment.
 #
 # where <OPERAND> is:
 #   <NAME>:<TYPE><SIZE>
 # the <TYPE> is one of:
 #   - R (register index)
-#   - C (constant index)
+#   - K (constant index)
 #   - Y (symbol index)
+#   - G (global index)
 #   - I (signed integer)
 #   - U (unsigned integer)
 # the <SIZE> is one of:
@@ -20,16 +21,28 @@
 #   - 16
 #   - 25
 #
+# In the <MNEMONIC> part, there are common prefixes:
+#   - "LD-" = load ...
+#   - "ST-" = store ...
+#   - "MK-" = make ...
+# and suffixes:
+#   - "-X" = ... by index
+#   - "-Y" = ... by symbol (name)
+#   - "-K" = constant (constant index)
+#   - "-I" = integer constant
+#
 # DO NOT use semicolon anywhere in this file.
 
-#NR#  #NAME#    #OPERANDS#                       #DESCRIPTION#
+#NR# #MNEMONIC# #OPERANDS#                       #DESCRIPTION#
 
 0x00  NOP       unused:U25                       # No operation.
 0x01  ARG       data:U25                         # Extra arguments for other instructions.
 
+0x03  BRK       breakpoint_id:U25                # Debugger breakpoint. breakpoint_id=0 for unregistered breakpoints.
+
 0x04  LDNIL     tgt:R9,count:U16                 # Load nils: REG[tgt ... tgt+count-1] <- nil.
 0x05  LDBLN     tgt:R9,val:U16                   # Load a boolean object: REG[tgt] <- (val ? true : false).
-0x06  LDCON     tgt:R9,id:C16                    # Load a constant: REG[tgt] <- CONSTANTS[id].
+0x06  LDCON     tgt:R9,id:K16                    # Load a constant: REG[tgt] <- CONSTANTS[id].
 0x07  LDSYM     tgt:R9,id:Y16                    # Load a symbol: REG[tgt] <- SYMBOLS[id].
 
 0x08  MKINT     tgt:R9,val:I16                   # Create an Int: REG[tgt] <- Int(val).
@@ -45,3 +58,24 @@
 0x13  CALL      ret_and_args:U25                 # Call REG[0] with arguments. The operands are: [24:20]=ret,[19:18]=argc,[17:12]=arg3,[11:6]=arg2,[5:0]=arg1.
 0x15  CALLV     ret:R9,arg_start:R8,arg_count:U8 # Call REG[0] with a vector of arguments REG[arg_start, ..., arg_start+arg_count-1].
 0x16  CALLP     ret:R9,args:R16                  # Call REG[0] with packed arguments REG[arg].
+
+0x18  IMP       tgt:R9,name:Y16                  # Import a module by name: REG[tgt] <- import( SYMBOLS[name] ).
+0x19  IMPSUB    top:R9,sub_name:Y16              # Import a submodule by name: REG[0], REG[top].SYMBOLS[name] <- import_sub(REG[top], SYMBOLS[name]).
+
+0x1a  LDLOC     val:R9,loc:R16                   # Load a local variable: REG[val] <- REG[loc].
+0x1b  STLOC     var:R9,loc:R16                   # Store a local variable: REG[loc] <- REG[val].
+
+0x1c  LDGLB     val:R9,name:Y16                  # Load a global variable by name: REG[val] <- GLOBALS[find_global(SYMBOLS[name])]. Will be replaced with LDGLBX after the first execution.
+0x1d  STGLB     val:R9,name:Y16                  # Store a global variable by name: GLOBALS[find_global(SYMBOLS[name])] <- REG[val]. Will be replaced with STGLBX after the first execution.
+0x1e  LDGLBX    val:R9,id:G16                    # Load a global variable by index: REG[val] <- GLOBALS[id].
+0x1f  STGLBX    val:R9,id:G16                    # Store a global variable by index: GLOBALS[id] <- REG[val].
+
+0x20  LDFLDY    name:Y9,fld:R8,obj:R8            # Load a field of an object by name: REG[fld] <- REG[obj] . SYMBOLS[name] .
+0x21  STFLDY    name:Y9,fld:R8,obj:R8            # Update a field of an object by name: REG[obj] . SYMBOLS[name] <- REG[fld].
+0x22  LDFLDX    index:Y9,fld:R8,obj:R8           # Load a field of an object by index: REG[fld] <- REG[obj] . index .
+0x23  STFLDX    index:Y9,fld:R8,obj:R8           # Update a field of an object by index: REG[obj] . index <- REG[fld].
+
+0x24  LDELM     key:R9,elm:R8,obj:R8             # Load an element: REG[elm] <- (REG[obj])[ REG[key] ].
+0x25  STELM     key:R9,elm:R8,obj:R8             # Store an element: (REG[obj])[ REG[key] ] <- REG[elm].
+0x26  LDELMI    key:I9,elm:R8,obj:R8             # Load an element by an integer key: REG[elm] <- (REG[obj])[ key ].
+0x27  STELMI    key:I9,elm:R8,obj:R8             # Store an element by an integer key: (REG[obj])[ key ] <- REG[elm].

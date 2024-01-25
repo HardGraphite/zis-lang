@@ -11,6 +11,7 @@
 struct zis_context;
 struct zis_module_obj;
 struct zis_object;
+struct zis_symbol_obj;
 
 /// Bytecode word.
 typedef uint32_t zis_func_obj_bytecode_word_t;
@@ -75,9 +76,10 @@ zis_func_obj_symbol_count(const struct zis_func_obj *self) {
 }
 
 /// Get a symbol from function symbol table.
-zis_static_force_inline struct zis_object *
+zis_static_force_inline struct zis_symbol_obj *
 zis_func_obj_symbol(const struct zis_func_obj *self, size_t id) {
-    return zis_array_slots_obj_get(self->_symbols, id);
+    struct zis_object *sym = zis_array_slots_obj_get(self->_symbols, id);
+    return zis_object_cast(sym, struct zis_symbol_obj);
 }
 
 /// Get the length of the constant table.

@@ -77,8 +77,8 @@ size_t zis_module_obj_find(
     struct zis_symbol_obj *name
 );
 
-/// Set module global variable.
-void zis_module_obj_set(
+/// Set module global variable. Returns the variable index.
+size_t zis_module_obj_set(
     struct zis_context *z, struct zis_module_obj *self,
     struct zis_symbol_obj *name, struct zis_object *value
 );

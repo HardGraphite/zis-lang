@@ -220,7 +220,7 @@ size_t zis_module_obj_find(
     return (size_t)index;
 }
 
-void zis_module_obj_set(
+size_t zis_module_obj_set(
     struct zis_context *z, struct zis_module_obj *self,
     struct zis_symbol_obj *name, struct zis_object *value
 ) {
@@ -259,6 +259,7 @@ void zis_module_obj_set(
         zis_locals_drop(z, var);
     }
     zis_array_slots_obj_set(self->_variables, index, value);
+    return index;
 }
 
 struct zis_object *zis_module_obj_get(
