@@ -10,6 +10,10 @@
 #define zis_round_up_to_n_pow2(to_n, num) \
     (((num) + ((to_n) - 1U)) & ~((to_n) - 1U))
 
+/// Check whether an unsigned integer `num` (of type `type`) is in range [`min`,`max`].
+#define zis_uint_in_range(type, num, min, max) \
+    ((type)(num) - (type)(min) <= (type)(max) - (type)(min))
+
 /* ----- hash functions ----------------------------------------------------- */
 
 /// Calculate hash code for a floating-point number.
