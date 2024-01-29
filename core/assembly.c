@@ -707,8 +707,8 @@ static struct zis_func_obj *tas_parse_func(
                 struct zis_object *v;
                 switch (toupper(line_result.pseudo.operands[0])) {
                 case 'I':
-                    v = zis_smallint_or_int_obj(
-                        tas->z, (zis_smallint_t)atoll(line_result.pseudo.operands + 2)
+                    v = zis_int_obj_or_smallint(
+                        tas->z, atoll(line_result.pseudo.operands + 2)
                     );
                     break;
                 case 'F':

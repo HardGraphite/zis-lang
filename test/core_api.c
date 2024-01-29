@@ -116,15 +116,55 @@ static void do_test_int64(zis_t z, int64_t v) {
     zis_test_assert_eq(value, v);
 }
 
+static void do_test_int_str(zis_t z, int64_t v) {
+    int status;
+    int64_t value;
+    char buf_v[80], buf_out[80];
+    size_t buf_out_sz;
+    zis_test_log(ZIS_TEST_LOG_TRACE, "v=%" PRIi64, v);
+    snprintf(buf_v, sizeof buf_v, "%" PRIi64, v);
+    status = zis_make_int_s(z, 0, buf_v, (size_t)-1, 10);
+    zis_test_assert_eq(status, ZIS_OK);
+    buf_out_sz = sizeof buf_out;
+    status = zis_read_int_s(z, 0, buf_out, &buf_out_sz, 10);
+    zis_test_assert_eq(status, ZIS_OK);
+    buf_out[buf_out_sz] = 0;
+    zis_test_assert_eq(sscanf(buf_out, "%" SCNi64, &value), 1);
+    zis_test_assert_eq(value, v);
+    zis_test_assert_eq(strcmp(buf_out, buf_v), 0);
+}
+
+static void do_test_int_str_2(zis_t z, const char *s, int base) {
+    int status;
+    char buf_out[128];
+    size_t buf_out_sz;
+    zis_test_log(ZIS_TEST_LOG_TRACE, "v=%s,base=%i", s, base);
+    status = zis_make_int_s(z, 0, s, (size_t)-1, base);
+    zis_test_assert_eq(status, ZIS_OK);
+    buf_out_sz = sizeof buf_out;
+    status = zis_read_int_s(z, 0, buf_out, &buf_out_sz, base);
+    zis_test_assert_eq(status, ZIS_OK);
+    buf_out[buf_out_sz] = 0;
+    zis_test_assert_eq(strcmp(buf_out, s), 0);
+}
+
 zis_test_define(test_int, z) {
-    for (int64_t i = INT8_MIN; i <= INT8_MAX; i++)
+    for (int64_t i = INT8_MIN; i <= INT8_MAX; i++) {
         do_test_int64(z, i);
-    for (int64_t i = ZIS_SMALLINT_MIN - 5; i <= ZIS_SMALLINT_MIN + 5; i++)
+        do_test_int_str(z, i);
+    }
+    for (int64_t i = ZIS_SMALLINT_MIN - 5; i <= ZIS_SMALLINT_MIN + 5; i++) {
         do_test_int64(z, i);
-    for (int64_t i = ZIS_SMALLINT_MAX - 5; i <= ZIS_SMALLINT_MAX + 5; i++)
+        do_test_int_str(z, i);
+    }
+    for (int64_t i = ZIS_SMALLINT_MAX - 5; i <= ZIS_SMALLINT_MAX + 5; i++) {
         do_test_int64(z, i);
-    do_test_int64(z, INT64_MIN);
+        do_test_int_str(z, i);
+    }
+    do_test_int64(z, INT64_MIN + 1);
     do_test_int64(z, INT64_MAX);
+    do_test_int_str_2(z, "10000000000000000000000000000000000000000000000", 10);
+    do_test_int_str_2(z, "1234567890qwertyuiopasdfghjklzxcbnm", 36);
 }
 
 static void do_test_float(zis_t z, double v) {

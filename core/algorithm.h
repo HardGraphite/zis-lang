@@ -14,6 +14,9 @@
 #define zis_uint_in_range(type, num, min, max) \
     ((type)(num) - (type)(min) <= (type)(max) - (type)(min))
 
+/// $f(a, x) = \\log_{a}^{x}$.
+double zis_math_log(double a, double x);
+
 /* ----- hash functions ----------------------------------------------------- */
 
 /// Calculate hash code for a floating-point number.

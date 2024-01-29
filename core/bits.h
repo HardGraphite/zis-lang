@@ -21,6 +21,15 @@
     ) ((X)) \
 // ^^^ zis_bits_count_tz() ^^^
 
+/// Count leading zero bits. `X` must not be 0.
+#define zis_bits_count_lz(X) \
+    (unsigned int) _Generic((X), \
+        unsigned long long : __builtin_clzll, \
+        unsigned long      : __builtin_clzl , \
+        unsigned int       : __builtin_clz    \
+    ) ((X)) \
+// ^^^ zis_bits_count_lz() ^^^
+
 #elif defined _MSC_VER
 
 #define zis_bits_count_tz(X) \
@@ -31,6 +40,14 @@
     ) ((X)) \
 // ^^^ zis_bits_count_tz() ^^^
 
+#define zis_bits_count_lz(X) \
+    _Generic((X),             \
+        unsigned long long : _zis_bits_count_lz_u64_msvc, \
+        unsigned long      : _zis_bits_count_lz_u32_msvc, \
+        unsigned int       : _zis_bits_count_lz_u32_msvc  \
+    ) ((X)) \
+// ^^^ zis_bits_count_lz() ^^^
+
 static __forceinline unsigned int _zis_bits_count_tz_u32_msvc(unsigned long mask) {
     unsigned long index;
     _BitScanForward(&index, mask);
@@ -40,6 +57,18 @@ static __forceinline unsigned int _zis_bits_count_tz_u32_msvc(unsigned long mask
 static __forceinline unsigned int _zis_bits_count_tz_u64_msvc(unsigned __int64 mask) {
     unsigned long index;
     _BitScanForward64(&index, mask);
+    return (unsigned int)index;
+}
+
+static __forceinline unsigned int _zis_bits_count_lz_u32_msvc(unsigned long mask) {
+    unsigned long index;
+    _BitScanReverse(&index, mask);
+    return (unsigned int)index;
+}
+
+static __forceinline unsigned int _zis_bits_count_lz_u64_msvc(unsigned __int64 mask) {
+    unsigned long index;
+    _BitScanReverse64(&index, mask);
     return (unsigned int)index;
 }
 

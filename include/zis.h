@@ -276,6 +276,31 @@ ZIS_API int zis_make_int(zis_t z, unsigned int reg, int64_t val) ZIS_NOEXCEPT;
 ZIS_API int zis_read_int(zis_t z, unsigned int reg, int64_t *val) ZIS_NOEXCEPT;
 
 /**
+ * Create an `Int` object from string.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param str pointer to the integer string (prefix "-" is allowed)
+ * @param str_sz size in bytes of the string `str`, or `-1` to take `str` as a NUL-terminated string
+ * @param base integer string base; the absolute value of which must be in the range `[2,36]`
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_ARG` (illegal `str`).
+ */
+ZIS_API int zis_make_int_s(zis_t z, unsigned int reg, const char *str, size_t str_sz, int base) ZIS_NOEXCEPT;
+
+/**
+ * Represent an `Int` object as string.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param buf pointer to a buffer to store UTF-8 string, or `NULL` to get expected buffer size
+ * @param buf_sz pointer to a `size_t` value that tells the buffer size and receives written size
+ * @param base integer string base, the absolute value of which must be in the range `[2,36]`; negative for uppercase letters
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_TYPE` (wrong type of `reg`),
+ * `ZIS_E_BUF` (`buf` is not big enough).
+ */
+ZIS_API int zis_read_int_s(zis_t z, unsigned int reg, char *buf, size_t *buf_sz, int base) ZIS_NOEXCEPT;
+
+/**
  * Create an `Float` object.
  *
  * @param z zis instance

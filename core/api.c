@@ -2,6 +2,7 @@
 
 #include <errno.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "attributes.h"
@@ -192,7 +193,7 @@ ZIS_API int zis_make_int(zis_t z, unsigned int reg, int64_t val) {
     struct zis_object **obj_ref = api_ref_local(z, reg);
     if (zis_unlikely(!obj_ref))
         return ZIS_E_IDX;
-    *obj_ref = zis_smallint_or_int_obj(z, val);
+    *obj_ref = zis_int_obj_or_smallint(z, val);
     return ZIS_OK;
 }
 
@@ -206,13 +207,47 @@ ZIS_API int zis_read_int(zis_t z, unsigned int reg, int64_t *val) {
     }
     if (zis_object_type(obj) == z->globals->type_Int) {
         const int64_t v_i64 =
-            zis_int_obj_value_l(zis_object_cast(obj, struct zis_int_obj));
+            zis_int_obj_value_i(zis_object_cast(obj, struct zis_int_obj));
         if (zis_unlikely(v_i64 == INT64_MIN && errno == ERANGE))
             return ZIS_E_BUF;
         *val = v_i64;
         return ZIS_OK;
     }
     return ZIS_E_TYPE;
+}
+
+ZIS_API int zis_make_int_s(zis_t z, unsigned int reg, const char *str, size_t str_sz, int base) {
+    struct zis_object **obj_ref = api_ref_local(z, reg);
+    if (zis_unlikely(!obj_ref))
+        return ZIS_E_IDX;
+    if (str_sz == (size_t)-1)
+        str_sz = strlen(str);
+    base = abs(base);
+    if (zis_unlikely(!(str_sz && 2 <= base && base <= 36)))
+        return ZIS_E_ARG;
+    const char *const str_end = str + str_sz, *str_end_1 = str_end;
+    struct zis_object *obj = zis_int_obj_or_smallint_s(z, str, &str_end_1, base);
+    if (zis_unlikely(str_end != str_end_1))
+        return ZIS_E_ARG;
+    *obj_ref = obj;
+    return ZIS_OK;
+}
+
+ZIS_API int zis_read_int_s(zis_t z, unsigned int reg, char *buf, size_t *buf_sz, int base) {
+    struct zis_object *obj = api_get_local(z, reg);
+    if (zis_unlikely(!obj))
+        return ZIS_E_IDX;
+    size_t n;
+    if (zis_object_is_smallint(obj))
+        n = zis_smallint_to_str(zis_smallint_from_ptr(obj), buf, *buf_sz, base);
+    else if (zis_object_type(obj) == z->globals->type_Int)
+        n = zis_int_obj_value_s(zis_object_cast(obj, struct zis_int_obj), buf, *buf_sz, base);
+    else
+        return ZIS_E_TYPE;
+    if (zis_unlikely(n == (size_t)-1))
+        return ZIS_E_BUF;
+    *buf_sz = n;
+    return ZIS_OK;
 }
 
 ZIS_API int zis_make_float(zis_t z, unsigned int reg, double val) {
@@ -370,7 +405,7 @@ static int api_make_values_impl(
         }
 
         case 'i':
-            *ret_p = zis_smallint_or_int_obj(z, va_arg(x->ap, int64_t));
+            *ret_p = zis_int_obj_or_smallint(z, va_arg(x->ap, int64_t));
             break;
 
         case 'f':
@@ -664,7 +699,7 @@ do {                  \
             }
             CHECK_TYPE(Int);
             const int64_t val =
-                zis_int_obj_value_l(zis_object_cast(in_obj, struct zis_int_obj));
+                zis_int_obj_value_i(zis_object_cast(in_obj, struct zis_int_obj));
             if (zis_unlikely(val == INT64_MIN && errno == ERANGE)) {
                 status = ZIS_E_BUF;
                 goto do_return;

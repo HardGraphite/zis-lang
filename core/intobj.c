@@ -1,14 +1,71 @@
 #include "intobj.h"
 
+#include <ctype.h>
 #include <errno.h>
 #include <limits.h>
 #include <math.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <string.h>
 
+#include "algorithm.h"
+#include "bits.h"
 #include "context.h"
 #include "globals.h"
+#include "memory.h"
 #include "ndefutil.h"
 #include "objmem.h"
+
+/* ----- big int arithmetics ------------------------------------------------ */
+
+typedef uint32_t bigint_cell_t;
+typedef uint64_t bigint_2cell_t;
+
+#define BIGINT_CELL_MAX    UINT32_MAX
+#define BIGINT_CELL_C(X)   UINT32_C((X))
+#define BIGINT_CELL_WIDTH  32
+
+static_assert(BIGINT_CELL_WIDTH == sizeof(bigint_cell_t) * 8, "");
+
+/// a_v[a_len] = 0
+static void bigint_zero(bigint_cell_t *restrict a_v, unsigned int a_len) {
+    memset(a_v, 0, sizeof a_v[0] * a_len);
+}
+
+/// a_v[a_len] = a_v[a_len] * b + c ... carry
+static bigint_cell_t bigint_self_mul_add_1(
+    bigint_cell_t *restrict a_v, unsigned int a_len,
+    bigint_cell_t b,
+    bigint_cell_t c
+) {
+    bigint_cell_t carry = c;
+    for (unsigned int i = 0; i < a_len; i++) {
+        const bigint_2cell_t p = (bigint_2cell_t)a_v[i] * (bigint_2cell_t)b + carry;
+        a_v[i] = (bigint_cell_t)p;
+        carry  = (bigint_cell_t)(p >> BIGINT_CELL_WIDTH);
+    }
+    return carry;
+}
+
+/// a_v[a_len] = a_v[a_len] / b ... rem
+static bigint_cell_t bigint_self_dev_1(
+    bigint_cell_t *restrict a_v, unsigned int a_len,
+    bigint_cell_t b
+) {
+    assert(b);
+    bigint_cell_t rem = 0;
+    for (unsigned int i = a_len; i > 0; i--) {
+        const bigint_2cell_t a = a_v[i - 1] + ((bigint_2cell_t)rem << BIGINT_CELL_WIDTH);
+        const bigint_cell_t q = (bigint_cell_t)(a / b);
+        const bigint_cell_t r = (bigint_cell_t)(a % b);
+        a_v[i - 1] = q;
+        rem = r;
+    }
+    assert(rem < b);
+    return rem;
+}
+
+/* ----- int object --------------------------------------------------------- */
 
 struct zis_int_obj {
     ZIS_OBJECT_HEAD
@@ -16,7 +73,7 @@ struct zis_int_obj {
     const size_t _bytes_size; // !
     uint16_t cell_count;
     bool     negative;
-    uint64_t cells[];
+    bigint_cell_t cells[];
 };
 
 #define INT_OBJ_CELL_COUNT_MAX  UINT16_MAX
@@ -30,7 +87,7 @@ struct zis_int_obj *int_obj_alloc(struct zis_context *z, size_t cell_count) {
     assert(cell_count <= INT_OBJ_CELL_COUNT_MAX);
     struct zis_object *const obj = zis_objmem_alloc_ex(
         z, ZIS_OBJMEM_ALLOC_AUTO, z->globals->type_Int,
-        0, INT_OBJ_BYTES_FIXED_SIZE + cell_count * sizeof(uint64_t)
+        0, INT_OBJ_BYTES_FIXED_SIZE + cell_count * sizeof(bigint_cell_t)
     );
     struct zis_int_obj *const self = zis_object_cast(obj, struct zis_int_obj);
     self->cell_count = (uint16_t)cell_count;
@@ -40,49 +97,100 @@ struct zis_int_obj *int_obj_alloc(struct zis_context *z, size_t cell_count) {
 /// Maximum number of cells in this object.
 zis_unused_fn static size_t int_obj_cells_capacity(const struct zis_int_obj *self) {
     assert(self->_bytes_size >= INT_OBJ_BYTES_FIXED_SIZE);
-    return (self->_bytes_size - INT_OBJ_BYTES_FIXED_SIZE) / sizeof(uint64_t);
+    return (self->_bytes_size - INT_OBJ_BYTES_FIXED_SIZE) / sizeof(bigint_cell_t);
 }
 
-struct zis_int_obj *_zis_int_obj_new(struct zis_context *z, int64_t val) {
-    struct zis_int_obj *const self = int_obj_alloc(z, 1);
-    if (val >= 0) {
-        self->negative = false;
-        self->cells[0] = (uint64_t)val;
+struct zis_object *zis_int_obj_or_smallint(
+    struct zis_context *z, int64_t val
+) {
+    if (ZIS_SMALLINT_MIN <= val && val <= ZIS_SMALLINT_MAX)
+        return zis_smallint_to_ptr((zis_smallint_t)val);
+
+    const bool val_neg = val < 0;
+    const uint64_t val_abs = val_neg ? (uint64_t)-val : (uint64_t)val;
+
+    struct zis_int_obj *self;
+    if (val_abs <= BIGINT_CELL_MAX) {
+        self = int_obj_alloc(z, 1);
+        self->negative = val_neg;
+        self->cells[0] = (bigint_cell_t)val_abs;
     } else {
-        self->negative = true;
-        self->cells[0] = (uint64_t)-val;
+        static_assert(sizeof(bigint_cell_t) * 2 == sizeof val_abs, "");
+        self = int_obj_alloc(z, 2);
+        self->negative = val_neg;
+        self->cells[0] = (bigint_cell_t)val_abs;
+        self->cells[1] = (bigint_cell_t)(val_abs >> BIGINT_CELL_WIDTH);
     }
-    return self;
+    return zis_object_from(self);
 }
 
-int zis_int_obj_value_i(const struct zis_int_obj *self) {
-    const size_t cell_count = self->cell_count;
-    assert(cell_count);
-    if (cell_count == 1) {
-        const uint64_t val = self->cells[0];
-        if (val <= (uint64_t)INT_MAX) {
-            const int val_int = (int)val;
-            return self->negative ? -val_int : val_int;
-        } else if (self->negative && val == (uint64_t)-(int64_t)INT_MIN) {
-            errno = 0;
-            return INT_MIN;
+static unsigned int _char_to_num(int c) {
+    if (isdigit(c))
+        return c - '0';
+    if (isalpha(c))
+        return tolower(c) - 'a' + 10;
+    return UINT_MAX;
+}
+
+struct zis_object *zis_int_obj_or_smallint_s(
+    struct zis_context *z,
+    const char *restrict str, const char **restrict str_end_p,
+    unsigned int base
+) {
+    assert(str && str_end_p && str <= *str_end_p);
+    assert(2 <= base && base <= 36);
+
+    bool negative = false;
+    if (str < *str_end_p && str[0] == '-') {
+        negative = true;
+        str++;
+    }
+
+    const char *str_end = str;
+    for (
+        const char *const str_end_max = *str_end_p;
+        str_end <= str_end_max && _char_to_num(*str_end) < base;
+        str_end++
+    );
+    *str_end_p = str_end;
+    const unsigned int num_width = (unsigned int)ceil((double)(str_end - str) * log2(base));
+
+    if (num_width < ZIS_SMALLINT_WIDTH) {
+        zis_smallint_t num = 0;
+        for (const char *p = str; p < str_end; p++) {
+            num = num * base + _char_to_num(*p);
+            assert(0 <= num && num <= ZIS_SMALLINT_MAX);
         }
+        if (negative)
+            num = -num;
+        return zis_smallint_to_ptr(num);
+    } else {
+        const size_t cell_count =
+            zis_round_up_to_n_pow2(BIGINT_CELL_WIDTH, num_width) / BIGINT_CELL_WIDTH;
+        struct zis_int_obj *self = int_obj_alloc(z, cell_count);
+        self->negative = negative;
+        bigint_cell_t *cells = self->cells;
+        bigint_zero(cells, cell_count);
+        for (const char *p = str; p < str_end; p++) {
+            const bigint_cell_t c = bigint_self_mul_add_1(cells, cell_count, base, _char_to_num(*p));
+            assert(!c), zis_unused_var(c);
+        }
+        return zis_object_from(self);
     }
-    errno = ERANGE;
-    return INT_MIN;
 }
 
-int64_t zis_int_obj_value_l(const struct zis_int_obj *self) {
+int64_t zis_int_obj_value_i(const struct zis_int_obj *self) {
     const size_t cell_count = self->cell_count;
     assert(cell_count);
     if (cell_count == 1) {
-        const uint64_t val = self->cells[0];
-        if (val <= (uint64_t)INT64_MAX) {
-            const int64_t val_i64 = (int64_t)val;
-            return self->negative ? -val_i64 : val_i64;
-        } else if (self->negative && val == UINT64_C(0) - (uint64_t)INT64_MIN) {
-            errno = 0;
-            return INT64_MIN;
+        static_assert(sizeof(bigint_cell_t) < sizeof(int64_t), "");
+        const int64_t v = self->cells[0];
+        return self->negative ? -v : v;
+    } else if (cell_count == 2) {
+        static_assert(sizeof(bigint_cell_t) * 2 == sizeof(int64_t), "");
+        if (self->cells[1] <= UINT32_MAX / 2) {
+            const int64_t v = ((int64_t)self->cells[1] << BIGINT_CELL_WIDTH) | (int64_t)self->cells[0];
+            return self->negative ? -v : v;
         }
     }
     errno = ERANGE;
@@ -98,6 +206,99 @@ double zis_int_obj_value_f(const struct zis_int_obj *self) {
     }
     errno = ERANGE;
     return HUGE_VAL;
+}
+
+static const char digits_lower[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+static const char digits_upper[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+size_t zis_int_obj_value_s(const struct zis_int_obj *self, char *restrict buf, size_t buf_sz, int _base) {
+    const bool uppercase = _base < 0;
+    const unsigned int base = (unsigned int)abs(_base);
+    assert(2 <= base && base <= 36);
+    assert(self->cell_count);
+    assert(self->cells[self->cell_count - 1]);
+
+    if (!buf) {
+        const unsigned int num_width =
+            self->cell_count - 1 +
+            BIGINT_CELL_WIDTH - zis_bits_count_lz(self->cells[self->cell_count - 1]);
+        assert(num_width);
+        const unsigned int n_digits = (unsigned int)((double)num_width / log2(base)) + 1;
+        assert(n_digits);
+        return self->negative ? n_digits + 1 : n_digits;
+    }
+
+    const char *const digits = uppercase ? digits_upper : digits_lower;
+    const unsigned int cell_count = self->cell_count;
+    bigint_cell_t *cell_dup = zis_mem_alloc(sizeof(bigint_cell_t) * cell_count);
+    memcpy(cell_dup, self->cells, sizeof(bigint_cell_t) * cell_count);
+    char *p = buf + buf_sz;
+    for (unsigned int reset_cell_count = cell_count; reset_cell_count; ) {
+        if (p <= buf)
+            return (size_t)-1;
+        const bigint_cell_t r = bigint_self_dev_1(cell_dup, cell_count, base);
+        assert(r <= 36);
+        *--p = digits[r];
+        while (reset_cell_count && !cell_dup[reset_cell_count - 1])
+            reset_cell_count--;
+    }
+    zis_mem_free(cell_dup);
+    if (self->negative) {
+        if (p <= buf)
+            return (size_t)-1;
+        *--p = '-';
+    }
+    const size_t written_size = (size_t)(buf + buf_sz - p);
+    if (p != buf)
+        memmove(buf, p, written_size);
+    return written_size;
+}
+
+size_t zis_smallint_to_str(zis_smallint_t i, char *restrict buf, size_t buf_sz, int _base) {
+    const bool negative = i < 0;
+    zis_smallint_unsigned_t num =
+        negative ? (zis_smallint_unsigned_t)-i : (zis_smallint_unsigned_t)i;
+
+    const bool uppercase = _base < 0;
+    const unsigned int base = (unsigned int)abs(_base);
+    assert(2 <= base && base <= 36);
+
+    if (!num) {
+        if (buf) {
+            if (!buf_sz)
+                return (size_t)-1;
+            buf[0] = '0';
+        }
+        return 1;
+    }
+
+    if (!buf) {
+        const unsigned int num_width = sizeof(zis_smallint_t) * 8 - zis_bits_count_lz(num);
+        const unsigned int n_digits = (unsigned int)((double)num_width / log2(base)) + 1;
+        assert(n_digits);
+        return negative ? n_digits + 1 : n_digits;
+    }
+
+    const char *const digits = uppercase ? digits_upper : digits_lower;
+    char *p = buf + buf_sz;
+    while (num) {
+        if (p <= buf)
+            return (size_t)-1;
+        const zis_smallint_unsigned_t q = num / base;
+        const zis_smallint_unsigned_t r = num % base;
+        num = q;
+        assert(r <= 36);
+        *--p = digits[r];
+    }
+    if (negative) {
+        if (p <= buf)
+            return (size_t)-1;
+        *--p = '-';
+    }
+    const size_t written_size = (size_t)(buf + buf_sz - p);
+    if (p != buf)
+        memmove(buf, p, written_size);
+    return written_size;
 }
 
 ZIS_NATIVE_FUNC_LIST_DEF(
