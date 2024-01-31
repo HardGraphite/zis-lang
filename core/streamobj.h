@@ -168,3 +168,6 @@ zis_static_force_inline bool zis_stream_obj_write_char(
 
 /// Read characters to the buffer until an end-of-line char (including) or end of buffer.
 size_t zis_stream_obj_read_line(struct zis_stream_obj *restrict self, char *restrict buffer, size_t size);
+
+/// Get or move the c-buffer pointer (_c_cur). Returns NULL if reaches the end of stream in the input mode.
+char *zis_stream_obj_char_buf_ptr(struct zis_stream_obj *restrict self, size_t move_offset, size_t *restrict rest_size_p);

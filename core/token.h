@@ -11,6 +11,7 @@
 
 struct zis_object;
 struct zis_float_obj;
+struct zis_int_obj;
 struct zis_string_obj;
 struct zis_symbol_obj;
 
@@ -66,7 +67,7 @@ struct zis_symbol_obj;
     E(DOTDOT        , ".."      ) \
     E(ELLIPSIS      , "..."     ) \
     E(L_ARROW       , "<-"      ) \
-    E(FATARROW      , "=>"      ) \
+    E(R_ARROW       , "->"      ) \
     E(L_PAREN       , "("       ) \
     E(R_PAREN       , ")"       ) \
     E(L_BRACKET     , "["       ) \
@@ -163,10 +164,9 @@ struct zis_token {
     enum zis_token_type type;
     union {
         struct zis_object     *value;
-        struct zis_object     *value_int;
+        struct zis_int_obj    *value_int;
         struct zis_float_obj  *value_float;
         struct zis_string_obj *value_string;
-        struct zis_symbol_obj *value_symbol;
         struct zis_symbol_obj *value_identifier;
     };
 };

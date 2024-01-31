@@ -21,6 +21,11 @@ Source code for the runtime core.
   - [`invoke.h`](invoke.h), [`invoke.c`](invoke.c)
   - [`loader.h`](loader.h), [`loader.c`](loader.c)
   - [`stack.h`](stack.h), [`stack.c`](stack.c)
++ compiling:
+  - [`assembly.h`](assembly.h), [`assembly.c`](assembly.c)
+  - [`compile.h`](compile.h), [`compile.c`](compile.c)
+  - [`lexer.h`](lexer.h), [`lexer.c`](lexer.c)
+  - [`token.h`](token.h), [`token.c`](token.c)
 + object system support (`obj*.*`)
   - [`locals.h`](locals.h), [`locals.c`](locals.c)
   - [`ndefutil.h`](ndefutil.h)

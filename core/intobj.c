@@ -15,6 +15,7 @@
 #include "memory.h"
 #include "ndefutil.h"
 #include "objmem.h"
+#include "strutil.h"
 
 /* ----- big int arithmetics ------------------------------------------------ */
 
@@ -124,14 +125,6 @@ struct zis_object *zis_int_obj_or_smallint(
     return zis_object_from(self);
 }
 
-static unsigned int _char_to_num(int c) {
-    if (isdigit(c))
-        return c - '0';
-    if (isalpha(c))
-        return tolower(c) - 'a' + 10;
-    return UINT_MAX;
-}
-
 struct zis_object *zis_int_obj_or_smallint_s(
     struct zis_context *z,
     const char *restrict str, const char **restrict str_end_p,
@@ -149,16 +142,18 @@ struct zis_object *zis_int_obj_or_smallint_s(
     const char *str_end = str;
     for (
         const char *const str_end_max = *str_end_p;
-        str_end <= str_end_max && _char_to_num(*str_end) < base;
+        str_end <= str_end_max && zis_char_digit(*str_end) < base;
         str_end++
     );
+    if (str_end == str)
+        return NULL;
     *str_end_p = str_end;
     const unsigned int num_width = (unsigned int)ceil((double)(str_end - str) * log2(base));
 
     if (num_width < ZIS_SMALLINT_WIDTH) {
         zis_smallint_t num = 0;
         for (const char *p = str; p < str_end; p++) {
-            num = num * base + _char_to_num(*p);
+            num = num * base + zis_char_digit(*p);
             assert(0 <= num && num <= ZIS_SMALLINT_MAX);
         }
         if (negative)
@@ -172,7 +167,7 @@ struct zis_object *zis_int_obj_or_smallint_s(
         bigint_cell_t *cells = self->cells;
         bigint_zero(cells, cell_count);
         for (const char *p = str; p < str_end; p++) {
-            const bigint_cell_t c = bigint_self_mul_add_1(cells, cell_count, base, _char_to_num(*p));
+            const bigint_cell_t c = bigint_self_mul_add_1(cells, cell_count, base, zis_char_digit(*p));
             assert(!c), zis_unused_var(c);
         }
         return zis_object_from(self);
@@ -198,14 +193,14 @@ int64_t zis_int_obj_value_i(const struct zis_int_obj *self) {
 }
 
 double zis_int_obj_value_f(const struct zis_int_obj *self) {
-    const size_t cell_count = self->cell_count;
-    if (cell_count <= 31) {
-        assert(cell_count);
-        const double val_flt = (double)self->cells[cell_count - 1];
-        return self->negative ? -val_flt : val_flt;
-    }
-    errno = ERANGE;
-    return HUGE_VAL;
+    double val_flt = 0.0;
+    const bigint_cell_t *const cells = self->cells;
+    const double cell_max_p1 = (double)BIGINT_CELL_MAX + 1.0;
+    for (unsigned int i = 0, n = self->cell_count; i < n; i++)
+        val_flt = val_flt * cell_max_p1 + cells[i];
+    if (self->negative)
+        val_flt = -val_flt;
+    return val_flt;
 }
 
 static const char digits_lower[] = "0123456789abcdefghijklmnopqrstuvwxyz";
@@ -299,6 +294,16 @@ size_t zis_smallint_to_str(zis_smallint_t i, char *restrict buf, size_t buf_sz, 
     if (p != buf)
         memmove(buf, p, written_size);
     return written_size;
+}
+
+struct zis_object *zis_int_obj_add_x(struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs) {
+    zis_context_panic(z, ZIS_CONTEXT_PANIC_IMPL);
+    zis_unused_var(lhs), zis_unused_var(rhs);
+}
+
+struct zis_object *zis_int_obj_mul_x(struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs) {
+    zis_context_panic(z, ZIS_CONTEXT_PANIC_IMPL);
+    zis_unused_var(lhs), zis_unused_var(rhs);
 }
 
 ZIS_NATIVE_FUNC_LIST_DEF(

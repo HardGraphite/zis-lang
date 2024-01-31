@@ -6,6 +6,7 @@
 #include "assembly.h"
 #include "attributes.h"
 #include "compat.h"
+#include "compile.h"
 #include "context.h"
 #include "debug.h"
 #include "fsutil.h"
@@ -323,6 +324,20 @@ static bool module_loader_load_from_file(
     switch (file_type) {
         // In each case, `init_func` shall be assigned, and the module of
         // `init_func` shall be set.
+
+#if ZIS_FEATURE_SRC
+    case MOD_FILE_SRC: {
+        const int ff = ZIS_STREAM_OBJ_MODE_IN | ZIS_STREAM_OBJ_TEXT | ZIS_STREAM_OBJ_UTF8;
+        struct zis_stream_obj *f = zis_stream_obj_new_file(z, file, ff);
+        var.init_func = zis_compile(z, f);
+        if (!var.init_func) {
+            status = ZIS_THR;
+            break;
+        }
+        zis_func_obj_set_module(z, var.init_func, var.module);
+        break;
+    }
+#endif // ZIS_FEATURE_SRC
 
     case MOD_FILE_NDL: {
         zis_dl_handle_t lib = zis_dl_open(file);

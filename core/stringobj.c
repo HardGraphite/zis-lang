@@ -232,6 +232,20 @@ size_t zis_string_obj_value(const struct zis_string_obj *self, char *buf, size_t
     }
 }
 
+const char *zis_string_obj_data_utf8(const struct zis_string_obj *self) {
+    if (string_obj_char_type(self) == STR_OBJ_C1)
+        return self->_data;
+    return NULL;
+}
+
+struct zis_string_obj *zis_string_obj_concat(
+    struct zis_context *z,
+    struct zis_string_obj *str1, struct zis_string_obj *str2
+) {
+    zis_context_panic(z, ZIS_CONTEXT_PANIC_IMPL);
+    zis_unused_var(str1), zis_unused_var(str2);
+}
+
 /* ----- type definition ---------------------------------------------------- */
 
 ZIS_NATIVE_FUNC_LIST_DEF(

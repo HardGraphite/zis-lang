@@ -283,6 +283,34 @@ size_t zis_stream_obj_read_line(
     return i;
 }
 
+char *zis_stream_obj_char_buf_ptr(
+    struct zis_stream_obj *restrict self,
+    size_t move_offset, size_t *restrict rest_size_p
+) {
+    assert_stream_valid(self);
+    assert(zis_stream_obj_flag_text(self));
+    if (self->_c_end == self->_c_cur) {
+        if (zis_stream_obj_flag_readable(self)) {
+            if (zis_stream_obj_peek_char(self) == -1)
+                return NULL;
+        } else {
+            assert(zis_stream_obj_flag_writeable(self));
+            zis_stream_obj_flush_chars(self);
+        }
+    }
+    size_t rest_size = (size_t)(self->_c_end - self->_c_cur);
+    assert(rest_size);
+    if (move_offset) {
+        if (move_offset > rest_size)
+            zis_context_panic(NULL, ZIS_CONTEXT_PANIC_ABORT);
+        self->_c_cur += move_offset;
+        rest_size -= move_offset;
+    }
+    if (rest_size_p)
+        *rest_size_p = rest_size;
+    return self->_c_cur;
+}
+
 ZIS_NATIVE_TYPE_DEF(
     Stream,
     struct zis_stream_obj, _bytes_size,

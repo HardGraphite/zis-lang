@@ -16,7 +16,7 @@ struct zis_int_obj;
 struct zis_object *zis_int_obj_or_smallint(struct zis_context *z, int64_t val);
 
 /// Create a small int or an `Int` object from string.
-/// `base` must be in range [2,36].
+/// `base` must be in range [2,36]. Returns NULL if no valid character is given.
 struct zis_object *zis_int_obj_or_smallint_s(
     struct zis_context *z,
     const char *restrict str, const char **restrict str_end_p,
@@ -38,3 +38,6 @@ size_t zis_int_obj_value_s(const struct zis_int_obj *self, char *restrict buf, s
 
 /// See `zis_int_obj_value_s()`.
 size_t zis_smallint_to_str(zis_smallint_t i, char *restrict buf, size_t buf_sz, int base);
+
+struct zis_object *zis_int_obj_add_x(struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs);
+struct zis_object *zis_int_obj_mul_x(struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs);
