@@ -12,7 +12,7 @@ struct zis_stream_obj;
 
 /// Compile source code from `input` stream to a function.
 /// On failure, formats an exception (REG-0) and returns NULL.
-struct zis_func_obj *zis_compile(
+struct zis_func_obj *zis_compile_source(
     struct zis_context *z, struct zis_stream_obj *input
 );
 

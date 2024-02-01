@@ -10,6 +10,7 @@
 #include "object.h"
 
 struct zis_context;
+struct zis_string_obj;
 
 /* ----- stream object ------------------------------------------------------ */
 
@@ -63,6 +64,17 @@ void zis_stream_obj_bind(
 struct zis_stream_obj *zis_stream_obj_new_file(
     struct zis_context *z,
     const zis_path_char_t *restrict file, int flags
+);
+
+/// Open a read-only stream for string reading. `string_size` can be -1.
+struct zis_stream_obj *zis_stream_obj_new_str(
+    struct zis_context *z,
+    const char *restrict string, size_t string_size, bool static_string
+);
+
+/// Open a read-only stream for string object reading.
+struct zis_stream_obj *zis_stream_obj_new_strob(
+    struct zis_context *z, struct zis_string_obj *str_obj
 );
 
 /// Close a stream.

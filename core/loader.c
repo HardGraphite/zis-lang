@@ -329,7 +329,7 @@ static bool module_loader_load_from_file(
     case MOD_FILE_SRC: {
         const int ff = ZIS_STREAM_OBJ_MODE_IN | ZIS_STREAM_OBJ_TEXT | ZIS_STREAM_OBJ_UTF8;
         struct zis_stream_obj *f = zis_stream_obj_new_file(z, file, ff);
-        var.init_func = zis_compile(z, f);
+        var.init_func = zis_compile_source(z, f);
         if (!var.init_func) {
             status = ZIS_THR;
             break;
@@ -342,20 +342,24 @@ static bool module_loader_load_from_file(
     case MOD_FILE_NDL: {
         zis_dl_handle_t lib = zis_dl_open(file);
         if (!lib) {
-            return zis_object_from(zis_exception_obj_format(
+            zis_context_set_reg0(z, zis_object_from(zis_exception_obj_format(
                 z, "sys", NULL,
                 "not a dynamic library: %" ZIS_PATH_STR_PRI, file
-            ));
+            )));
+            status = ZIS_THR;
+            break;
         }
         char mod_def_var_name[80] = ZIS_NATIVE_MODULE_VARNAME_PREFIX_STR;
         static_assert(sizeof ZIS_NATIVE_MODULE_VARNAME_PREFIX_STR + sizeof mod_name <= sizeof mod_def_var_name, "");
         strcat(mod_def_var_name, mod_name);
         struct zis_native_module_def *mod_def = zis_dl_get(lib, mod_def_var_name);
         if (!mod_def) {
-            return zis_object_from(zis_exception_obj_format(
+            zis_context_set_reg0(z, zis_object_from(zis_exception_obj_format(
                 z, "sys", NULL,
                 "not a module file: %" ZIS_PATH_STR_PRI, file
-            ));
+            )));
+            status = ZIS_THR;
+            break;
         }
         // zis_dl_close(lib); // CAN NOT close library here!!
         var.init_func = zis_module_obj_load_native_def(z, var.module, mod_def);
@@ -386,6 +390,43 @@ static bool module_loader_load_from_file(
     zis_locals_drop(z, var);
     assert(status == ZIS_OK || status == ZIS_THR);
     return status == ZIS_OK;
+}
+
+static bool module_loader_load_from_source(
+    struct zis_context *z,
+    struct zis_stream_obj *input,
+    struct zis_module_obj *_module
+) {
+#if ZIS_FEATURE_SRC
+
+    zis_locals_decl(
+        z, var,
+        struct zis_module_obj *module;
+        struct zis_func_obj *init_func;
+    );
+    zis_locals_zero(z, var);
+    var.module = _module;
+    var.init_func = zis_compile_source(z, input);
+    int status = ZIS_OK;
+    if (!var.init_func) {
+        status = ZIS_THR;
+    } else {
+        zis_func_obj_set_module(z, var.init_func, var.module);
+        status = zis_module_obj_do_init(z, var.init_func);
+    }
+    zis_locals_drop(z, var);
+    assert(status == ZIS_OK || status == ZIS_THR);
+    return status == ZIS_OK;
+
+#else // ZIS_FEATURE_SRC
+
+    zis_unused_var(input), zis_unused_var(_module);
+    zis_context_set_reg0(z, zis_object_from(zis_exception_obj_format(
+        z, "sys", NULL, ""
+    )));
+    return false;
+
+#endif // ZIS_FEATURE_SRC
 }
 
 /// Try to Load an embedded module.
@@ -689,6 +730,20 @@ struct zis_module_obj *zis_module_loader_import_file(
         z, zis_path_obj_data(var.file), file_type, var.module
     );
 
+    zis_locals_drop(z, var);
+    return ok ? var.module : NULL;
+}
+
+struct zis_module_obj *zis_module_loader_import_source(
+    struct zis_context *z, struct zis_module_obj *_module /* = NULL */,
+    struct zis_stream_obj *input
+) {
+    zis_locals_decl(
+        z, var,
+        struct zis_module_obj *module;
+    );
+    var.module = _module ? _module : zis_module_obj_new(z, true);
+    const bool ok = module_loader_load_from_source(z, input, var.module);
     zis_locals_drop(z, var);
     return ok ? var.module : NULL;
 }

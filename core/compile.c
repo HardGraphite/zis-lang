@@ -7,7 +7,7 @@
 
 #if ZIS_FEATURE_SRC
 
-struct zis_func_obj *zis_compile(
+struct zis_func_obj *zis_compile_source(
     struct zis_context *z, struct zis_stream_obj *input
 ) {
     // NOTE: this functions is for lexer tests now, and must be rewritten.

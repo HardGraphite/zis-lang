@@ -494,11 +494,19 @@ ZIS_API int zis_make_exception(
  */
 ZIS_API int zis_read_exception(zis_t z, unsigned int reg, int flag, unsigned int reg_out) ZIS_NOEXCEPT;
 
-#define ZIS_STREAM_FILE    0x01 ///< `zis_make_stream()` type: file stream
+/** @name zis_make_stream() flags */
+/** @{ */
 
-#define ZIS_STREAM_RDONLY  0x10 ///< `zis_make_stream()` mode: read-only
-#define ZIS_STREAM_WRONLY  0x20 ///< `zis_make_stream()` mode: write-only
-#define ZIS_STREAM_WINEOL  0x40 ///< `zis_make_stream()` mode: use Windows style of end-of-line (CRLF)
+#define ZIS_IOS_FILE    0x01 ///< `zis_make_stream()` type: file stream.
+#define ZIS_IOS_TEXT    0x02 ///< `zis_make_stream()` type: read-only string stream.
+
+#define ZIS_IOS_RDONLY  0x10 ///< `zis_make_stream()` `ZIS_IOS_FILE` mode: read-only.
+#define ZIS_IOS_WRONLY  0x20 ///< `zis_make_stream()` `ZIS_IOS_FILE` mode: write-only.
+#define ZIS_IOS_WINEOL  0x40 ///< `zis_make_stream()` `ZIS_IOS_FILE` mode: use Windows style of end-of-line (CRLF).
+
+#define ZIS_IOS_STATIC  0x80 ///< `zis_make_stream()` `ZIS_IOS_TEXT` mode: string is static (infinite lifetime).
+
+/** @} */
 
 /**
  * Create a stream object.
@@ -515,7 +523,18 @@ ZIS_API int zis_read_exception(zis_t z, unsigned int reg, int flag, unsigned int
  * const char *file_path = ...; // path to the file
  * const char *encoding  = ...; // text encoding (empty for UTF-8), or NULL to open as a binary file
  * const int other_flags = ...;
- * int status = zis_make_stream(z, reg, ZIS_STREAM_FILE | other_flags, file_path, encoding);
+ * int status = zis_make_stream(z, reg, ZIS_IOS_FILE | other_flags, file_path, encoding);
+ * ```
+ * To open a string stream:
+ * ```c
+ * const char *string = "..."; // the string
+ * const size_t string_size = strlen(string); // string size, or -1
+ * int status = zis_make_stream(z, reg, ZIS_IOS_TEXT | ZIS_IOS_STATIC, string, string_size);
+ * ```
+ * To open a string stream from a `String` object:
+ * ```c
+ * const unsigned int reg_str_obj = ...; // the register where the string object is
+ * int status = zis_make_stream(z, reg, ZIS_IOS_TEXT, NULL, reg_str_obj);
  * ```
  */
 ZIS_API int zis_make_stream(zis_t z, unsigned int reg, int flags, ...);
@@ -596,11 +615,17 @@ ZIS_API int zis_make_module(zis_t z, unsigned int reg, const struct zis_native_m
  */
 ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) ZIS_NOEXCEPT;
 
+/** @name zis_import() flags */
+/** @{ */
+
 #define ZIS_IMP_NAME     0x01 ///< `zis_import()` type: import by name.
 #define ZIS_IMP_PATH     0x02 ///< `zis_import()` type: import by file path.
+#define ZIS_IMP_CODE     0x03 ///< `zis_import()` type: compile source code.
 #define ZIS_IMP_ADDP     0x0f ///< `zis_import()` type: add to search path.
 
 #define ZIS_IMP_MAIN     0xf0 ///< `zis_import()` extra: call the `main` function (REG-1 = `(int)argc`, REG-2 = `(char**)argv`).
+
+/** @} */
 
 /**
  * Import a module.
@@ -617,6 +642,10 @@ ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) ZIS_NOEX
  * zis_import(z, reg, "module_name", ZIS_IMP_NAME);
  * // ##  To import a module by file path
  * zis_import(z, reg, "path/to/the/module/file.ext", ZIS_IMP_PATH);
+ * // ##  To compile a string to a module
+ * zis_import(z, reg, "the source code ...", ZIS_IMP_CODE);
+ * // ##  To compile the `Stream` object in `REG-0` to a module
+ * zis_import(z, reg, NULL, ZIS_IMP_CODE);
  * // ##  To add a module search path
  * zis_import(z, 0, "path/to/the/module/dir", ZIS_IMP_ADDP);
  * // ##  To load a module by path as the entry

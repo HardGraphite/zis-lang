@@ -337,7 +337,7 @@ zis_test_define(test_file_stream, z) {
         return;
     }
 
-    status = zis_make_stream(z, 1, ZIS_STREAM_FILE | ZIS_STREAM_RDONLY, this_file, "UTF-8");
+    status = zis_make_stream(z, 1, ZIS_IOS_FILE | ZIS_IOS_RDONLY, this_file, "UTF-8");
     zis_test_assert_eq(status, ZIS_OK);
 
     fclose(fp);

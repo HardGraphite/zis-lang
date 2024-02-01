@@ -11,6 +11,7 @@
 #include "globals.h"
 #include "invoke.h"
 #include "loader.h"
+#include "locals.h"
 #include "ndefutil.h"
 #include "object.h"
 #include "stack.h"
@@ -956,7 +957,7 @@ ZIS_API int zis_read_exception(zis_t z, unsigned int reg, int flag, unsigned int
 }
 
 struct _api_make_stream_context {
-    int stream_obj_flags;
+    int stream_obj_flags, api_flags;
     va_list api_args;
     struct zis_context *z;
     struct zis_object **res_obj_ref;
@@ -980,18 +981,38 @@ static int _api_make_stream_open_file_fn(const zis_path_char_t *path, void *_arg
     return ZIS_OK;
 }
 
+static int _api_make_stream_open_str(struct _api_make_stream_context *restrict x) {
+    const char *str = va_arg(x->api_args, const char *);
+    struct zis_stream_obj *stream_obj;
+    if (str) {
+        const size_t str_sz = va_arg(x->api_args, size_t);
+        const bool str_static = x->api_flags & ZIS_IOS_STATIC;
+        stream_obj = zis_stream_obj_new_str(x->z, str, str_sz, str_static);
+    } else {
+        const unsigned int reg = va_arg(x->api_args, size_t);
+        struct zis_object *obj = api_get_local(x->z, reg);
+        if (zis_unlikely(!obj))
+            return ZIS_E_IDX;
+        if (zis_unlikely(zis_object_is_smallint(obj) || zis_object_type(obj) != x->z->globals->type_String))
+            return ZIS_E_TYPE;
+        stream_obj = zis_stream_obj_new_strob(x->z, zis_object_cast(obj, struct zis_string_obj));
+    }
+    *x->res_obj_ref = zis_object_from(stream_obj);
+    return ZIS_OK;
+}
+
 #define ZIS_STREAM_TYPE_MASK 0x0f
 
 static int api_stream_flags_conv(int api_flags) {
     int result = 0;
-    if (api_flags & ZIS_STREAM_WRONLY) {
-        if (api_flags & ZIS_STREAM_RDONLY)
+    if (api_flags & ZIS_IOS_WRONLY) {
+        if (api_flags & ZIS_IOS_RDONLY)
             return 0;
         result |= ZIS_STREAM_OBJ_MODE_OUT;
     } else {
         result |= ZIS_STREAM_OBJ_MODE_IN;
     }
-    if (api_flags & ZIS_STREAM_WINEOL)
+    if (api_flags & ZIS_IOS_WINEOL)
         result |= ZIS_STREAM_OBJ_CRLF;
     return result;
 }
@@ -999,6 +1020,7 @@ static int api_stream_flags_conv(int api_flags) {
 ZIS_API int zis_make_stream(zis_t z, unsigned int reg, int flags, ...) {
     struct _api_make_stream_context context;
     context.stream_obj_flags = api_stream_flags_conv(flags);
+    context.api_flags = flags;
     if (zis_unlikely(!context.stream_obj_flags))
         return ZIS_E_ARG;
     context.res_obj_ref = api_ref_local(z, reg);
@@ -1008,11 +1030,14 @@ ZIS_API int zis_make_stream(zis_t z, unsigned int reg, int flags, ...) {
     int status;
     va_start(context.api_args, flags);
     switch (flags & ZIS_STREAM_TYPE_MASK) {
-    case ZIS_STREAM_FILE:
+    case ZIS_IOS_FILE:
         status = zis_path_with_temp_path_from_str(
             va_arg(context.api_args, const char *),
             _api_make_stream_open_file_fn, &context
         );
+        break;
+    case ZIS_IOS_TEXT:
+        status = _api_make_stream_open_str(&context);
         break;
     default:
         status = ZIS_E_ARG;
@@ -1151,6 +1176,23 @@ static int api_import_by_path(zis_t z, struct zis_object **res_ref, const char *
     return status;
 }
 
+static int api_import_compile_code(zis_t z, struct zis_object **res_ref, const char *code) {
+    struct zis_stream_obj *source_stream;
+    if (code) {
+        source_stream = zis_stream_obj_new_str(z, code, (size_t)-1, true);
+    } else {
+        struct zis_object *obj = zis_context_get_reg0(z);
+        if (zis_object_is_smallint(obj) || zis_object_type(obj) != z->globals->type_Stream)
+            return ZIS_E_TYPE;
+        source_stream = zis_object_cast(obj, struct zis_stream_obj);
+    }
+    struct zis_module_obj *const mod = zis_module_loader_import_source(z, NULL, source_stream);
+    if (!mod)
+        return ZIS_THR;
+    *res_ref = zis_object_from(mod);
+    return ZIS_OK;
+}
+
 static int _api_import_add_path_fn(const zis_path_char_t *path, void *_z) {
     zis_t z = _z;
     zis_module_loader_add_path(z, zis_path_obj_new(z, path, (size_t)-1));
@@ -1226,6 +1268,9 @@ ZIS_API int zis_import(zis_t z, unsigned int reg, const char *what, int flags) {
         break;
     case ZIS_IMP_PATH:
         status = api_import_by_path(z, obj_ref, what);
+        break;
+    case ZIS_IMP_CODE:
+        status = api_import_compile_code(z, obj_ref, what);
         break;
     case ZIS_IMP_ADDP:
         return api_import_add_path(z, what);
