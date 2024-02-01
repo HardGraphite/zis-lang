@@ -206,6 +206,11 @@ static void scan_number(
     while (true) {
         size_t buf_sz;
         const char *buf = stream_buffer(input, &buf_sz);
+        if (!buf) {
+            if (!l->temp_var)
+                error_unexpected_end_of(l, "number literal");
+            break;
+        }
         const char *buf_end = buf + buf_sz;
         struct zis_object *int_obj =
             zis_int_obj_or_smallint_s(z, buf, &buf_end, digit_base);
@@ -401,7 +406,6 @@ static void scan_identifier(struct zis_lexer *restrict l, struct zis_token *rest
     clear_temp_var(l);
 
     token_set_pos1(tok, l), tok->column1--;
-    stream_ignore_1(input);
 
     zis_debug_log(
         TRACE, "Lexer", "identifier: %.*s",

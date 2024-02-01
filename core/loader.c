@@ -330,6 +330,7 @@ static bool module_loader_load_from_file(
         const int ff = ZIS_STREAM_OBJ_MODE_IN | ZIS_STREAM_OBJ_TEXT | ZIS_STREAM_OBJ_UTF8;
         struct zis_stream_obj *f = zis_stream_obj_new_file(z, file, ff);
         var.init_func = zis_compile_source(z, f);
+        zis_stream_obj_close(f);
         if (!var.init_func) {
             status = ZIS_THR;
             break;
@@ -371,6 +372,7 @@ static bool module_loader_load_from_file(
         const int ff = ZIS_STREAM_OBJ_MODE_IN | ZIS_STREAM_OBJ_TEXT | ZIS_STREAM_OBJ_UTF8;
         struct zis_stream_obj *f = zis_stream_obj_new_file(z, file, ff);
         var.init_func = zis_assemble_func_from_text(z, f);
+        zis_stream_obj_close(f);
         if (!var.init_func) {
             status = ZIS_THR;
             break;
