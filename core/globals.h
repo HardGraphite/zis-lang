@@ -16,6 +16,9 @@ struct zis_type_obj;
     E(struct zis_array_slots_obj, empty_array_slots ) \
     E(struct zis_module_obj     , mod_prelude       ) \
     E(struct zis_module_obj     , mod_unnamed       ) \
+    E(struct zis_stream_obj     , stream_stdin      ) \
+    E(struct zis_stream_obj     , stream_stdout     ) \
+    E(struct zis_stream_obj     , stream_stderr     ) \
 // ^^^ _ZIS_BUILTIN_VAL_LIST ^^^
 
 /// List of type (Type).

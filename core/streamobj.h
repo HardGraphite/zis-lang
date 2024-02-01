@@ -66,6 +66,12 @@ struct zis_stream_obj *zis_stream_obj_new_file(
     const zis_path_char_t *restrict file, int flags
 );
 
+/// Open a stream associated with a file.
+struct zis_stream_obj *zis_stream_obj_new_file_native(
+    struct zis_context *z,
+    zis_file_handle_t file, int flags
+);
+
 /// Open a read-only stream for string reading. `string_size` can be -1.
 struct zis_stream_obj *zis_stream_obj_new_str(
     struct zis_context *z,

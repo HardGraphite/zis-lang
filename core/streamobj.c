@@ -193,6 +193,15 @@ struct zis_stream_obj *zis_stream_obj_new_file(
     return self;
 }
 
+struct zis_stream_obj *zis_stream_obj_new_file_native(
+    struct zis_context *z,
+    zis_file_handle_t file, int flags
+) {
+    struct zis_stream_obj *self = zis_stream_obj_new(z);
+    zis_stream_obj_bind(self, &sop_file, file, flags);
+    return self;
+}
+
 struct zis_stream_obj *zis_stream_obj_new_str(
     struct zis_context *z,
     const char *restrict string, size_t string_size, bool static_string
@@ -227,7 +236,7 @@ struct zis_stream_obj *zis_stream_obj_new_strob(
     const size_t data_size = zis_string_obj_value(str_obj, NULL, 0);
     struct sop_str_state *state = sop_str_alloc_state(data_size);
     const size_t n = zis_string_obj_value(str_obj, state->_data, data_size);
-    assert(n == data_size);
+    assert(n == data_size), zis_unused_var(n);
     struct zis_stream_obj *self = zis_stream_obj_new(z);
     const int flags = ZIS_STREAM_OBJ_MODE_IN | ZIS_STREAM_OBJ_TEXT | ZIS_STREAM_OBJ_UTF8;
     zis_stream_obj_bind(self, &sop_str, state, flags);

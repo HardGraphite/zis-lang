@@ -15,6 +15,7 @@
 #include "bytesobj.h"
 #include "moduleobj.h"
 #include "nilobj.h"
+#include "streamobj.h"
 #include "stringobj.h"
 #include "symbolobj.h"
 #include "tupleobj.h"
@@ -98,6 +99,17 @@ zis_cold_fn static void _init_values_1(
 ) {
     g->val_mod_prelude = zis_module_obj_new(z, false);
     g->val_mod_unnamed = zis_module_obj_new(z, true);
+
+    const int stdio_common_flags = ZIS_STREAM_OBJ_TEXT | ZIS_STREAM_OBJ_UTF8;
+    g->val_stream_stdin = zis_stream_obj_new_file_native(
+        z, zis_file_stdio(ZIS_FILE_STDIN), stdio_common_flags | ZIS_STREAM_OBJ_MODE_IN
+    );
+    g->val_stream_stdout = zis_stream_obj_new_file_native(
+        z, zis_file_stdio(ZIS_FILE_STDOUT), stdio_common_flags | ZIS_STREAM_OBJ_MODE_OUT
+    );
+    g->val_stream_stderr = zis_stream_obj_new_file_native(
+        z, zis_file_stdio(ZIS_FILE_STDERR), stdio_common_flags | ZIS_STREAM_OBJ_MODE_OUT
+    );
 }
 
 /// Initialize symbols.

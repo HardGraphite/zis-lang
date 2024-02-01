@@ -947,7 +947,11 @@ ZIS_API int zis_read_exception(zis_t z, unsigned int reg, int flag, unsigned int
         *out_obj_ref = exc_obj->what;
         break;
     case ZIS_RDE_DUMP:
-        zis_exception_obj_print(z, exc_obj, NULL);
+        zis_exception_obj_print(
+            z, exc_obj,
+            (!zis_object_is_smallint(*out_obj_ref) && zis_object_type(*out_obj_ref) == z->globals->type_Stream) ?
+                zis_object_cast(*out_obj_ref, struct zis_stream_obj) : NULL
+        );
         break;
     default:
         return ZIS_E_ARG;
@@ -977,6 +981,19 @@ static int _api_make_stream_open_file_fn(const zis_path_char_t *path, void *_arg
     struct zis_stream_obj *stream_obj = zis_stream_obj_new_file(x->z, path, flags);
     if (!stream_obj)
         return ZIS_THR;
+    *x->res_obj_ref = zis_object_from(stream_obj);
+    return ZIS_OK;
+}
+
+static int _api_make_stream_get_stdio(struct _api_make_stream_context *restrict x) {
+    struct zis_stream_obj *stream_obj;
+    const struct zis_context_globals *const g = x->z->globals;
+    switch (va_arg(x->api_args, int)) {
+    case 0 : stream_obj = g->val_stream_stdin ; break;
+    case 1 : stream_obj = g->val_stream_stdout; break;
+    case 2 : stream_obj = g->val_stream_stderr; break;
+    default: return ZIS_E_ARG;
+    }
     *x->res_obj_ref = zis_object_from(stream_obj);
     return ZIS_OK;
 }
@@ -1035,6 +1052,9 @@ ZIS_API int zis_make_stream(zis_t z, unsigned int reg, int flags, ...) {
             va_arg(context.api_args, const char *),
             _api_make_stream_open_file_fn, &context
         );
+        break;
+    case ZIS_IOS_STDX:
+        status = _api_make_stream_get_stdio(&context);
         break;
     case ZIS_IOS_TEXT:
         status = _api_make_stream_open_str(&context);

@@ -498,7 +498,8 @@ ZIS_API int zis_read_exception(zis_t z, unsigned int reg, int flag, unsigned int
 /** @{ */
 
 #define ZIS_IOS_FILE    0x01 ///< `zis_make_stream()` type: file stream.
-#define ZIS_IOS_TEXT    0x02 ///< `zis_make_stream()` type: read-only string stream.
+#define ZIS_IOS_STDX    0x02 ///< `zis_make_stream()` type: standard I/O stream (0=stdin, 1=stdout, 2=stderr).
+#define ZIS_IOS_TEXT    0x03 ///< `zis_make_stream()` type: read-only string stream.
 
 #define ZIS_IOS_RDONLY  0x10 ///< `zis_make_stream()` `ZIS_IOS_FILE` mode: read-only.
 #define ZIS_IOS_WRONLY  0x20 ///< `zis_make_stream()` `ZIS_IOS_FILE` mode: write-only.
@@ -524,6 +525,11 @@ ZIS_API int zis_read_exception(zis_t z, unsigned int reg, int flag, unsigned int
  * const char *encoding  = ...; // text encoding (empty for UTF-8), or NULL to open as a binary file
  * const int other_flags = ...;
  * int status = zis_make_stream(z, reg, ZIS_IOS_FILE | other_flags, file_path, encoding);
+ * ```
+ * To get the standard input stream:
+ * ```c
+ * const int stdio_id = 0; // 0 for stdin
+ * int status = zis_make_stream(z, reg, ZIS_IOS_STDX, stdio_id);
  * ```
  * To open a string stream:
  * ```c

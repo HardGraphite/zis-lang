@@ -71,7 +71,7 @@ static const struct clopts_option program_options[] = {
 };
 
 static const struct clopts_program program = {
-    .usage_args = "[OPTION...] [FILE|@MODULE [ARGUMENT...]]",
+    .usage_args = "[OPTION...] [[--] -|FILE|@MODULE [ARGUMENT...]]",
     .options = program_options,
     .rest_args = rest_args_handler,
 };
@@ -93,7 +93,11 @@ static int start(zis_t z, void *_args) {
     if (args->rest_args_num) {
         const char *module = args->rest_args[0];
         int imp_flags = ZIS_IMP_MAIN;
-        if (module[0] == '@') {
+        if (module[0] == '-' && !module[1]) {
+            zis_make_stream(z, 0, ZIS_IOS_STDX, 0); // stdin
+            module = NULL;
+            imp_flags |= ZIS_IMP_CODE;
+        } else if (module[0] == '@') {
             module++;
             imp_flags |= ZIS_IMP_NAME;
         } else {
@@ -102,7 +106,9 @@ static int start(zis_t z, void *_args) {
         zis_make_int(z, 1, (int64_t)args->rest_args_num);
         zis_make_int(z, 2, (intptr_t)args->rest_args);
         if (zis_import(z, 0, module, imp_flags) == ZIS_THR) {
-            zis_read_exception(z, 0, ZIS_RDE_DUMP, 0);
+            zis_move_local(z, 1, 0);
+            zis_make_stream(z, 2, ZIS_IOS_STDX, 2); // stderr
+            zis_read_exception(z, 1, ZIS_RDE_DUMP, 2);
             exit_status = EXIT_FAILURE;
         }
     }
