@@ -58,7 +58,14 @@ struct zis_type_obj;
     E(Function)                 \
     E(Map_Node)                 \
     E(Module)                   \
+    _ZIS_BUILTIN_TYPE_LIST2__E_AstNode \
 // ^^^ _ZIS_BUILTIN_TYPE_LIST2 ^^^
+
+#if ZIS_FEATURE_SRC
+#    define _ZIS_BUILTIN_TYPE_LIST2__E_AstNode E(AstNode)
+#else // !ZIS_FEATURE_SRC
+#    define _ZIS_BUILTIN_TYPE_LIST2__E_AstNode
+#endif // ZIS_FEATURE_SRC
 
 /// List of frequently used symbols.
 #define _ZIS_BUILTIN_SYM_LIST \

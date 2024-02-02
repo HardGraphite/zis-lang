@@ -1,0 +1,16 @@
+##
+## Definition of AST nodes.
+##
+
+# Syntax:
+#   <NodeName>  ( <Type1> <field1> , <Type2> <field2> , ... )
+#   # Comment.
+#
+# where <Type#> is:
+#   - Node     ->  struct zis_ast_node_obj *
+#   - Node<?>  ->  struct zis_ast_node_obj *, whose node name is "?"
+#   - Object   ->  struct zis_object *
+#   - Xxx      ->  struct zis_xxx_obj *
+
+Constant       (Object value)
+Name           (Symbol value)

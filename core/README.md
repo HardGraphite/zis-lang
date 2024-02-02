@@ -23,6 +23,7 @@ Source code for the runtime core.
   - [`stack.h`](stack.h), [`stack.c`](stack.c)
 + compiling:
   - [`assembly.h`](assembly.h), [`assembly.c`](assembly.c)
+  - [`ast.h`](ast.h), [`ast.c`](ast.c)
   - [`compile.h`](compile.h), [`compile.c`](compile.c)
   - [`lexer.h`](lexer.h), [`lexer.c`](lexer.c)
   - [`token.h`](token.h), [`token.c`](token.c)

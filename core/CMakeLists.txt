@@ -55,6 +55,15 @@ file(CONFIGURE OUTPUT "${zis_core_conf_header_dir}/zis_config.h" @ONLY CONTENT [
 ]==])
 
 add_custom_command(
+    OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/astdef.h"
+    COMMAND ${CMAKE_COMMAND} -P "astdef.cmake"
+    MAIN_DEPENDENCY "astdef.txt"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Updating astdef.h"
+    VERBATIM
+)
+
+add_custom_command(
     OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/oplist.h"
     COMMAND ${CMAKE_COMMAND} -P "oplist.cmake"
     MAIN_DEPENDENCY "oplist.txt"
@@ -98,7 +107,7 @@ else()
 endif()
 set(zis_core_tgt ${zis_core_tgt} PARENT_SCOPE)
 # Extra dependencies.
-target_sources(${zis_core_tgt} PRIVATE "oplist.h")
+target_sources(${zis_core_tgt} PRIVATE "astdef.h" "oplist.h")
 # Output name and prefix.
 set_target_properties(${zis_core_tgt} PROPERTIES OUTPUT_NAME "${ZIS_OUTPUT_NAME}")
 get_target_property(prefix ${zis_core_tgt} PREFIX)
