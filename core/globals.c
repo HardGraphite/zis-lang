@@ -110,6 +110,11 @@ zis_cold_fn static void _init_values_1(
     g->val_stream_stderr = zis_stream_obj_new_file_native(
         z, zis_file_stdio(ZIS_FILE_STDERR), stdio_common_flags | ZIS_STREAM_OBJ_MODE_OUT
     );
+
+#if ZIS_FEATURE_SRC
+    // NOTE: Leave it uninitialized. Shall be initialized by a lexer lazily.
+    assert(zis_object_is_smallint(zis_object_from(g->val_lexer_keywords)));
+#endif // ZIS_FEATURE_SRC
 }
 
 /// Initialize symbols.

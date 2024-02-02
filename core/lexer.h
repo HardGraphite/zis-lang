@@ -6,6 +6,7 @@
 
 struct zis_context;
 struct zis_lexer;
+struct zis_map_obj;
 struct zis_object;
 struct zis_stream_obj;
 struct zis_token;
@@ -21,6 +22,7 @@ struct zis_lexer {
     unsigned int line, column;
     struct zis_context *z;
     struct zis_stream_obj *input; // Stream objects will not be moved by the GC system.
+    struct zis_map_obj *keywords;
     struct zis_object *temp_var;
     zis_lexer_error_handler_t error_handler;
 };

@@ -119,7 +119,7 @@ zis_test_define(test_lexer_lit_string, z) {
     do_compile_expecting_error(z, "'\\\\\\'");
 }
 
-static void do_test_lexer_lit_identifier(zis_t z, const char *restrict code, const char *restrict val) {
+static void do_test_lexer_identifier(zis_t z, const char *restrict code, const char *restrict val) {
     zis_test_log(ZIS_TEST_LOG_TRACE, "identifier: <<<%s>>>, value: <<<%s>>>", code, val);
     int status = try_compile(z, code);
     zis_test_assert_eq(status, ZIS_OK);
@@ -127,10 +127,39 @@ static void do_test_lexer_lit_identifier(zis_t z, const char *restrict code, con
 }
 
 zis_test_define(test_lexer_identifier, z) {
-    do_test_lexer_lit_identifier(z, "abc", "abc");
-    do_test_lexer_lit_identifier(z, "ab12_", "ab12_");
-    do_test_lexer_lit_identifier(z, " abc ", "abc");
-    do_test_lexer_lit_identifier(z, "\tabc\n", "abc");
+    do_test_lexer_identifier(z, "abc", "abc");
+    do_test_lexer_identifier(z, "ab12_", "ab12_");
+    do_test_lexer_identifier(z, " abc ", "abc");
+    do_test_lexer_identifier(z, "\tabc\n", "abc");
+}
+
+static void do_test_lexer_keyword(zis_t z, const char *restrict kw) {
+    zis_test_log(ZIS_TEST_LOG_TRACE, "keyword: %s", kw);
+    int status = try_compile(z, kw);
+    zis_test_assert_eq(status, ZIS_OK);
+}
+
+zis_test_define(test_lexer_keyword, z) {
+    // See "../core/token.h".
+    const char *const kw_list[] = {
+        "nil",
+        "true",
+        "false",
+        "func",
+        "struct",
+        "if",
+        "elif",
+        "else",
+        "while",
+        "for",
+        "break",
+        "continue",
+        "return",
+        "throw",
+        "end"  ,
+    };
+    for (unsigned int i = 0; i < sizeof kw_list / sizeof kw_list[0]; i++)
+        do_test_lexer_keyword(z, kw_list[i]);
 }
 
 zis_test_define(test_lexer_comment, z) {
@@ -145,5 +174,6 @@ zis_test_list(
     test_lexer_lit_float,
     test_lexer_lit_string,
     test_lexer_identifier,
+    test_lexer_keyword,
     test_lexer_comment,
 )

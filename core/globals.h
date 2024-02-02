@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "zis_config.h" // ZIS_FEATURE_SRC
+
 struct zis_context;
 struct zis_type_obj;
 
@@ -19,7 +21,14 @@ struct zis_type_obj;
     E(struct zis_stream_obj     , stream_stdin      ) \
     E(struct zis_stream_obj     , stream_stdout     ) \
     E(struct zis_stream_obj     , stream_stderr     ) \
+    _ZIS_BUILTIN_VAL_LIST__E_LEXER_KEYWORDS           \
 // ^^^ _ZIS_BUILTIN_VAL_LIST ^^^
+
+#if ZIS_FEATURE_SRC
+#    define _ZIS_BUILTIN_VAL_LIST__E_LEXER_KEYWORDS E(struct zis_map_obj, lexer_keywords)
+#else // !ZIS_FEATURE_SRC
+#    define _ZIS_BUILTIN_VAL_LIST__E_LEXER_KEYWORDS
+#endif // ZIS_FEATURE_SRC
 
 /// List of type (Type).
 #define _ZIS_BUILTIN_TYPE_LIST0 \

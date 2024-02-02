@@ -10,6 +10,7 @@
 #include "context.h"
 #include "debug.h"
 #include "globals.h"
+#include "locals.h"
 #include "memory.h"
 #include "objmem.h"
 #include "strutil.h"
@@ -17,6 +18,7 @@
 
 #include "floatobj.h"
 #include "intobj.h"
+#include "mapobj.h"
 #include "streamobj.h"
 #include "stringobj.h"
 #include "symbolobj.h"
@@ -135,6 +137,47 @@ zis_static_force_inline void token_set_type(
     struct zis_token *restrict tok, enum zis_token_type tt
 ) {
     tok->type = tt;
+}
+
+/* ----- keyword table ------------------------------------------------------ */
+
+/// Create the keyword table.
+static struct zis_map_obj *keyword_table_new(struct zis_context *z) {
+    const unsigned int first_kw_tok_id = (unsigned int)ZIS_TOK_KW_NIL;
+    const unsigned int kw_count =
+#define E(NAME, TEXT) + 1
+    ZIS_KEYWORD_LIST
+#undef E
+    ;
+
+    zis_locals_decl_1(z, var, struct zis_map_obj *kwt);
+    zis_locals_zero(z, var);
+    var.kwt = zis_map_obj_new(z, 1.0f, kw_count);
+
+    for (unsigned int tt = first_kw_tok_id, tt_end = tt + kw_count; tt < tt_end; tt++) {
+        const char *name_str = zis_token_keyword_text(tt);
+        struct zis_symbol_obj *name_sym = zis_symbol_registry_get(z, name_str, (size_t)-1);
+        struct zis_object *tt_smi = zis_smallint_to_ptr((zis_smallint_t)tt);
+        zis_map_obj_sym_set(z, var.kwt, name_sym, tt_smi);
+    }
+    assert(zis_map_obj_length(var.kwt) == (size_t)kw_count);
+
+    zis_locals_drop(z, var);
+    return var.kwt;
+}
+
+/// Check whether a symbol is a keyword.
+/// If it is, returns a `ZIS_TOK_KW_*` value; otherwise, returns 0.
+static int keyword_table_lookup(struct zis_map_obj *kwt, struct zis_symbol_obj *sym) {
+    struct zis_object *res = zis_map_obj_sym_get(kwt, sym);
+    if (!res)
+        return 0;
+    assert(zis_object_is_smallint(res));
+    zis_smallint_t x = zis_smallint_from_ptr(res);
+    assert(x > 0 && x < 256);
+    int tt = (int)x;
+    assert(zis_token_type_is_keyword(tt));
+    return tt;
 }
 
 /* ----- scanning  ---------------------------------------------------------- */
@@ -439,7 +482,7 @@ static void scan_string(
     );
 }
 
-static void scan_identifier(struct zis_lexer *restrict l, struct zis_token *restrict tok) {
+static void scan_identifier_or_keyword(struct zis_lexer *restrict l, struct zis_token *restrict tok) {
     // token_set_pos0(tok, l);
     token_set_type(tok, ZIS_TOK_IDENTIFIER);
 
@@ -495,12 +538,16 @@ static void scan_identifier(struct zis_lexer *restrict l, struct zis_token *rest
     }
     assert(zis_object_type(l->temp_var) == z->globals->type_Symbol);
     tok->value_identifier = zis_object_cast(l->temp_var, struct zis_symbol_obj);
+    const int kw_id = keyword_table_lookup(l->keywords, tok->value_identifier);
+    if (kw_id)
+        token_set_type(tok, (enum zis_token_type)kw_id);
     clear_temp_var(l);
 
     token_set_pos1(tok, l), tok->column1--;
 
     zis_debug_log(
-        TRACE, "Lexer", "identifier: %.*s",
+        TRACE, "Lexer", "identifier%s: %.*s",
+        tok->type == ZIS_TOK_IDENTIFIER ? "" : " (keyword)",
         (int)zis_symbol_obj_data_size(tok->value_identifier),
         zis_symbol_obj_data(tok->value_identifier)
     );
@@ -752,7 +799,7 @@ scan_next_char:
     case 'z':
     case '_':
     case_identifier:
-        scan_identifier(l, tok);
+        scan_identifier_or_keyword(l, tok);
         break;
 
     case '"':
@@ -812,8 +859,16 @@ token_set_pos1__pos_next__return:
 /* ----- public functions --------------------------------------------------- */
 
 void zis_lexer_init(struct zis_lexer *restrict l, struct zis_context *z) {
+    struct zis_map_obj *keyword_table = z->globals->val_lexer_keywords;
+    if (zis_object_is_smallint(zis_object_from(keyword_table))) {
+        // NOTE: see "globals.c".
+        keyword_table = keyword_table_new(z);
+        z->globals->val_lexer_keywords = keyword_table;
+    }
+
     zis_lexer_finish(l);
     l->z = z;
+    l->keywords = keyword_table;
 }
 
 void zis_lexer_start(
@@ -828,6 +883,7 @@ void zis_lexer_start(
 
 void zis_lexer_finish(struct zis_lexer *restrict l) {
     l->input = zis_object_cast(zis_smallint_to_ptr(0), struct zis_stream_obj);
+    l->keywords = zis_object_cast(zis_smallint_to_ptr(0), struct zis_map_obj);
     l->temp_var = zis_smallint_to_ptr(0);
     l->error_handler = NULL;
 }
@@ -843,9 +899,10 @@ void zis_lexer_next(struct zis_lexer *restrict l, struct zis_token *restrict tok
 
 void _zis_lexer_gc_visit(struct zis_lexer *restrict l, int op) {
     struct zis_object **begin = (struct zis_object **)&l->input;
-    struct zis_object **end = begin + 2;
+    struct zis_object **end = begin + 3;
     assert((void *)begin[0] == (void *)l->input);
-    assert((void *)begin[1] == (void *)l->temp_var);
+    assert((void *)begin[1] == (void *)l->keywords);
+    assert((void *)begin[2] == (void *)l->temp_var);
     zis_objmem_visit_object_vec(begin, end, (enum zis_objmem_obj_visit_op)op);
 }
 
