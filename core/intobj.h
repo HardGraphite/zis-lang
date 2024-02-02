@@ -15,7 +15,7 @@ struct zis_int_obj;
 /// Create a small int or an `Int` object.
 struct zis_object *zis_int_obj_or_smallint(struct zis_context *z, int64_t val);
 
-/// Create a small int or an `Int` object from string.
+/// Create a small int or an `Int` object from string. Underscores ('_') are ignored.
 /// `base` must be in range [2,36]. Returns NULL if no valid character is given.
 struct zis_object *zis_int_obj_or_smallint_s(
     struct zis_context *z,

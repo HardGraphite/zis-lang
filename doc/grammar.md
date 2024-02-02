@@ -8,12 +8,16 @@
 
 ```
 lit_int
-  = ( { ?/[0-9]/? } )                        (* DEC *)
-  | ( "0" ("b" | "B") { ?/[0-1]/? } )        (* BIN *)
-  | ( "0" ("o" | "O") { ?/[0-7]/? } )        (* OCT *)
-  | ( "0" ("o" | "X") { ?/[0-9a-fA-F]/? } )  (* HEX *)
+  = ( { ?/[0-9]/? } )                         (* DEC *)
+  | ( "0" ("b" | "B") { ?/[0-1_]/? } )        (* BIN *)
+  | ( "0" ("o" | "O") { ?/[0-7_]/? } )        (* OCT *)
+  | ( "0" ("o" | "X") { ?/[0-9a-fA-F_]/? } )  (* HEX *)
   ;
 ```
+
+Optional case-insensitive prefix "`0b`", "`0o`", or "`0x`"
+indicates the base of the integer literal.
+Optional underscore "`_`" may be inserted between the digits as a separator.
 
 Examples:
 
@@ -23,6 +27,7 @@ Examples:
 0123    #=>  123
 0b0110  #=>  6
 0Xff    #=>  255
+12_34   #=>  1234
 ```
 
 #### Floating-point literals

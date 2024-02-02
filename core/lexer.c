@@ -185,7 +185,7 @@ static void scan_number(
             tok->value = zis_smallint_to_ptr(0);
             goto scan_floating_point;
         default:
-            if (!isdigit(c)) {
+            if (!(isdigit(c) || c == '_')) {
                 if (isalpha(c))
                     error_unexpected_char(l, c);
                 token_set_pos1(tok, l);
@@ -267,6 +267,8 @@ scan_floating_point:
         c = stream_peek(input);
         const unsigned int x = zis_char_digit((zis_wchar_t)c);
         if (x >= digit_base) {
+            if (c == '_')
+                continue;
             if (!fractional_count)
                 error_unexpected_end_of(l, "number literal");
             break;

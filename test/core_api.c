@@ -148,6 +148,17 @@ static void do_test_int_str_2(zis_t z, const char *s, int base) {
     zis_test_assert_eq(strcmp(buf_out, s), 0);
 }
 
+static void do_test_int_str_3(zis_t z, const char *s, int base, int64_t val) {
+    int status;
+    int64_t val_out;
+    zis_test_log(ZIS_TEST_LOG_TRACE, "v=%s/%" PRIi64 ",base=%i", s, val, base);
+    status = zis_make_int_s(z, 0, s, (size_t)-1, base);
+    zis_test_assert_eq(status, ZIS_OK);
+    status = zis_read_int(z, 0, &val_out);
+    zis_test_assert_eq(status, ZIS_OK);
+    zis_test_assert_eq(val, val_out);
+}
+
 zis_test_define(test_int, z) {
     for (int64_t i = INT8_MIN; i <= INT8_MAX; i++) {
         do_test_int64(z, i);
@@ -165,6 +176,8 @@ zis_test_define(test_int, z) {
     do_test_int64(z, INT64_MAX);
     do_test_int_str_2(z, "10000000000000000000000000000000000000000000000", 10);
     do_test_int_str_2(z, "1234567890qwertyuiopasdfghjklzxcbnm", 36);
+    do_test_int_str_3(z, "-1_2_3", 10, -123);
+    do_test_int_str_3(z, "ff_ff", 16, 0xffff);
 }
 
 static void do_test_float(zis_t z, double v) {

@@ -140,20 +140,26 @@ struct zis_object *zis_int_obj_or_smallint_s(
     }
 
     const char *str_end = str;
-    for (
-        const char *const str_end_max = *str_end_p;
-        str_end <= str_end_max && zis_char_digit(*str_end) < base;
-        str_end++
-    );
-    if (str_end == str)
+    size_t digit_count = 0;
+    for (const char *const str_end_max = *str_end_p; str_end < str_end_max; str_end++) {
+        const char c = *str_end;
+        if (zis_char_digit(c) < base)
+            digit_count++;
+        else if (c != '_')
+            break;
+    }
+    if (!digit_count)
         return NULL;
     *str_end_p = str_end;
-    const unsigned int num_width = (unsigned int)ceil((double)(str_end - str) * log2(base));
+    const unsigned int num_width = (unsigned int)ceil((double)digit_count * log2(base));
 
     if (num_width < ZIS_SMALLINT_WIDTH) {
         zis_smallint_t num = 0;
         for (const char *p = str; p < str_end; p++) {
-            num = num * base + zis_char_digit(*p);
+            const char c = *p;
+            if (zis_unlikely(c == '_'))
+                continue;
+            num = num * base + zis_char_digit(c);
             assert(0 <= num && num <= ZIS_SMALLINT_MAX);
         }
         if (negative)
@@ -167,8 +173,12 @@ struct zis_object *zis_int_obj_or_smallint_s(
         bigint_cell_t *cells = self->cells;
         bigint_zero(cells, cell_count);
         for (const char *p = str; p < str_end; p++) {
-            const bigint_cell_t c = bigint_self_mul_add_1(cells, cell_count, base, zis_char_digit(*p));
-            assert(!c), zis_unused_var(c);
+            const char c = *p;
+            if (zis_unlikely(c == '_'))
+                continue;
+            const bigint_cell_t carry =
+                bigint_self_mul_add_1(cells, cell_count, base, zis_char_digit(c));
+            assert(!carry), zis_unused_var(carry);
         }
         return zis_object_from(self);
     }

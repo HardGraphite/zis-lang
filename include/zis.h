@@ -280,7 +280,7 @@ ZIS_API int zis_read_int(zis_t z, unsigned int reg, int64_t *val) ZIS_NOEXCEPT;
  *
  * @param z zis instance
  * @param reg register index
- * @param str pointer to the integer string (prefix "-" is allowed)
+ * @param str pointer to the integer string (prefix '-' is allowed; underscores '_' are ignored)
  * @param str_sz size in bytes of the string `str`, or `-1` to take `str` as a NUL-terminated string
  * @param base integer string base; the absolute value of which must be in the range `[2,36]`
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_ARG` (illegal `str`).

@@ -60,6 +60,8 @@ zis_test_define(test_lexer_lit_int, z) {
         snprintf(buffer, sizeof buffer, "%#09X", i);
         do_test_lexer_lit_int(z, buffer, i);
     }
+    do_test_lexer_lit_int(z, "1_2_34", 1234);
+    do_test_lexer_lit_int(z, "0xff_ff", 0xffff);
 
     do_compile_expecting_error(z, "0x");
     do_compile_expecting_error(z, "0a1");
