@@ -284,9 +284,82 @@ scan_floating_point:
     );
 }
 
+static zis_wchar_t _lit_str_esc_trans(const char *restrict s, const char **restrict s_end_p) {
+    const char *s_end = *s_end_p;
+    const ptrdiff_t s_n = s_end - s;
+    if (!s_n)
+        return (zis_wchar_t)-1;
+
+    zis_wchar_t result;
+    switch (s[0]) {
+    case '\'':
+        result = '\'';
+        break;
+    case '"':
+        result = '"';
+        break;
+    case '\\':
+        result = '\\';
+        break;
+    case 'a':
+        result = '\a';
+        break;
+    case 'b':
+        result = '\b';
+        break;
+    case 'f':
+        result = '\f';
+        break;
+    case 'n':
+        result = '\n';
+        break;
+    case 'r':
+        result = '\r';
+        break;
+    case 't':
+        result = '\t';
+        break;
+    case 'v':
+        result = '\v';
+        break;
+    case 'x':
+        if (s_n >= 3 && isdigit(s[1]) && isxdigit(s[2])) {
+            const int x = (s[1] - '0') * 16 + (isdigit(s[2]) ? s[2] - '0' : tolower(s[2]) - 'a' + 10);
+            if (x < 0x80) {
+                result = (zis_wchar_t)x;
+                s += 2;
+                break;
+            }
+        }
+        return (zis_wchar_t)-1;
+    case 'u':
+        if (s_n < 4 || s[1] != '{')
+            return (zis_wchar_t)-1;
+        result = 0;
+        for (ptrdiff_t i = 2; ; i++) {
+            const char c = s[i];
+            if (c == '}') {
+                s += i;
+                break;
+            }
+            if (i >= s_n || !isxdigit(c))
+                return (zis_wchar_t)-1;
+            result = result * 16 + (isdigit(c) ? c - '0' : tolower(c) - 'a' + 10);
+            if (result > 0x10fff)
+                return (zis_wchar_t)-1;
+        }
+        break;
+    default:
+        return (zis_wchar_t)-1;
+    }
+
+    *s_end_p = s + 1;
+    return result;
+}
+
 static void scan_string(
     struct zis_lexer *l, struct zis_token *restrict tok,
-    int32_t delimiter
+    int32_t delimiter, bool allow_escape_sequences
 ) {
     // token_set_pos0(tok, l);
     token_set_type(tok, ZIS_TOK_LIT_STRING);
@@ -305,22 +378,39 @@ static void scan_string(
             error_unexpected_end_of(l, "input stream before the string literal terminates");
         const char *end_p = buf;
         assert(buf_sz);
-        while (true) {
-            end_p = memchr(end_p, (int)delimiter, buf_sz);
+        for (const char *const buf_end = buf + buf_sz; end_p <= buf_end; ) {
+            end_p = memchr(end_p, (int)delimiter, (size_t)(buf_end - end_p));
             if (!end_p) {
                 end_p = (char *)zis_u8str_find_end((const zis_char8_t *)buf, buf_sz);
                 if (!end_p)
                     error(l, "illegal string literal");
                 break;
             }
-            if (end_p[-1] != '\\') {
+            if (end_p[-1] != '\\' || !allow_escape_sequences) {
                 end_reached = true;
                 break;
             }
+            for (const char *p = buf; ; ) {
+                assert(p <= end_p);
+                p = memchr(p, '\\', (size_t)(end_p - p));
+                if (!p) {
+                    end_reached = true;
+                    goto end_p_ready;
+                }
+                if (p == end_p - 1) {
+                    end_p++;
+                    break;
+                }
+                p += 2;
+            }
         }
+    end_p_ready:;
         const size_t consumed_size = (size_t)(end_p - buf);
         assert(consumed_size <= buf_sz);
-        struct zis_string_obj *str_obj = zis_string_obj_new(z, buf, consumed_size);
+        struct zis_string_obj *str_obj =
+            allow_escape_sequences ?
+            zis_string_obj_new_esc(z, buf, consumed_size, _lit_str_esc_trans) :
+            zis_string_obj_new(z, buf, consumed_size);
         stream_buffer_ignore(input, consumed_size);
         pos_next_char_n(l, (unsigned int)consumed_size);
         if (!str_obj)
@@ -569,11 +659,20 @@ scan_next_char:
     case '>': // ">", ">=", ">>"
         CASE_OPERATOR_3('>', ZIS_TOK_OP_GT, ZIS_TOK_OP_GE, ZIS_TOK_OP_SHR);
 
-    case '?': // ","
+    case '?': // "?"
         CASE_OPERATOR_1('?', ZIS_TOK_QUESTION);
 
-    case '@': // ","
-        CASE_OPERATOR_1('@', ZIS_TOK_AT);
+    case '@': // "@", `@"..."'
+        stream_ignore_1(input);
+        {
+            const int32_t second_char = stream_peek(input);
+            if (second_char == '"' || second_char == '\'') {
+                scan_string(l, tok, second_char, false);
+                break;
+            }
+        }
+        token_set_type(tok, ZIS_TOK_AT);
+        goto token_set_pos1__pos_next__return;
 
     case '^': // "^", "^="
         CASE_OPERATOR_2('^', ZIS_TOK_OP_BIT_XOR, ZIS_TOK_OP_BIT_XOR_EQL);
@@ -656,7 +755,7 @@ scan_next_char:
 
     case '"':
     case '\'':
-        scan_string(l, tok, first_char);
+        scan_string(l, tok, first_char, true);
         break;
 
     case '(':

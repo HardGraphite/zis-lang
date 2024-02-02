@@ -45,16 +45,46 @@ Examples:
 
 ```
 lit_string
-  = ( "'" { (- "'") } "'" )
-  | ( '"' { (- '"') } '"' )
+  = ?lit_str_delim? ?lit_str_char_or_esc_seq? ?lit_str_delim?
+  | "@" ?lit_str_delim? ?lit_str_char_seq? ?lit_str_delim?
   ;
 ```
+
+The `?lit_str_delim?` is a quotation mark (`'` or `"`).
+The `?lit_str_char_or_esc_seq?` and `?lit_str_char_seq?` are
+sequences of any characters excepting standalone `?lit_str_delim?`s.
+In `?lit_str_char_or_esc_seq?`,
+escape sequences (starting with backslash `\`) are used to represent special characters;
+while in `?lit_str_char_seq?`,
+each character is scanned as it is.
+
+Escape sequences:
+
+| Sequence  | Description                |
+|:---------:|----------------------------|
+|   `\'`    | single quote    (`U+0027`) |
+|   `\"`    | double quote    (`U+0022`) |
+|   `\\`    | backslash       (`U+005C`) |
+|   `\a`    | audible bell    (`U+0007`) |
+|   `\b`    | backspace       (`U+0008`) |
+|   `\f`    | form feed       (`U+000C`) |
+|   `\n`    | line feed       (`U+000A`) |
+|   `\r`    | carriage return (`U+000D`) |
+|   `\t`    | horizontal tab  (`U+0009`) |
+|   `\v`    | vertical tab    (`U+000B`) |
+| `\x`*nn*  | byte `0x`*nn*              |
+| `\u{...}` | Unicode character `U+`...  |
 
 Examples:
 
 ```
 "hello, world"
 'bye, world'
+'*line-1*\n*line-2*'   #=> *line-1*<LF>*line-2*
+"\x7e1"                #=> ~1
+'\u{4f60}\u{597D}^_^'  #=> <U+4F60><U+597D>^_^
+@"\\\"                 #=> \\\
+@'*line-1*\n*line-1*'  #=> *line-1*\n*line-1*
 ```
 
 #### Identifiers

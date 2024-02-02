@@ -23,6 +23,15 @@ struct zis_string_obj *zis_string_obj_new(
     const char *s, size_t n /* = -1 */
 );
 
+/// Create a `String` like `zis_string_obj_new()`, allowing escape sequence ("\\...").
+/// The translator function shall return the translated character and update the `s_end` pointer;
+/// or return -1 to report an error.
+struct zis_string_obj *zis_string_obj_new_esc(
+    struct zis_context *z,
+    const char *s, size_t n /* = -1 */,
+    zis_string_obj_wchar_t (*escape_translator)(const char *restrict s, const char **restrict s_end)
+);
+
 struct zis_string_obj *_zis_string_obj_new_empty(struct zis_context *z);
 
 /// Create a `String` object from a character (Unicode code point).

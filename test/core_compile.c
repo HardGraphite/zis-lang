@@ -94,13 +94,27 @@ static void do_test_lexer_lit_string(zis_t z, const char *restrict code, const c
 }
 
 zis_test_define(test_lexer_lit_string, z) {
+    do_test_lexer_lit_string(z, "''", "");
     do_test_lexer_lit_string(z, "'abc'", "abc");
     do_test_lexer_lit_string(z, "\"abc\"", "abc");
     do_test_lexer_lit_string(z, u8"'你好，世界！'", u8"你好，世界！");
+    do_test_lexer_lit_string(z, "'\\\\'", "\\");
+    do_test_lexer_lit_string(z, "'\\''", "'");
     do_test_lexer_lit_string(z, "'a\nb'", "a\nb");
+    do_test_lexer_lit_string(z, "'\\x7e1'", "~1");
+    do_test_lexer_lit_string(z, "'\\u{4f60}\\u{597D}^_^'", "~1");
+    do_test_lexer_lit_string(z, "@'\\\\\\'", "\\\\\\");
 
     do_compile_expecting_error(z, "'abc");
     do_compile_expecting_error(z, "\"abc'");
+    do_compile_expecting_error(z, "'\\x1'");
+    do_compile_expecting_error(z, "'\\x1g'");
+    do_compile_expecting_error(z, "'\\xff'");
+    do_compile_expecting_error(z, "'\\u{123'");
+    do_compile_expecting_error(z, "'\\u{}'");
+    do_compile_expecting_error(z, "'\\z'");
+    do_compile_expecting_error(z, "'\\'");
+    do_compile_expecting_error(z, "'\\\\\\'");
 }
 
 static void do_test_lexer_lit_identifier(zis_t z, const char *restrict code, const char *restrict val) {

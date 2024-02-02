@@ -87,7 +87,8 @@ struct zis_string_obj *zis_string_obj_new(
 
     zis_wchar_t codepoint_max = 0;
     size_t      char_count    = 0;
-    if (n != (size_t)-1) {
+    assert(n != (size_t)-1);
+    {
         const zis_char8_t *src_p = (const zis_char8_t *)s, *const src_end = src_p + n;
         while (src_p < src_end) {
             zis_wchar_t  codepoint;
@@ -101,21 +102,6 @@ struct zis_string_obj *zis_string_obj_new(
         }
         if (src_p != src_end) // error at (src_end - 1 - s)
             return NULL;
-    } else {
-        // `n` is unknown
-        const zis_char8_t *src_p = (const zis_char8_t *)s;
-        while (true) {
-            zis_wchar_t  codepoint;
-            const size_t char_len = zis_u8char_to_code(&codepoint, src_p, (void *)UINTPTR_MAX);
-            if (zis_unlikely(!char_len)) // error at (src_p - s)
-                return NULL;
-            if (codepoint > codepoint_max)
-                codepoint_max = codepoint;
-            else if (zis_unlikely(codepoint == 0))
-                break;
-            src_p += char_len;
-            char_count++;
-        }
     }
 
 #define COPY_STR_DATA(C_X) \
@@ -134,6 +120,85 @@ struct zis_string_obj *zis_string_obj_new(
     if (codepoint_max <= STR_OBJ_C1_CODE_MAX) {
         self = string_obj_alloc(z, STR_OBJ_C1, char_count);
         if (codepoint_max < 0x80)
+            memcpy(string_obj_data(self), s, char_count);
+        else
+            COPY_STR_DATA(1);
+    } else if (codepoint_max <= STR_OBJ_C2_CODE_MAX) {
+        self = string_obj_alloc(z, STR_OBJ_C2, char_count);
+        COPY_STR_DATA(2);
+    } else {
+        self = string_obj_alloc(z, STR_OBJ_C4, char_count);
+        COPY_STR_DATA(4);
+    }
+    return self;
+
+#undef COPY_STR_DATA
+}
+
+struct zis_string_obj *zis_string_obj_new_esc(
+    struct zis_context *z,
+    const char *s, size_t n /* = -1 */,
+    zis_string_obj_wchar_t (*escape_translator)(const char *restrict s, const char **restrict s_end)
+) {
+    // Adapted from `zis_string_obj_new()`.
+
+    if (zis_unlikely(n == (size_t)-1))
+        n = strlen(s);
+
+    if (zis_unlikely(!n))
+        return z->globals->val_empty_string;
+
+    zis_wchar_t codepoint_max = 0;
+    size_t      char_count    = 0;
+    bool        has_esc_seq   = false;
+    assert(n != (size_t)-1);
+    {
+        const zis_char8_t *src_p = (const zis_char8_t *)s, *const src_end = src_p + n;
+        while (src_p < src_end) {
+            zis_wchar_t  codepoint;
+            const size_t char_len = zis_u8char_to_code(&codepoint, src_p, src_end);
+            if (zis_unlikely(!char_len)) // error at (src_p - s)
+                return NULL;
+            if (codepoint == '\\') {
+                has_esc_seq = true;
+                const char *esc_end_p = s + n;
+                codepoint = escape_translator((const char *)src_p + 1, &esc_end_p);
+                if (codepoint == (zis_wchar_t)-1)
+                    return NULL;
+                assert(esc_end_p <= s + n);
+                src_p = (const zis_char8_t *)esc_end_p - 1;
+            }
+            if (codepoint > codepoint_max)
+                codepoint_max = codepoint;
+            src_p += char_len;
+            char_count++;
+        }
+        if (src_p != src_end) // error at (src_end - 1 - s)
+            return NULL;
+    }
+
+#define COPY_STR_DATA(C_X) \
+    do {                   \
+        const zis_char8_t *src_p = (const zis_char8_t *)s; \
+        string_obj_c##C_X##_t *dst_p = string_obj_data(self); \
+        for (size_t i = 0; i < char_count; i++) {          \
+            zis_wchar_t ch;\
+            src_p   += zis_u8char_to_code(&ch, src_p, (void *)UINTPTR_MAX); \
+            if (ch == '\\') {                              \
+                const char *esc_end_p = s + n;             \
+                ch = escape_translator((const char *)src_p, &esc_end_p);    \
+                assert(ch != (zis_wchar_t)-1);             \
+                assert(esc_end_p <= s + n);                \
+                src_p = (const zis_char8_t *)esc_end_p;    \
+            }              \
+            *dst_p++ = (string_obj_c##C_X##_t)ch;          \
+        }                  \
+    } while (0) // ^^^ COPY_STR_DATA() ^^^
+
+    struct zis_string_obj *self;
+    if (codepoint_max <= STR_OBJ_C1_CODE_MAX) {
+        self = string_obj_alloc(z, STR_OBJ_C1, char_count);
+        if (codepoint_max < 0x80 && !has_esc_seq)
             memcpy(string_obj_data(self), s, char_count);
         else
             COPY_STR_DATA(1);
