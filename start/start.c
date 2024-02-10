@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "cliutil.h"
 #include "zis_config.h"
@@ -47,10 +48,22 @@ static void oh_help(struct clopts_context *ctx, const char *arg, void *_data) {
 
 static void oh_version(struct clopts_context *ctx, const char *arg, void *_data) {
     assert(!arg), (void)arg, (void)_data;
+    FILE *const stream = stdout;
+
+    char time_str[32];
+    const time_t timestamp = (time_t)zis_build_info.timestamp * 60;
+    strftime(time_str, sizeof time_str, "%F %R %z", localtime(&timestamp));
+
     fprintf(
-        stdout, ZIS_DISPLAY_NAME " %u.%u.%u\n",
-        zis_version[0], zis_version[1], zis_version[2]
+        stream, ZIS_DISPLAY_NAME " %u.%u.%u\n" "[%s %s; %s; %s]\n",
+        zis_build_info.version[0], zis_build_info.version[1], zis_build_info.version[2],
+        zis_build_info.system, zis_build_info.machine, zis_build_info.compiler, time_str
     );
+    if (zis_build_info.extra) {
+        fputc('\n', stream);
+        fputs(zis_build_info.extra, stream);
+        fputc('\n', stream);
+    }
     clopts_handler_break(ctx);
 }
 
@@ -66,7 +79,7 @@ static void rest_args_handler(
 
 static const struct clopts_option program_options[] = {
     {'h', NULL, oh_help, "Print help message and exit."},
-    {'v', NULL, oh_version, "Print version and exit."},
+    {'v', NULL, oh_version, "Print version and build information, and exit."},
     {0, 0, 0, 0},
 };
 

@@ -25,6 +25,8 @@ set(ZIS_ENVIRON_NAME_DEBUG_LOG "${zis_name_upper}_DEBUG_LOG" CACHE STRING
     "Environment variable name for debug logging configuration. Optional.")
 unset(zis_name_upper)
 
+set(ZIS_BUILD_EXTRA_INFO "" CACHE STRING "Extra build information. See `zis_build_info`.")
+
 ##########################
 ##### Generate files #####
 ##########################
@@ -32,11 +34,31 @@ unset(zis_name_upper)
 set(zis_core_conf_header_dir "${CMAKE_CURRENT_BINARY_DIR}")
 set(zis_core_conf_header_dir ${zis_core_conf_header_dir} PARENT_SCOPE)
 
+# Compiler info.
+if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    set(ZIS_BUILD_COMPILER_INFO "GCC")
+else()
+    set(ZIS_BUILD_COMPILER_INFO ${CMAKE_C_COMPILER_ID})
+endif()
+set(ZIS_BUILD_COMPILER_INFO "${ZIS_BUILD_COMPILER_INFO} ${CMAKE_C_COMPILER_VERSION}")
+# Build timestamp.
+string(TIMESTAMP ZIS_BUILD_TIMESTAMP "%s" UTC)
+# Extra info.
+if(ZIS_BUILD_EXTRA_INFO)
+    set(ZIS_BUILD_EXTRA_INFO_STR "${ZIS_BUILD_EXTRA_INFO}")
+    string(REPLACE "\\" "\\\\" ZIS_BUILD_EXTRA_INFO_STR "${ZIS_BUILD_EXTRA_INFO_STR}")
+    string(REPLACE "\"" "\\\"" ZIS_BUILD_EXTRA_INFO_STR "${ZIS_BUILD_EXTRA_INFO_STR}")
+    set(ZIS_BUILD_EXTRA_INFO_STR "\"${ZIS_BUILD_EXTRA_INFO_STR}\"")
+endif()
+
 file(CONFIGURE OUTPUT "${zis_core_conf_header_dir}/zis_config.h" @ONLY CONTENT [==[
 #pragma once
 #define         ZIS_VERSION_MAJOR   @ZIS_VERSION_MAJOR@
 #define         ZIS_VERSION_MINOR   @ZIS_VERSION_MINOR@
 #define         ZIS_VERSION_PATCH   @ZIS_VERSION_PATCH@
+#define         ZIS_BUILD_COMPILER_INFO    "@ZIS_BUILD_COMPILER_INFO@"
+#define         ZIS_BUILD_TIMESTAMP        (@ZIS_BUILD_TIMESTAMP@ / 60)
+#cmakedefine    ZIS_BUILD_EXTRA_INFO       @ZIS_BUILD_EXTRA_INFO_STR@
 #define         ZIS_FILENAME_EXTENSION_SRC "@ZIS_FILENAME_EXTENSION_SRC@"
 #define         ZIS_FILENAME_EXTENSION_NDL "@ZIS_FILENAME_EXTENSION_NDL@"
 #define         ZIS_FILENAME_EXTENSION_BYT "@ZIS_FILENAME_EXTENSION_BYT@"

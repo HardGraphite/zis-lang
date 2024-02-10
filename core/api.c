@@ -27,6 +27,7 @@
 #include "mapobj.h"
 #include "moduleobj.h"
 #include "pathobj.h"
+#include "platform.h"
 #include "streamobj.h"
 #include "stringobj.h"
 #include "symbolobj.h"
@@ -96,10 +97,23 @@ static struct zis_object *api_get_current_func_or(zis_t z, struct zis_object *al
 
 /* ----- zis-api-general ---------------------------------------------------- */
 
-ZIS_API const uint_least16_t zis_version[3] = {
-    ZIS_VERSION_MAJOR,
-    ZIS_VERSION_MINOR,
-    ZIS_VERSION_PATCH,
+ZIS_API const struct zis_build_info zis_build_info = {
+    .system    = ZIS_SYSTEM_NAME,
+    .machine   = ZIS_ARCH_NAME,
+    .compiler  = ZIS_BUILD_COMPILER_INFO,
+    .extra     =
+#ifdef ZIS_BUILD_EXTRA_INFO
+        ZIS_BUILD_EXTRA_INFO
+#else // !ZIS_BUILD_EXTRA_INFO
+        NULL
+#endif // ZIS_BUILD_EXTRA_INFO
+    ,
+    .timestamp = ZIS_BUILD_TIMESTAMP,
+    .version   = {
+        ZIS_VERSION_MAJOR,
+        ZIS_VERSION_MINOR,
+        ZIS_VERSION_PATCH,
+    },
 };
 
 /* ----- zis-api-context ---------------------------------------------------- */

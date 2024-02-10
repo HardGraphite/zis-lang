@@ -67,9 +67,21 @@ extern "C" {
 /** @} */
 
 /**
- * Version number: { major, minor, patch }.
+ * Build information structure. @see `zis_build_info`.
  */
-ZIS_API extern const uint_least16_t zis_version[3];
+struct zis_build_info {
+    const char *system;     ///< Operating system name.
+    const char *machine;    ///< Hardware (architecture) name.
+    const char *compiler;   ///< Compiler name and version.
+    const char *extra;      ///< Extra information. Optional.
+    uint32_t    timestamp;  ///< UNIX timestamp (UTC), divided by 60.
+    uint8_t     version[3]; ///< Version number (major, minor, patch).
+};
+
+/**
+ * Build information.
+ */
+ZIS_API extern const struct zis_build_info zis_build_info;
 
 /** @} */
 
