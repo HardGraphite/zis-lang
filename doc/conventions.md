@@ -16,17 +16,17 @@
 
 ### Braces and spaces
 
-- For a code block,
-  opening brace shall be put at the end of a line
-  and closing brace shall be put at the beginning of a line.
-- Use a space after keywords `if`, `switch`, `case`, `for`, `while`, `do`.
-- Use a space around (on each side of) binary and ternary operators.
-- Use a space around (on each side of) "`//`" and "`/*`"
-  unless they are at the beginning of a line.
-- May add extra spaces around operators to align them.
-- No space around the `.` and `->` operators.
-- No space after unary operators.
-- No trailing whitespace.
+-   For a code block,
+    opening brace shall be put at the end of a line
+    and closing brace shall be put at the beginning of a line.
+-   Use a space after keywords `if`, `switch`, `case`, `for`, `while`, `do`.
+-   Use a space around (on each side of) binary and ternary operators.
+-   Use a space around (on each side of) "`//`" and "`/*`"
+    unless they are at the beginning of a line.
+-   May add extra spaces around operators to align them.
+-   No space around the `.` and `->` operators.
+-   No space after unary operators.
+-   No trailing whitespace.
 
 ### Breaking long lines
 

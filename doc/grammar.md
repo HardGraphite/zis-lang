@@ -8,11 +8,11 @@
 
 ```
 lit_int
-  = ( { ?/[0-9]/? } )                         (* DEC *)
-  | ( "0" ("b" | "B") { ?/[0-1_]/? } )        (* BIN *)
-  | ( "0" ("o" | "O") { ?/[0-7_]/? } )        (* OCT *)
-  | ( "0" ("o" | "X") { ?/[0-9a-fA-F_]/? } )  (* HEX *)
-  ;
+    = ( { ?/[0-9]/? } )                         (* DEC *)
+    | ( "0" ("b" | "B") { ?/[0-1_]/? } )        (* BIN *)
+    | ( "0" ("o" | "O") { ?/[0-7_]/? } )        (* OCT *)
+    | ( "0" ("o" | "X") { ?/[0-9a-fA-F_]/? } )  (* HEX *)
+    ;
 ```
 
 Optional case-insensitive prefix "`0b`", "`0o`", or "`0x`"
@@ -34,8 +34,8 @@ Examples:
 
 ```
 lit_float
-  = lit_int "." ?lit_int without prefix?
-  ;
+    = lit_int "." ?lit_int without prefix?
+    ;
 ```
 
 Examples:
@@ -50,9 +50,9 @@ Examples:
 
 ```
 lit_string
-  = ?lit_str_delim? ?lit_str_char_or_esc_seq? ?lit_str_delim?
-  | "@" ?lit_str_delim? ?lit_str_char_seq? ?lit_str_delim?
-  ;
+    = ?lit_str_delim? ?lit_str_char_or_esc_seq? ?lit_str_delim?
+    | "@" ?lit_str_delim? ?lit_str_char_seq? ?lit_str_delim?
+    ;
 ```
 
 The `?lit_str_delim?` is a quotation mark (`'` or `"`).
