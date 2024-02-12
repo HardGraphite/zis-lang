@@ -151,7 +151,7 @@ static struct zis_map_obj *keyword_table_new(struct zis_context *z) {
     ;
 
     zis_locals_decl_1(z, var, struct zis_map_obj *kwt);
-    zis_locals_zero(z, var);
+    zis_locals_zero(var);
     var.kwt = zis_map_obj_new(z, 1.0f, kw_count);
 
     for (unsigned int tt = first_kw_tok_id, tt_end = tt + kw_count; tt < tt_end; tt++) {

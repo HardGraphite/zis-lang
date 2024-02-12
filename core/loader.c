@@ -316,7 +316,7 @@ static bool module_loader_load_from_file(
         struct zis_module_obj *module;
         struct zis_func_obj *init_func;
     );
-    zis_locals_zero(z, var);
+    zis_locals_zero(var);
     var.module = _module;
 
     int status = ZIS_OK;
@@ -406,7 +406,7 @@ static bool module_loader_load_from_source(
         struct zis_module_obj *module;
         struct zis_func_obj *init_func;
     );
-    zis_locals_zero(z, var);
+    zis_locals_zero(var);
     var.module = _module;
     var.init_func = zis_compile_source(z, input);
     int status = ZIS_OK;
@@ -677,7 +677,7 @@ struct zis_module_obj *zis_module_loader_import(
         struct zis_module_obj *module;
         struct zis_symbol_obj *module_name, *sub_module_name;
     );
-    zis_locals_zero(z, var);
+    zis_locals_zero(var);
     var.module_name = _module_name;
     if (_sub_module_name)
         var.sub_module_name = _sub_module_name;

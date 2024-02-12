@@ -110,7 +110,7 @@ void zis_type_obj_load_native_def(
         struct zis_array_slots_obj *method_table;
         struct zis_map_obj *statics_map;
     );
-    zis_locals_zero(z, var);
+    zis_locals_zero(var);
     var.self = _self;
 
     if (name_map_reserve)

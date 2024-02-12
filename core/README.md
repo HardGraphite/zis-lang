@@ -94,7 +94,7 @@ struct xyz_obj *xyz_obj_add(zis_context *z, struct xyz_obj *_a, struct xyz_obj *
         z, var,
         struct xyz_obj *a, *b;
     ); // Declare local references.
-    // zis_locals_zero(z, var); // This line is not needed here.
+    // zis_locals_zero(var); // This line is not needed here.
     var.a = _a. var.b = _b; // Initialize the variables.
     struct xyz_adder_obj *adder = xyz_adder_obj_new(z); // Create object.
     struct xyz_obj *y = xyz_adder_obj_add(adder, var.a, var.b);

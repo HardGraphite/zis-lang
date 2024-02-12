@@ -22,7 +22,7 @@ struct zis_context {
     struct zis_symbol_registry *symbol_registry;
     struct zis_context_globals *globals;
     struct zis_module_loader   *module_loader;
-    struct _zis_locals_root     locals_root;
+    struct zis_locals_root      locals_root;
     zis_context_panic_handler_t panic_handler;
 };
 
