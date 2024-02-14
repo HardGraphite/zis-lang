@@ -38,21 +38,23 @@ enum zis_ast_node_type {
 // ^^^ zis_ast_node_new() ^^^
 
 /// Get data field of a node.
-#define zis_ast_node_get_field(__node_var, __type, __field) \
-(                                                           \
-    assert(zis_ast_node_obj_type((__node_var)) == ZIS_AST_NODE_##__type), \
-    _zis_ast_node_obj_data_as((__node_var), struct zis_ast_node_##__type##_data)->__field \
-)                                                           \
+#define zis_ast_node_get_field(__node, __type, __field) \
+(                                                       \
+    assert(zis_ast_node_obj_type((__node)) == ZIS_AST_NODE_##__type),                 \
+    _zis_ast_node_obj_data_as((__node), struct zis_ast_node_##__type##_data)->__field \
+)                                                        \
 // ^^^ zis_ast_node_get_field() ^^^
 
 /// Set data field of a node.
-#define zis_ast_node_set_field(__node_var, __type, __field, __value) \
-do {                                                                 \
+#define zis_ast_node_set_field(__node, __type, __field, __value) \
+do {                                                             \
     (void)sizeof((((struct zis_ast_node_##__type##_data *)0)->__field = (__value)) ? 1 : 0); \
-    void *const __value_1 = (__value);                               \
-    zis_ast_node_get_field(__node_var, __type, __field) = __value_1; \
-    zis_object_write_barrier((__node_var), __value_1);               \
-} while (0)                                                          \
+    struct zis_ast_node_obj *const __node_1 = (__node);          \
+    assert(zis_ast_node_obj_type(__node_1) == ZIS_AST_NODE_##__type); \
+    void *const __value_1 = (__value);                           \
+    _zis_ast_node_obj_data_as(__node_1, struct zis_ast_node_##__type##_data)->__field = __value_1; \
+    zis_object_write_barrier(__node_1, __value_1);               \
+} while (0)                                                      \
 // ^^^ zis_ast_node_set_field() ^^^
 
 /* ----- node object -------------------------------------------------------- */

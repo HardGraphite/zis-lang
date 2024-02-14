@@ -54,8 +54,8 @@ struct zis_symbol_obj;
     E(OR            , "||" , 14) \
     E(PERIOD        , "."  ,  1) \
     E(COLON         , ":"  ,  1) \
-    E(CALL          , "()" ,  2) \
-    E(SUBSCRIPT     , "[]" ,  2) \
+    E(CALL          , "(...)",2) \
+    E(SUBSCRIPT     , "[...]",2) \
 // ^^^ ZIS_BINARY_OPERATOR_LIST ^^^
 
 #define ZIS_SPECIAL_OPERATOR_LIST \
@@ -94,6 +94,13 @@ struct zis_symbol_obj;
     E(END     , "end"     ) \
 // ^^^ ZIS_KEYWORD_LIST ^^^
 
+#define ZIS_LITERAL_TYPE_LIST \
+    E(INT   , "integer"     ) \
+    E(FLOAT , "floating-point") \
+    E(STRING, "string"      ) \
+    E(SYMBOL, "symbol"      ) \
+// ^^^ ZIS_LITERAL_TYPE_LIST ^^^
+
 #if ZIS_FEATURE_SRC
 
 /// Type of lexical tokens.
@@ -115,12 +122,11 @@ enum zis_token_type {
     ZIS_KEYWORD_LIST
 #undef E
 
-    ZIS_TOK_IDENTIFIER,
+#define E(NAME, TEXT) ZIS_TOK_LIT_##NAME ,
+    ZIS_LITERAL_TYPE_LIST
+#undef E
 
-    ZIS_TOK_LIT_INT,    ///< Literal: integer.
-    ZIS_TOK_LIT_FLOAT,  ///< Literal: floating-point.
-    ZIS_TOK_LIT_STRING, ///< Literal: string.
-    ZIS_TOK_LIT_SYMBOL, ///< Literal: symbol.
+    ZIS_TOK_IDENTIFIER,
 
     ZIS_TOK_EOS, ///< End of statement.
     ZIS_TOK_EOF, ///< End of file.
@@ -157,6 +163,9 @@ zis_static_force_inline const char *zis_token_keyword_text(enum zis_token_type t
     assert(zis_token_type_is_keyword(tt));
     return _zis_token_keyword_texts[(unsigned)tt - (unsigned)ZIS_TOK_KW_NIL];
 }
+
+/// Represent the token type as a string. This can be very slow.
+const char *zis_token_type_represent(enum zis_token_type tt);
 
 /// Lexical tokens.
 struct zis_token {

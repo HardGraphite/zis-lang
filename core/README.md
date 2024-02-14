@@ -26,6 +26,7 @@ Source code for the runtime core.
     - [`ast.h`](ast.h), [`ast.c`](ast.c)
     - [`compile.h`](compile.h), [`compile.c`](compile.c)
     - [`lexer.h`](lexer.h), [`lexer.c`](lexer.c)
+    - [`parser.h`](parser.c), [`parser.c`](parser.c)
     - [`token.h`](token.h), [`token.c`](token.c)
 + object system support (`obj*.*`)
     - [`locals.h`](locals.h), [`locals.c`](locals.c)

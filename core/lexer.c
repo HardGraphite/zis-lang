@@ -29,10 +29,10 @@
 
 /// Format the error message and call the handler. No-return.
 zis_printf_fn_attrs(2, 3) zis_noreturn zis_noinline zis_cold_fn
-    static void error(
-        struct zis_lexer *restrict l,
-        zis_printf_fn_arg_fmtstr const char *restrict fmt, ...
-    ) {
+static void error(
+    struct zis_lexer *restrict l,
+    zis_printf_fn_arg_fmtstr const char *restrict fmt, ...
+) {
     char msg_buf[128];
     va_list ap;
     va_start(ap, fmt);
@@ -892,8 +892,9 @@ void zis_lexer_next(struct zis_lexer *restrict l, struct zis_token *restrict tok
     scan_next(l, tok);
     assert(zis_object_is_smallint(l->temp_var));
     zis_debug_log(
-        TRACE, "Lexer", "token: pos=(%u,%u-%u,%u), type=%i",
-        tok->line0, tok->column0, tok->line1, tok->column1, tok->type
+        TRACE, "Lexer", "token: pos=(%u,%u-%u,%u), type=%i, name=%s",
+        tok->line0, tok->column0, tok->line1, tok->column1, tok->type,
+        zis_token_type_represent(tok->type)
     );
 }
 
