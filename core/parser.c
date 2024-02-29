@@ -21,6 +21,7 @@
 #include "arrayobj.h"
 #include "exceptobj.h"
 #include "stringobj.h"
+#include "symbolobj.h"
 
 #if ZIS_FEATURE_SRC
 
@@ -121,7 +122,7 @@ static void next_token(struct zis_parser *restrict p) {
     ))
 
 #define parser_debug_log_node_end(__p, __type) \
-    (zis_debug_log(TRACE, "Parser", "%-*c<%s/>", (int)(__p)->tree_depth--, ' ', (__type)))
+    (zis_debug_log(TRACE, "Parser", "%-*c</%s>", (int)(__p)->tree_depth--, ' ', (__type)))
 
 /* ----- convinient functions ----------------------------------------------- */
 
@@ -770,7 +771,7 @@ static struct zis_ast_node_obj *parse_Module(struct zis_parser *p) {
     zis_locals_decl_1(p, var, struct zis_ast_node_obj *node);
     zis_locals_zero_1(var, node);
     var.node = zis_ast_node_new(parser_z(p), Module, true);
-    zis_ast_node_set_field(var.node, Module, file, zis_string_obj_new(parser_z(p), "", 0));
+    zis_ast_node_set_field(var.node, Module, file, zis_object_from(zis_string_obj_new(parser_z(p), "", 0)));
     zis_ast_node_set_field(var.node, Module, body, parse_block(p));
     memset(zis_ast_node_obj_position(var.node), 0, sizeof(struct zis_ast_node_obj_position));
     parser_debug_log_node_end(p, "Module");
@@ -796,6 +797,66 @@ void zis_parser_destroy(struct zis_parser *p, struct zis_context *z) {
     zis_mem_free(p);
 }
 
+#if ZIS_DEBUG_LOGGING
+
+static void _parser_dump_ast(
+    struct zis_context *z, FILE *fp,
+    struct zis_ast_node_obj *node, unsigned int level
+) {
+    const enum zis_ast_node_type node_type = zis_ast_node_obj_type(node);
+    const struct zis_ast_node_obj_position *const node_pos =
+        zis_ast_node_obj_position(node);
+    struct zis_context_globals *const g = z->globals;
+    fprintf(
+        fp, "%*c%s pos=\"%u:%u-%u:%u\">\n",
+        level, '<', zis_ast_node_type_represent(node_type),
+        node_pos->line0, node_pos->column0, node_pos->line1, node_pos->column1
+    );
+    const char *f_names[4]; struct zis_type_obj *f_types[4];
+    int f_n = zis_ast_node_type_fields(z, node_type, f_names, f_types);
+    assert(f_n >= 0);
+    for (int i = 0; i < f_n; i++) {
+        fprintf(fp, "%*c%s>\n", level + 1, '<', f_names[i]);
+        struct zis_object *const field_obj = node->_data[i];
+        struct zis_type_obj *field_obj_type;
+        if (zis_object_is_smallint(field_obj)) {
+            fprintf(fp, "%*c%lli\n", level + 1, ' ', (long long)zis_smallint_from_ptr(field_obj));
+        } else if ((field_obj_type = zis_object_type(field_obj)), field_obj_type == g->type_AstNode) {
+            _parser_dump_ast(z, fp, zis_object_cast(field_obj, struct zis_ast_node_obj), level + 2);
+        } else if (field_obj_type == g->type_Array) {
+            struct zis_array_obj *const arr_obj = zis_object_cast(field_obj, struct zis_array_obj);
+            for (size_t i = 0, n = zis_array_obj_length(arr_obj); i < n; i++) {
+                struct zis_object *elem = zis_array_obj_get(arr_obj, i);
+                if (!zis_object_is_smallint(elem) && zis_object_type(elem) == g->type_AstNode)
+                    _parser_dump_ast(z, fp, zis_object_cast(elem, struct zis_ast_node_obj), level + 2);
+                else
+                    fprintf(fp, "%*c...\n", level + 1, ' ');
+            }
+        } else if (field_obj_type == g->type_Symbol) {
+            struct zis_symbol_obj *const sym_obj = zis_object_cast(field_obj, struct zis_symbol_obj);
+            const char *s = zis_symbol_obj_data(sym_obj);
+            const int n = (int)zis_symbol_obj_data_size(sym_obj);
+            fprintf(fp, "%*c%.*s\n", level + 1, ' ', n, s);
+        } else if (field_obj_type == g->type_String) {
+            char buffer[64]; size_t size = sizeof buffer;
+            size = zis_string_obj_value(zis_object_cast(field_obj, struct zis_string_obj), buffer, size);
+            if (size != (size_t)-1)
+                fprintf(fp, "%*c<![CDATA[%.*s]]>\n", level + 1, ' ', (int)size, buffer);
+            else
+                fprintf(fp, "%*c(long string)\n", level + 1, ' ');
+        } else if (field_obj_type == g->type_Bool) {
+            const char *s = field_obj == zis_object_from(g->val_true) ? "true" : "false";
+            fprintf(fp, "%*c%s\n", level + 1, ' ', s);
+        } else {
+            fprintf(fp, "%*c...\n", level + 1, ' ');
+        }
+        fprintf(fp, "%*c/%s>\n", level + 1, '<', f_names[i]);
+    }
+    fprintf(fp, "%*c/%s>\n", level, '<', zis_ast_node_type_represent(node_type));
+}
+
+#endif // ZIS_DEBUG_LOGGING
+
 struct zis_ast_node_obj *zis_parser_parse(
     struct zis_parser *p,
     struct zis_stream_obj *input,
@@ -807,6 +868,7 @@ struct zis_ast_node_obj *zis_parser_parse(
 #if ZIS_DEBUG_LOGGING
     p->tree_depth = 0;
 #endif // ZIS_DEBUG_LOGGING
+
     if (!parser_error_setjmp(p)) {
         next_token(p);
         switch (what) {
@@ -822,9 +884,19 @@ struct zis_ast_node_obj *zis_parser_parse(
         zis_locals_root_reset(&p->locals_root);
         result = NULL;
     }
+
     zis_lexer_finish(&p->lexer);
     p->token.value = zis_smallint_to_ptr(0);
     assert(!p->locals_root._list);
+
+#if ZIS_DEBUG_LOGGING
+    if (result) {
+        zis_debug_log_1(DUMP, "Parser", "zis_parser_parse()", stream, {
+            _parser_dump_ast(parser_z(p), stream, result, 1);
+        });
+    }
+#endif // ZIS_DEBUG_LOGGING
+
     return result;
 }
 

@@ -1,7 +1,9 @@
 #include "ast.h"
 
 #include <assert.h>
+#include <string.h>
 
+#include "compat.h"
 #include "context.h"
 #include "globals.h"
 #include "ndefutil.h"
@@ -23,13 +25,58 @@ static const char *const node_type_text[(unsigned int)_ZIS_AST_NODE_TYPE_COUNT] 
 
 };
 
+static const char *node_type_fields[(unsigned int)_ZIS_AST_NODE_TYPE_COUNT] = {
+
+    // [ TYPE ] = "NAME1\0TYPE1\0NAME2\0TYPE2\0"
+
+#define E(NAME, FIELD_LIST) [ (unsigned int) ZIS_AST_NODE_##NAME ] = FIELD_LIST ,
+    ZIS_AST_NODE_LIST
+#undef E
+
+};
+
 #pragma pack(pop)
 
 const char *zis_ast_node_type_represent(enum zis_ast_node_type type) {
     const unsigned int type_index = (unsigned int)type;
     if (type_index < (unsigned int)_ZIS_AST_NODE_TYPE_COUNT)
         return node_type_text[type_index];
-    return "?";
+    return NULL;
+}
+
+int zis_ast_node_type_fields(
+    struct zis_context *z, enum zis_ast_node_type type,
+    const char *restrict f_names[ZIS_PARAMARRAY_STATIC 4],
+    struct zis_type_obj *restrict f_types[ZIS_PARAMARRAY_STATIC 4]
+) {
+    const unsigned int type_index = (unsigned int)type;
+    if (type_index >= (unsigned int)_ZIS_AST_NODE_TYPE_COUNT)
+        return -1;
+    struct zis_context_globals *const g = z->globals;
+    const char *fields = node_type_fields[type_index];
+    for (unsigned int i = 0; ; i++) {
+        assert(i < 4);
+        if (!*fields)
+            return (unsigned int)i;
+        const char *field_type_name = fields;
+        const char *field_name = field_type_name + strlen(field_type_name) + 1;
+        fields = field_name + strlen(field_name) + 1;
+        f_names[i] = field_name;
+        struct zis_type_obj *field_type;
+        if (strcmp(field_type_name, "Node") == 0)
+            field_type = g->type_AstNode;
+        else if (strcmp(field_type_name, "Array") == 0)
+            field_type = g->type_Array;
+        else if (strcmp(field_type_name, "Symbol") == 0)
+            field_type = g->type_Symbol;
+        else if (strcmp(field_type_name, "Bool") == 0)
+            field_type = g->type_Bool;
+        else if (strcmp(field_type_name, "Object") == 0)
+            field_type = NULL;
+        else
+            return -1;
+        f_types[i] = field_type;
+    }
 }
 
 /* ----- node object -------------------------------------------------------- */

@@ -163,44 +163,44 @@ struct zis_ast_node_Map_data {
 };
 
 struct zis_ast_node_Module_data {
-    struct zis_string_obj *file;
+    struct zis_object *file;
     struct zis_array_obj *body;
 };
 
 #define ZIS_AST_NODE_LIST \
-    E(Nil            , "value") \
-    E(Bool           , "value") \
-    E(Constant       , "value") \
-    E(Name           , "value") \
-    E(Pos            , "value") \
-    E(Neg            , "value") \
-    E(BitNot         , "value") \
-    E(Not            , "value") \
-    E(Add            , "lhs,rhs") \
-    E(Sub            , "lhs,rhs") \
-    E(Mul            , "lhs,rhs") \
-    E(Div            , "lhs,rhs") \
-    E(Rem            , "lhs,rhs") \
-    E(Shl            , "lhs,rhs") \
-    E(Shr            , "lhs,rhs") \
-    E(BitAnd         , "lhs,rhs") \
-    E(BitOr          , "lhs,rhs") \
-    E(BitXor         , "lhs,rhs") \
-    E(Assign         , "lhs,rhs") \
-    E(Eq             , "lhs,rhs") \
-    E(Ne             , "lhs,rhs") \
-    E(Lt             , "lhs,rhs") \
-    E(Le             , "lhs,rhs") \
-    E(Gt             , "lhs,rhs") \
-    E(Ge             , "lhs,rhs") \
-    E(And            , "lhs,rhs") \
-    E(Or             , "lhs,rhs") \
-    E(Subscript      , "value,key") \
-    E(Field          , "value,name") \
-    E(Call           , "value,args") \
-    E(Send           , "target,method,args") \
-    E(Tuple          , "args") \
-    E(Array          , "args") \
-    E(Map            , "args") \
-    E(Module         , "file,body") \
+    E(Nil            , "Object\0value\0") \
+    E(Bool           , "Bool\0value\0") \
+    E(Constant       , "Object\0value\0") \
+    E(Name           , "Symbol\0value\0") \
+    E(Pos            , "Node\0value\0") \
+    E(Neg            , "Node\0value\0") \
+    E(BitNot         , "Node\0value\0") \
+    E(Not            , "Node\0value\0") \
+    E(Add            , "Node\0lhs\0Node\0rhs\0") \
+    E(Sub            , "Node\0lhs\0Node\0rhs\0") \
+    E(Mul            , "Node\0lhs\0Node\0rhs\0") \
+    E(Div            , "Node\0lhs\0Node\0rhs\0") \
+    E(Rem            , "Node\0lhs\0Node\0rhs\0") \
+    E(Shl            , "Node\0lhs\0Node\0rhs\0") \
+    E(Shr            , "Node\0lhs\0Node\0rhs\0") \
+    E(BitAnd         , "Node\0lhs\0Node\0rhs\0") \
+    E(BitOr          , "Node\0lhs\0Node\0rhs\0") \
+    E(BitXor         , "Node\0lhs\0Node\0rhs\0") \
+    E(Assign         , "Node\0lhs\0Node\0rhs\0") \
+    E(Eq             , "Node\0lhs\0Node\0rhs\0") \
+    E(Ne             , "Node\0lhs\0Node\0rhs\0") \
+    E(Lt             , "Node\0lhs\0Node\0rhs\0") \
+    E(Le             , "Node\0lhs\0Node\0rhs\0") \
+    E(Gt             , "Node\0lhs\0Node\0rhs\0") \
+    E(Ge             , "Node\0lhs\0Node\0rhs\0") \
+    E(And            , "Node\0lhs\0Node\0rhs\0") \
+    E(Or             , "Node\0lhs\0Node\0rhs\0") \
+    E(Subscript      , "Node\0value\0Node\0key\0") \
+    E(Field          , "Node\0value\0Symbol\0name\0") \
+    E(Call           , "Node\0value\0Array\0args\0") \
+    E(Send           , "Node\0target\0Symbol\0method\0Array\0args\0") \
+    E(Tuple          , "Array\0args\0") \
+    E(Array          , "Array\0args\0") \
+    E(Map            , "Array\0args\0") \
+    E(Module         , "Object\0file\0Array\0body\0") \
 // ^^^ ZIS_AST_NODE_LIST ^^^

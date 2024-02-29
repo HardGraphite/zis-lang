@@ -24,7 +24,7 @@ function(zis_update_astdef input_file output_file)
         string(STRIP ${CMAKE_MATCH_2} node_field_list)
         string(REGEX REPLACE "[ \t]*,[ \t]*" ";" node_field_list ${node_field_list})
 
-        set(field_name_list)
+        set(field_list)
         string(APPEND result_structs_string "struct zis_ast_node_${node_name}_data {\n")
         foreach(node_field IN LISTS node_field_list)
             if(NOT node_field MATCHES "([0-9a-zA-Z<>]+)[ \t]+([0-9a-z_]+)")
@@ -34,7 +34,7 @@ function(zis_update_astdef input_file output_file)
             set(field_name ${CMAKE_MATCH_2})
             set(field_type_node_type_name)
 
-            list(APPEND field_name_list ${field_name})
+            list(APPEND field_list "${field_type}\\0${field_name}")
 
             if (field_type STREQUAL "Node")
                 set(field_c_type "struct zis_ast_node_obj *")
@@ -58,8 +58,8 @@ function(zis_update_astdef input_file output_file)
 
         set(node_name_formatted ${node_name})
         _zis_astdef_string_ljust(node_name_formatted 15)
-        string(REPLACE ";" "," field_names_formatted "${field_name_list}")
-        string(APPEND result_name_list_string "    E(${node_name_formatted}, \"${field_names_formatted}\") \\\n")
+        string(REPLACE ";" "\\0" field_list_formatted "${field_list}\\0") # See "ast.c".
+        string(APPEND result_name_list_string "    E(${node_name_formatted}, \"${field_list_formatted}\") \\\n")
     endforeach()
 
     string(APPEND result_name_list_string "// ^^^ ZIS_AST_NODE_LIST ^^^\n")

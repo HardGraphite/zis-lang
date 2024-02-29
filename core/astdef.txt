@@ -50,4 +50,4 @@ Tuple          (Array args)
 Array          (Array args)
 Map            (Array args)
 
-Module         (String file, Array body)
+Module         (Object file, Array body)

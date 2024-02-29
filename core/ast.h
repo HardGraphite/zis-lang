@@ -5,6 +5,7 @@
 #include <stdbool.h>
 
 #include "attributes.h"
+#include "compat.h"
 #include "object.h"
 
 #include "zis_config.h" // ZIS_FEATURE_SRC
@@ -59,6 +60,15 @@ do {                                                             \
 
 /// Represent node type as text.
 const char *zis_ast_node_type_represent(enum zis_ast_node_type type);
+
+/// Get field names and types of a node type.
+/// Returns the number of fields; or -1 on error.
+/// The field type being NULL means the field can be any object.
+int zis_ast_node_type_fields(
+    struct zis_context *z, enum zis_ast_node_type type,
+    const char *restrict f_names[ZIS_PARAMARRAY_STATIC 4],
+    struct zis_type_obj *restrict f_types[ZIS_PARAMARRAY_STATIC 4]
+);
 
 /* ----- node object -------------------------------------------------------- */
 
