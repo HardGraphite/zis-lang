@@ -57,6 +57,9 @@ do {                                                             \
 } while (0)                                                      \
 // ^^^ zis_ast_node_set_field() ^^^
 
+/// Represent node type as text.
+const char *zis_ast_node_type_represent(enum zis_ast_node_type type);
+
 /* ----- node object -------------------------------------------------------- */
 
 /// AST node object.

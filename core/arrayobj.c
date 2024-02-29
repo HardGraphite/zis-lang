@@ -161,29 +161,13 @@ void zis_array_obj_append(
     self->length = old_len + 1;
 }
 
-struct zis_object *zis_array_obj_pop(
-    struct zis_context *z,
-    struct zis_array_obj *self
-) {
+struct zis_object *zis_array_obj_pop(struct zis_array_obj *self) {
     struct zis_array_slots_obj *self_data = self->_data;
-    const size_t old_cap = zis_array_slots_obj_length(self_data);
     const size_t old_len = self->length;
+    assert(old_len <= zis_array_slots_obj_length(self_data));
 
     if (zis_unlikely(!old_len))
         return NULL; // empty
-
-    if (zis_unlikely(old_len <= old_cap / 2 && old_len >= 16)) {
-        const size_t new_cap = old_len;
-
-        zis_locals_decl_1(z, var, struct zis_array_obj *self);
-        var.self = self;
-        self_data = zis_array_slots_obj_new2(z, new_cap, self_data);
-        self = var.self;
-        zis_locals_drop(z, var);
-
-        self->_data = self_data;
-        zis_object_write_barrier(self, self_data);
-    }
 
     const size_t new_len = old_len - 1;
     self->length = new_len;
@@ -240,7 +224,7 @@ bool zis_array_obj_remove(
     if (zis_unlikely(!old_len || pos >= old_len))
         return false;
     if (zis_unlikely(pos == old_len - 1)) {
-        zis_array_obj_pop(z, self);
+        zis_array_obj_pop(self);
         return true;
     }
 
@@ -370,7 +354,7 @@ bool zis_array_obj_Mx_remove_element(
             if (zis_unlikely(idx == 0))
                 return false;
             if (idx == -1)
-                return zis_array_obj_pop(z, self) ? true : false;
+                return zis_array_obj_pop(self) ? true : false;
             idx = len_smi + idx;
             if (zis_unlikely((size_t)idx >= len))
                 return false;

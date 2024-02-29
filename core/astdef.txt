@@ -12,7 +12,42 @@
 #   - Object   ->  struct zis_object *
 #   - Xxx      ->  struct zis_xxx_obj *
 
+Nil            (Object value)
+Bool           (Bool value)
 Constant       (Object value)
 Name           (Symbol value)
+
+Pos            (Node value)
+Neg            (Node value)
+BitNot         (Node value)
+Not            (Node value)
+
+Add            (Node lhs, Node rhs)
+Sub            (Node lhs, Node rhs)
+Mul            (Node lhs, Node rhs)
+Div            (Node lhs, Node rhs)
+Rem            (Node lhs, Node rhs)
+Shl            (Node lhs, Node rhs)
+Shr            (Node lhs, Node rhs)
+BitAnd         (Node lhs, Node rhs)
+BitOr          (Node lhs, Node rhs)
+BitXor         (Node lhs, Node rhs)
+Assign         (Node lhs, Node rhs)
+Eq             (Node lhs, Node rhs)
+Ne             (Node lhs, Node rhs)
+Lt             (Node lhs, Node rhs)
+Le             (Node lhs, Node rhs)
+Gt             (Node lhs, Node rhs)
+Ge             (Node lhs, Node rhs)
+And            (Node lhs, Node rhs)
+Or             (Node lhs, Node rhs)
+Subscript      (Node value, Node key)
+Field          (Node value, Symbol name)
+Call           (Node value, Array args)
+Send           (Node target, Symbol method, Array args)
+
+Tuple          (Array args)
+Array          (Array args)
+Map            (Array args)
 
 Module         (String file, Array body)

@@ -118,6 +118,21 @@ zis_array_obj_data(const struct zis_array_obj *self) {
     return self->_data->_data;
 }
 
+/// Get the first element of the array.
+/// Return NULL if the array is empty.
+zis_static_force_inline struct zis_object *
+zis_array_obj_front(const struct zis_array_obj *self) {
+    return self->length ? self->_data->_data[0] : NULL;
+}
+
+/// Get the last element of the array.
+/// Return NULL if the array is empty.
+zis_static_force_inline struct zis_object *
+zis_array_obj_back(const struct zis_array_obj *self) {
+    const size_t n = self->length;
+    return n ? self->_data->_data[n - 1] : NULL;
+}
+
 /// Add new element to the end of the array.
 void zis_array_obj_append(
     struct zis_context *z,
@@ -126,10 +141,7 @@ void zis_array_obj_append(
 
 /// Remove and return the last element of the array.
 /// Return NULL if the array is empty.
-struct zis_object *zis_array_obj_pop(
-    struct zis_context *z,
-    struct zis_array_obj *self
-);
+struct zis_object *zis_array_obj_pop(struct zis_array_obj *self);
 
 /// Insert an element to `pos`.
 bool zis_array_obj_insert(

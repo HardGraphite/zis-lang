@@ -34,6 +34,16 @@ struct zis_symbol_obj;
     E(BIT_OR        , "|"  , 12) \
     E(BIT_XOR       , "^"  , 11) \
     E(EQL           , "="  ,-15) \
+    E(EQ            , "==" ,  9) \
+    E(NE            , "!=" ,  9) \
+    E(LT            , "<"  ,  8) \
+    E(LE            , "<=" ,  8) \
+    E(GT            , ">"  ,  8) \
+    E(GE            , ">=" ,  8) \
+    E(AND           , "&&" , 13) \
+    E(OR            , "||" , 14) \
+    E(SUBSCRIPT     , "[...]",2) \
+    E(PERIOD        , "."  ,  1) \
     E(ADD_EQL       , "+=" ,-15) \
     E(SUB_EQL       , "-=" ,-15) \
     E(MUL_EQL       , "*=" ,-15) \
@@ -44,23 +54,11 @@ struct zis_symbol_obj;
     E(BIT_AND_EQL   , "&=" ,-15) \
     E(BIT_OR_EQL    , "|=" ,-15) \
     E(BIT_XOR_EQL   , "^=" ,-15) \
-    E(EQ            , "==" ,  9) \
-    E(NE            , "!=" ,  9) \
-    E(LT            , "<"  ,  8) \
-    E(LE            , "<=" ,  8) \
-    E(GT            , ">"  ,  8) \
-    E(GE            , ">=" ,  8) \
-    E(AND           , "&&" , 13) \
-    E(OR            , "||" , 14) \
-    E(PERIOD        , "."  ,  1) \
     E(COLON         , ":"  ,  1) \
     E(CALL          , "(...)",2) \
-    E(SUBSCRIPT     , "[...]",2) \
 // ^^^ ZIS_BINARY_OPERATOR_LIST ^^^
 
 #define ZIS_SPECIAL_OPERATOR_LIST \
-    E(COMMA         , ","       ) \
-    E(HASHTAG       , "#"       ) \
     E(AT            , "@"       ) \
     E(QUESTION      , "?"       ) \
     E(DOLLAR        , "$"       ) \
@@ -68,6 +66,7 @@ struct zis_symbol_obj;
     E(ELLIPSIS      , "..."     ) \
     E(L_ARROW       , "<-"      ) \
     E(R_ARROW       , "->"      ) \
+    E(COMMA         , ","       ) \
     E(L_PAREN       , "("       ) \
     E(R_PAREN       , ")"       ) \
     E(L_BRACKET     , "["       ) \
@@ -138,7 +137,11 @@ enum zis_token_type {
 
 /// Check whether the token is a binary operator.
 #define zis_token_type_is_bin_op(tok_type) \
-    zis_uint_in_range(unsigned, tok_type, ZIS_TOK_OP_ADD, ZIS_TOK_OP_SUBSCRIPT)
+    zis_uint_in_range(unsigned, tok_type, ZIS_TOK_OP_ADD, ZIS_TOK_OP_CALL)
+
+/// Check whether the token is an unary/binary operator.
+#define zis_token_type_is_operator(tok_type) \
+    zis_uint_in_range(unsigned, tok_type, ZIS_TOK_OP_POS, ZIS_TOK_OP_CALL)
 
 /// Check whether the token is a keyword.
 #define zis_token_type_is_keyword(tok_type) \
@@ -148,11 +151,11 @@ enum zis_token_type {
 #define zis_token_type_is_literal(tok_type) \
     zis_uint_in_range(unsigned, tok_type, ZIS_TOK_LIT_INT, ZIS_TOK_LIT_SYMBOL)
 
-extern const signed char _zis_token_operator_precedences[(unsigned)ZIS_TOK_OP_SUBSCRIPT + 1U];
+extern const signed char _zis_token_operator_precedences[(unsigned)ZIS_TOK_OP_CALL + 1U];
 
 /// Get the precedence of an operator. Negative value means a right-to-left associativity.
 zis_static_force_inline signed char zis_token_operator_precedence(enum zis_token_type tt) {
-    assert(zis_token_type_is_un_op(tt) || zis_token_type_is_bin_op(tt));
+    assert(zis_token_type_is_operator(tt));
     return _zis_token_operator_precedences[(unsigned)tt];
 }
 

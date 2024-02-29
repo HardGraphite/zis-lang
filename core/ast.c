@@ -13,6 +13,25 @@
 
 /* ----- AST nodes ---------------------------------------------------------- */
 
+#pragma pack(push, 1)
+
+static const char *const node_type_text[(unsigned int)_ZIS_AST_NODE_TYPE_COUNT] = {
+
+#define E(NAME, FIELD_LIST) [ (unsigned int) ZIS_AST_NODE_##NAME ] = #NAME ,
+    ZIS_AST_NODE_LIST
+#undef E
+
+};
+
+#pragma pack(pop)
+
+const char *zis_ast_node_type_represent(enum zis_ast_node_type type) {
+    const unsigned int type_index = (unsigned int)type;
+    if (type_index < (unsigned int)_ZIS_AST_NODE_TYPE_COUNT)
+        return node_type_text[type_index];
+    return "?";
+}
+
 /* ----- node object -------------------------------------------------------- */
 
 struct zis_ast_node_obj *_zis_ast_node_obj_new(

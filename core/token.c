@@ -8,7 +8,7 @@ static_assert((unsigned)ZIS_TOK_OP_POS == 0, "");
 static_assert((unsigned)ZIS_TOK_OP_NOT + 1 == (unsigned)ZIS_TOK_OP_ADD, "");
 
 const signed char
-_zis_token_operator_precedences[(unsigned)ZIS_TOK_OP_SUBSCRIPT + 1U] = {
+_zis_token_operator_precedences[(unsigned)ZIS_TOK_OP_CALL + 1U] = {
 
 #define E(NAME, TEXT, PRECEDENCE) [(unsigned)ZIS_TOK_OP_##NAME] = PRECEDENCE ,
     ZIS_UNARY_OPERATOR_LIST
