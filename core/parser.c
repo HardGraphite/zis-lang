@@ -520,6 +520,7 @@ zis_nodiscard static bool expr_builder_put_r_paren(
 }
 
 /// Consume all operators and operands to generate the finally result.
+/// If no expression is generated returns NULL.
 static struct zis_ast_node_obj *expr_builder_generate_expr(
     struct expr_builder_state *eb, struct zis_parser *p
 ) {
@@ -528,19 +529,16 @@ static struct zis_ast_node_obj *expr_builder_generate_expr(
     while (zis_array_obj_length(eb->operator_stack)) {
         expr_builder_gen_one_expr(eb, p);
     }
-    if (zis_unlikely(zis_array_obj_length(eb->operand_stack) != 1)) {
-        if (zis_array_obj_length(eb->operand_stack)) {
+    const size_t rest_operands_count = zis_array_obj_length(eb->operand_stack);
+    if (zis_unlikely(rest_operands_count != 1)) {
+        if (!rest_operands_count) {
+            return NULL; // empty expression
+        } else {
             struct zis_object *node = zis_array_obj_pop(eb->operand_stack);
             assert(zis_object_type(node) == z->globals->type_AstNode);
             struct zis_ast_node_obj_position *pos =
                 zis_ast_node_obj_position(zis_object_cast(node, struct zis_ast_node_obj));
             error(p, pos->line0, pos->column0, "unexpected %s", "expression");
-        } else {
-            const struct zis_token *tok = this_token(p);
-            error(
-                p, tok->line0, tok->column0, "expected %s before %s",
-                "an expression", zis_token_type_represent(tok->type)
-            );
         }
     }
 
@@ -628,7 +626,7 @@ static struct zis_ast_node_obj *parse_Subs_args(struct zis_parser *p) {
     error_not_implemented(p, __func__);
 }
 
-/// Parse an expression.
+/// Parse an expression. If there is no expression here returns NULL.
 static struct zis_ast_node_obj *parse_expression(struct zis_parser *p) {
     parser_debug_log_node_begin(p, "expression");
 
@@ -732,20 +730,27 @@ end_expr_building:;
 
     struct zis_ast_node_obj *node = expr_builder_generate_expr(&var.expr_builder, p);
     zis_locals_drop(p, var);
-    return node;
+    return node; // `node` may be NULL.
 }
 
 /// Parse a statement. If the next token is an end of a block, returns NULL.
 static struct zis_ast_node_obj *parse_statement(struct zis_parser *p) {
-    const enum zis_token_type tok_type = this_token(p)->type;
-    if (zis_token_type_is_keyword(tok_type)) {
-        zis_context_panic(parser_z(p), ZIS_CONTEXT_PANIC_ABORT); // Not implemented.
-    }
-    if (tok_type == ZIS_TOK_EOF)
+    struct zis_ast_node_obj *node;
+    while (true) {
+        const enum zis_token_type tok_type = this_token(p)->type;
+        if (zis_token_type_is_keyword(tok_type)) {
+            error_not_implemented(p, __func__);
+        }
+        if (zis_unlikely(tok_type == ZIS_TOK_EOS)) {
+            next_token(p);
+            continue; // empty statement
+        }
+        if ((node = parse_expression(p))) {
+            check_token_type_and_ignore(p, ZIS_TOK_EOS);
+            return node;
+        }
         return NULL;
-    struct zis_ast_node_obj *node = parse_expression(p);
-    check_token_type_and_ignore(p, ZIS_TOK_EOS);
-    return node;
+    }
 }
 
 /// Parse a block.
