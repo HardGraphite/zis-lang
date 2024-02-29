@@ -520,7 +520,6 @@ zis_nodiscard static bool expr_builder_put_r_paren(
 }
 
 /// Consume all operators and operands to generate the finally result.
-/// If no expression is generated returns NULL.
 static struct zis_ast_node_obj *expr_builder_generate_expr(
     struct expr_builder_state *eb, struct zis_parser *p
 ) {
@@ -532,7 +531,11 @@ static struct zis_ast_node_obj *expr_builder_generate_expr(
     const size_t rest_operands_count = zis_array_obj_length(eb->operand_stack);
     if (zis_unlikely(rest_operands_count != 1)) {
         if (!rest_operands_count) {
-            return NULL; // empty expression
+            const struct zis_token *tok = this_token(p);
+            error(
+                p, tok->line0, tok->column0, "expected %s before %s",
+                "an expression", zis_token_type_represent(tok->type)
+            );
         } else {
             struct zis_object *node = zis_array_obj_pop(eb->operand_stack);
             assert(zis_object_type(node) == z->globals->type_AstNode);
@@ -626,7 +629,7 @@ static struct zis_ast_node_obj *parse_Subs_args(struct zis_parser *p) {
     error_not_implemented(p, __func__);
 }
 
-/// Parse an expression. If there is no expression here returns NULL.
+/// Parse an expression.
 static struct zis_ast_node_obj *parse_expression(struct zis_parser *p) {
     parser_debug_log_node_begin(p, "expression");
 
@@ -730,10 +733,12 @@ end_expr_building:;
 
     struct zis_ast_node_obj *node = expr_builder_generate_expr(&var.expr_builder, p);
     zis_locals_drop(p, var);
-    return node; // `node` may be NULL.
+    assert(node);
+    return node;
 }
 
-/// Parse a statement. If the next token is an end of a block, returns NULL.
+/// Parse a statement.
+/// If the next token is an end of a block (some keyword or EOF), returns NULL.
 static struct zis_ast_node_obj *parse_statement(struct zis_parser *p) {
     struct zis_ast_node_obj *node;
     while (true) {
@@ -741,15 +746,22 @@ static struct zis_ast_node_obj *parse_statement(struct zis_parser *p) {
         if (zis_token_type_is_keyword(tok_type)) {
             error_not_implemented(p, __func__);
         }
-        if (zis_unlikely(tok_type == ZIS_TOK_EOS)) {
-            next_token(p);
-            continue; // empty statement
+        if (zis_unlikely(tok_type >= ZIS_TOK_EOS)) {
+            static_assert((int)ZIS_TOK_EOS + 1 == (int)ZIS_TOK_EOF, "");
+            static_assert((int)ZIS_TOK_EOS + 2 == (int)_ZIS_TOK_COUNT, "");
+            if (tok_type == ZIS_TOK_EOS) {
+                next_token(p);
+                continue; // empty statement
+            }
+            if (tok_type == ZIS_TOK_EOF) {
+                return NULL; // end
+            }
+            zis_unreachable();
         }
         if ((node = parse_expression(p))) {
             check_token_type_and_ignore(p, ZIS_TOK_EOS);
             return node;
         }
-        return NULL;
     }
 }
 

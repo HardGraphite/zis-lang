@@ -129,6 +129,8 @@ enum zis_token_type {
 
     ZIS_TOK_EOS, ///< End of statement.
     ZIS_TOK_EOF, ///< End of file.
+
+    _ZIS_TOK_COUNT
 };
 
 /// Check whether the token is a unary operator.
