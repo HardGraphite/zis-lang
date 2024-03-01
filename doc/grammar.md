@@ -214,11 +214,12 @@ array_expr
     ;
 
 subscript_expr
-    | expr "[" expr [{ "," expr }] [ "," ] "]"
+    = expr "[" expr "]"                          (* key is passed as it is *)
+    | expr "[" expr [{ "," expr }] [ "," ] "]"   (* keys are packed as a tuple *)
     ;
 
 map_expr
-    | "{" "}"
+    = "{" "}"
     | "{" map_elem_expr [{ "," map_elem_expr }] [ "," ] "}"
     ;
 map_elem_expr
@@ -230,7 +231,9 @@ Notes:
 
 - For unary and binary expressions, the precedences and associativities matter.
 - Trailing commas are allowing in bracket-rounded expressions.
-- The trailing comma cannot be omitted if there is exactly one element in a `tuple_expr`.
+- In a `tuple_expr`, the trailing comma cannot be omitted if there is exactly one element.
+- In a `subscript_expr` where the keys are expected to be passed as a tuple,
+    the trailing comma cannot be omitted if there is exactly one key.
 - In a bracket-rounded expression, end-of-line tokens are ignored.
 
 Examples:

@@ -605,9 +605,8 @@ static struct zis_ast_node_obj *parse_Name(struct zis_parser *p) {
     return node;
 }
 
-static struct zis_ast_node_obj *parse_expression_1(
-    struct zis_parser *p, struct expr_builder_state *restrict eb
-);
+static struct zis_ast_node_obj *parse_expression_1(struct zis_parser *p, struct expr_builder_state *restrict eb);
+static struct zis_ast_node_obj *parse_expression(struct zis_parser *p);
 
 /// Parse a comma-separated list: "beginning_tok element, element, ... end_tok".
 /// `beginning_tok` can be `NTOK` to ignore. `pairs` specifies whether the elements
@@ -662,7 +661,7 @@ static void parse_list(
     zis_locals_drop(p, var);
 }
 
-// expr "," ... ")"
+// expr "," ... ")"; `_first_element` = NULL to make a Tuple node without args
 static struct zis_ast_node_obj *parse_Tuple_rest(
     struct zis_parser *p, struct zis_ast_node_obj *_first_element /* = NULL */
 ) {
@@ -673,20 +672,21 @@ static struct zis_ast_node_obj *parse_Tuple_rest(
         p, var,
         struct zis_ast_node_obj *first_element;
         struct zis_ast_node_obj *node;
+        struct zis_array_obj *args;
     );
     zis_locals_zero(var);
 
     if (_first_element)
         var.first_element = _first_element;
     var.node = zis_ast_node_new(z, Tuple, true);
-    struct zis_array_obj *args = zis_array_obj_new(z, NULL, 0);
-    zis_ast_node_set_field(var.node, Tuple, args, args);
+    var.args = zis_array_obj_new(z, NULL, 0);
+    zis_ast_node_set_field(var.node, Tuple, args, var.args);
 
     if (_first_element) {
-        zis_array_obj_append(z, args, zis_object_from(var.first_element));
+        zis_array_obj_append(z, var.args, zis_object_from(var.first_element));
         struct zis_ast_node_obj_location node_loc =
             *zis_ast_node_obj_location(var.first_element);
-        parse_list(p, NTOK, ZIS_TOK_R_PAREN, false, args, &node_loc);
+        parse_list(p, NTOK, ZIS_TOK_R_PAREN, false, var.args, &node_loc);
         *zis_ast_node_obj_location(var.node) = node_loc;
     } else {
         node_copy_token_loc(var.node, this_token(p));
@@ -745,7 +745,7 @@ static struct zis_ast_node_obj *parse_Map(struct zis_parser *p) {
     return var.node;
 }
 
-// ? "(" ... ")"
+// ? "(" ... ")"; generates a Call node
 static struct zis_ast_node_obj *parse_Call_args(struct zis_parser *p) {
     parser_debug_log_node_begin(p, "CallArgs");
 
@@ -771,27 +771,47 @@ static struct zis_ast_node_obj *parse_Subs_args(struct zis_parser *p) {
     parser_debug_log_node_begin(p, "SubsArgs");
 
     struct zis_context *z = parser_z(p);
-    zis_locals_decl(
-        p, var,
-        struct zis_ast_node_obj *node;
-        struct zis_array_obj *args;
-    );
-    zis_locals_zero(var);
 
-    var.node = zis_ast_node_new(z, Call, true);
-    var.args = zis_array_obj_new(z, NULL, 0);
-    zis_ast_node_set_field(var.node, Call, args, var.args);
+    assert(this_token(p)->type == ZIS_TOK_L_BRACKET);
+    zis_lexer_ignore_eol_begin(&p->lexer);
+    next_token(p); // "["
 
-    struct zis_ast_node_obj_location node_loc;
-    parse_list(p, ZIS_TOK_L_BRACKET, ZIS_TOK_R_BRACKET, false, var.args, &node_loc);
-    *zis_ast_node_obj_location(var.node) = node_loc;
+    if (this_token(p)->type == ZIS_TOK_R_BRACKET)
+        error(p, this_token(p)->line0, this_token(p)->column0, "empty subscript");
 
-    if (!zis_array_obj_length(var.args))
-        error(p, node_loc.line0, node_loc.column0, "empty subscript");
+    struct zis_ast_node_obj *node = parse_expression(p);
+    if (this_token(p)->type == ZIS_TOK_R_BRACKET) {
+        zis_lexer_ignore_eol_end(&p->lexer);
+        next_token(p); // "]"
+    } else {
+        check_token_type_and_ignore(p, ZIS_TOK_COMMA);
+        zis_lexer_ignore_eol_end(&p->lexer);
+
+        zis_locals_decl(
+            p, var,
+            struct zis_ast_node_obj *first_element;
+            struct zis_ast_node_obj *node;
+            struct zis_array_obj *args;
+        );
+        zis_locals_zero(var);
+
+        var.first_element = node;
+        var.node = zis_ast_node_new(z, Tuple, true);
+        var.args = zis_array_obj_new(z, NULL, 0);
+        zis_ast_node_set_field(var.node, Tuple, args, var.args);
+
+        zis_array_obj_append(z, var.args, zis_object_from(var.first_element));
+        struct zis_ast_node_obj_location node_loc =
+            *zis_ast_node_obj_location(var.first_element);
+        parse_list(p, NTOK, ZIS_TOK_R_BRACKET, false, var.args, &node_loc);
+        *zis_ast_node_obj_location(var.node) = node_loc;
+
+        node = var.node;
+        zis_locals_drop(p, var);
+    }
 
     parser_debug_log_node_end(p, "SubsArgs");
-    zis_locals_drop(p, var);
-    return var.node;
+    return node;
 }
 
 /// Parse an expression using an existing expr builder.
