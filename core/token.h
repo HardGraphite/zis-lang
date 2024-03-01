@@ -54,7 +54,7 @@ struct zis_symbol_obj;
     E(BIT_AND_EQL   , "&=" ,-15) \
     E(BIT_OR_EQL    , "|=" ,-15) \
     E(BIT_XOR_EQL   , "^=" ,-15) \
-    E(COLON         , ":"  ,  1) \
+    E(COLON         , ":"  ,  3) \
     E(CALL          , "(...)",2) \
 // ^^^ ZIS_BINARY_OPERATOR_LIST ^^^
 

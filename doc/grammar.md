@@ -180,3 +180,64 @@ A "`#`" is used to start a line comment.
 The content from it to the end of the line are ignored.
 
 ## Syntax rules
+
+### Expression
+
+```
+expr
+    = lit_int | lit_float | lit_string | identifier
+    | "nil" | "true" | "false"
+    | un_op expr
+    | expr bin_op expr
+    | call_expr
+    | subscript_expr
+    | tuple_expr
+    | array_expr
+    | map_expr;
+    ;
+
+tuple_expr
+    = "(" ")"
+    | "(" expr "," ")"
+    | "(" expr { "," expr } [ "," ] ")"
+    ;
+
+call_expr
+    = expr "(" ")"
+    | expr "(" expr [{ "," expr }] [ "," ] ")"
+    ;
+
+array_expr
+    = "[" "]"
+    | "[" expr [{ "," expr }] [ "," ] "]"
+    ;
+
+subscript_expr
+    | expr "[" expr [{ "," expr }] [ "," ] "]"
+    ;
+
+map_expr
+    | "{" "}"
+    | "{" map_elem_expr [{ "," map_elem_expr }] [ "," ] "}"
+    ;
+map_elem_expr
+    = expr "->" expr
+    ;
+```
+
+Notes:
+
+- For unary and binary expressions, the precedences and associativities matter.
+- Trailing commas are allowing in bracket-rounded expressions.
+- The trailing comma cannot be omitted if there is exactly one element in a `tuple_expr`.
+
+Examples:
+
+```
+pi = 4 - (4 / (3 * 2 * 1)) - (12 / 5 / 4 / 3 / 2)
+pos = (x,)
+coord = (pos[1], y)
+seq = [ 3, 2, 1, coord[1], coord[2] ]
+digits = {'one' -> 1, 'two' -> 2, 'three' -> 3 }
+q = seq[digits[num_to_str(pi:floor())]]
+```
