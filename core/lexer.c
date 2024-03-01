@@ -630,11 +630,18 @@ scan_next_char:
         goto scan_next_char;
 
     case '\n':
+        if (zis_unlikely(l->ignore_eol)) {
+            stream_ignore_1(input);
+            loc_next_line(l);
+            goto scan_next_char;
+        }
         token_set_type(tok, ZIS_TOK_EOS);
         loc_next_line(l), l->column--;
         goto input_ignore1__token_set_loc1__loc_next__return;
 
     case ';':
+        if (zis_unlikely(l->ignore_eol))
+            error_unexpected_char(l, ';');
         token_set_type(tok, ZIS_TOK_EOS);
         goto input_ignore1__token_set_loc1__loc_next__return;
 
@@ -876,6 +883,7 @@ void zis_lexer_start(
     struct zis_stream_obj *input_stream, zis_lexer_error_handler_t error_handler
 ) {
     l->line = 1, l->column = 1;
+    l->ignore_eol = 0;
     l->input = input_stream;
     l->temp_var = zis_smallint_to_ptr(0);
     l->error_handler = error_handler;
@@ -896,6 +904,18 @@ void zis_lexer_next(struct zis_lexer *restrict l, struct zis_token *restrict tok
         tok->line0, tok->column0, tok->line1, tok->column1, tok->type,
         zis_token_type_represent(tok->type)
     );
+}
+
+void zis_lexer_ignore_eol_begin(struct zis_lexer *restrict l) {
+    l->ignore_eol++;
+    assert(l->ignore_eol != 0);
+    zis_debug_log(TRACE, "Lexer", "ignore-eol: begin (#%u)", l->ignore_eol);
+}
+
+void zis_lexer_ignore_eol_end(struct zis_lexer *restrict l) {
+    assert(l->ignore_eol != 0);
+    zis_debug_log(TRACE, "Lexer", "ignore-eol: end (#%u)", l->ignore_eol);
+    l->ignore_eol--;
 }
 
 void _zis_lexer_gc_visit(struct zis_lexer *restrict l, int op) {

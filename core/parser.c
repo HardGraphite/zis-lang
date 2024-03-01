@@ -617,6 +617,8 @@ static void parse_list(
     enum zis_token_type beginning_tok /*=NTOK*/, enum zis_token_type end_tok, const bool pairs,
     struct zis_array_obj *_elements_out, struct zis_ast_node_obj_location *restrict loc_out
 ) {
+    zis_lexer_ignore_eol_begin(&p->lexer);
+
     if (beginning_tok != NTOK) {
         const struct zis_token *tok = this_token(p);
         loc_out->line0 = tok->line0, loc_out->column0 = tok->column0;
@@ -647,6 +649,8 @@ static void parse_list(
             break;
         check_token_type_and_ignore(p, ZIS_TOK_COMMA);
     }
+
+    zis_lexer_ignore_eol_end(&p->lexer);
 
     {
         const struct zis_token *tok = this_token(p);
@@ -822,20 +826,24 @@ static struct zis_ast_node_obj *parse_expression_1(
                     expr_builder_put_operator(eb, p, ZIS_TOK_OP_CALL);
                     node = parse_Call_args(p);
                 } else {
+                    zis_lexer_ignore_eol_begin(&p->lexer);
                     next_token(p);
                     if ((zis_likely(this_token(p)->type != ZIS_TOK_R_PAREN))) {
                         expr_builder_put_l_paren(eb, z);
                         continue;
-                        // "(a, b, ...)" -> case ZIS_TOK_COMMA.
+                        // "(expr)" -> case ZIS_TOK_R_PAREN
+                        // "(expr, ...)" -> case ZIS_TOK_COMMA
                     }
+                    zis_lexer_ignore_eol_end(&p->lexer);
                     next_token(p); // ")"
                     node = parse_Tuple_rest(p, NULL); // "()".
+                    last_tok_is_operand = true;
                 }
-                last_tok_is_operand = true;
                 break;
             case ZIS_TOK_R_PAREN: // ")"
                 if (!expr_builder_put_r_paren(eb, p))
                     goto end_expr_building;
+                zis_lexer_ignore_eol_end(&p->lexer);
                 next_token(p);
                 last_tok_is_operand = true;
                 continue;
@@ -863,6 +871,7 @@ static struct zis_ast_node_obj *parse_expression_1(
                 if (!node)
                     goto end_expr_building;
                 next_token(p);
+                zis_lexer_ignore_eol_end(&p->lexer); // After `next_token()`!
                 node = parse_Tuple_rest(p, node);
                 last_tok_is_operand = true;
                 break;
