@@ -119,14 +119,14 @@ zis_static_force_inline void stream_buffer_ignore(
 
 /* ----- token operations --------------------------------------------------- */
 
-zis_static_force_inline void token_set_pos0(
+zis_static_force_inline void token_set_loc0(
     struct zis_token *restrict tok, struct zis_lexer *restrict l
 ) {
     tok->line0 = l->line;
     tok->column0 = l->column;
 }
 
-zis_static_force_inline void token_set_pos1(
+zis_static_force_inline void token_set_loc1(
     struct zis_token *restrict tok, struct zis_lexer *restrict l
 ) {
     tok->line1 = l->line;
@@ -182,15 +182,15 @@ static int keyword_table_lookup(struct zis_map_obj *kwt, struct zis_symbol_obj *
 
 /* ----- scanning  ---------------------------------------------------------- */
 
-zis_static_force_inline void pos_next_char(struct zis_lexer *restrict l) {
+zis_static_force_inline void loc_next_char(struct zis_lexer *restrict l) {
     l->column++;
 }
 
-zis_static_force_inline void pos_next_char_n(struct zis_lexer *restrict l, unsigned int n) {
+zis_static_force_inline void loc_next_char_n(struct zis_lexer *restrict l, unsigned int n) {
     l->column += n;
 }
 
-zis_static_force_inline void pos_next_line(struct zis_lexer *restrict l) {
+zis_static_force_inline void loc_next_line(struct zis_lexer *restrict l) {
     l->column = 1;
     l->line++;
 }
@@ -202,7 +202,7 @@ zis_static_force_inline void clear_temp_var(struct zis_lexer *restrict l) {
 static void scan_number(
     struct zis_lexer *l, struct zis_token *restrict tok
 ) {
-    // token_set_pos0(tok, l);
+    // token_set_loc0(tok, l);
     token_set_type(tok, ZIS_TOK_LIT_INT);
 
     struct zis_context *const z = l->z;
@@ -231,9 +231,9 @@ static void scan_number(
             if (!(isdigit(c) || c == '_')) {
                 if (isalpha(c))
                     error_unexpected_char(l, c);
-                token_set_pos1(tok, l);
+                token_set_loc1(tok, l);
                 tok->value = zis_smallint_to_ptr(0);
-                pos_next_char(l);
+                loc_next_char(l);
                 zis_debug_log(TRACE, "Lexer", "int: base=10, val=0");
                 return;
             }
@@ -241,7 +241,7 @@ static void scan_number(
         }
         if (isalpha(c)) {
             stream_ignore_1(input);
-            pos_next_char(l);
+            loc_next_char(l);
         }
     }
 
@@ -259,7 +259,7 @@ static void scan_number(
             zis_int_obj_or_smallint_s(z, buf, &buf_end, digit_base);
         const size_t consumed_size = (size_t)(buf_end - buf);
         assert(consumed_size <= buf_sz);
-        pos_next_char_n(l, (unsigned int)consumed_size);
+        loc_next_char_n(l, (unsigned int)consumed_size);
         stream_buffer_ignore(input, consumed_size);
         if (!int_obj)
             error_unexpected_end_of(l, "number literal");
@@ -282,7 +282,7 @@ static void scan_number(
     clear_temp_var(l);
 
     if (stream_peek(input) != '.') {
-        token_set_pos1(tok, l), tok->column1--;
+        token_set_loc1(tok, l), tok->column1--;
         zis_debug_log(
             TRACE, "Lexer", "int: base=%u, val=%ji(0 if too long)",
             digit_base,
@@ -304,7 +304,7 @@ scan_floating_point:
     assert(float_value >= 0.0);
 
     stream_ignore_1(input); // "."
-    pos_next_char(l);
+    loc_next_char(l);
     unsigned int fractional_count = 0;
     for (double weight = 1.0 / digit_base; ; weight /= digit_base, fractional_count++) {
         c = stream_peek(input);
@@ -319,9 +319,9 @@ scan_floating_point:
         stream_ignore_1(input);
         float_value += (double)x * weight;
     }
-    pos_next_char_n(l, fractional_count);
+    loc_next_char_n(l, fractional_count);
 
-    token_set_pos1(tok, l), tok->column1--;
+    token_set_loc1(tok, l), tok->column1--;
     tok->value_float = zis_float_obj_new(z, float_value);
     zis_debug_log(
         TRACE, "Lexer", "float: base=%u, val=%f",
@@ -406,14 +406,14 @@ static void scan_string(
     struct zis_lexer *l, struct zis_token *restrict tok,
     int32_t delimiter, bool allow_escape_sequences
 ) {
-    // token_set_pos0(tok, l);
+    // token_set_loc0(tok, l);
     token_set_type(tok, ZIS_TOK_LIT_STRING);
 
     struct zis_context *const z = l->z;
     struct zis_stream_obj *const input = l->input;
     assert(stream_peek(input) == delimiter);
     stream_ignore_1(input);
-    pos_next_char(l);
+    loc_next_char(l);
 
     l->temp_var = NULL;
     for (bool end_reached = false; !end_reached; ) {
@@ -457,7 +457,7 @@ static void scan_string(
             zis_string_obj_new_esc(z, buf, consumed_size, _lit_str_esc_trans) :
             zis_string_obj_new(z, buf, consumed_size);
         stream_buffer_ignore(input, consumed_size);
-        pos_next_char_n(l, (unsigned int)consumed_size);
+        loc_next_char_n(l, (unsigned int)consumed_size);
         if (!str_obj)
             error(l, "illegal string literal");
         if (l->temp_var) {
@@ -472,9 +472,9 @@ static void scan_string(
     clear_temp_var(l);
 
     assert(stream_peek(input) == delimiter);
-    token_set_pos1(tok, l);
+    token_set_loc1(tok, l);
     stream_ignore_1(input);
-    pos_next_char(l);
+    loc_next_char(l);
 
     zis_debug_log(
         TRACE, "Lexer", "string: ``%s''",
@@ -483,7 +483,7 @@ static void scan_string(
 }
 
 static void scan_identifier_or_keyword(struct zis_lexer *restrict l, struct zis_token *restrict tok) {
-    // token_set_pos0(tok, l);
+    // token_set_loc0(tok, l);
     token_set_type(tok, ZIS_TOK_IDENTIFIER);
 
     struct zis_context *const z = l->z;
@@ -503,7 +503,7 @@ static void scan_identifier_or_keyword(struct zis_lexer *restrict l, struct zis_
             const char c = *end_p;
             const size_t n = zis_u8char_len_1((zis_char8_t)c);
             if (!n) {
-                pos_next_char_n(l, (unsigned int)(end_p - buf));
+                loc_next_char_n(l, (unsigned int)(end_p - buf));
                 error_unexpected_end_of(l, "identifier");
             }
             if (n == 1 && !(isalnum(c) || c == '_')) {
@@ -520,7 +520,7 @@ static void scan_identifier_or_keyword(struct zis_lexer *restrict l, struct zis_
         }
         const size_t consumed_size = (size_t)(end_p - buf);
         assert(consumed_size <= buf_sz);
-        pos_next_char_n(l, (unsigned int)consumed_size);
+        loc_next_char_n(l, (unsigned int)consumed_size);
         struct zis_symbol_obj *sym_obj;
         if (l->temp_var) {
             assert(zis_object_type(l->temp_var) == z->globals->type_Symbol);
@@ -543,7 +543,7 @@ static void scan_identifier_or_keyword(struct zis_lexer *restrict l, struct zis_
         token_set_type(tok, (enum zis_token_type)kw_id);
     clear_temp_var(l);
 
-    token_set_pos1(tok, l), tok->column1--;
+    token_set_loc1(tok, l), tok->column1--;
 
     zis_debug_log(
         TRACE, "Lexer", "identifier%s: %.*s",
@@ -559,14 +559,14 @@ static void scan_next(struct zis_lexer *restrict l, struct zis_token *restrict t
     int32_t first_char;
 
 scan_next_char:
-    token_set_pos0(tok, l);
+    token_set_loc0(tok, l);
     switch ((first_char = stream_peek(input))) {
 
 // For 'C': C.
 #define CASE_OPERATOR_1(C, TOK_TYPE_C) \
     do {                          \
         token_set_type(tok, TOK_TYPE_C); \
-        goto input_ignore1__token_set_pos1__pos_next__return; \
+        goto input_ignore1__token_set_loc1__loc_next__return; \
     } while(0)
 
 // For 'C': C, C=.
@@ -575,10 +575,10 @@ scan_next_char:
         stream_ignore_1(input);                        \
         if (stream_peek(input) == '=') {               \
             token_set_type(tok, TOK_TYPE_C_EQL);       \
-            goto pos_next__input_ignore1__token_set_pos1__pos_next__return; \
+            goto loc_next__input_ignore1__token_set_loc1__loc_next__return; \
         } else {                                       \
             token_set_type(tok, TOK_TYPE_C);           \
-            goto token_set_pos1__pos_next__return;     \
+            goto token_set_loc1__loc_next__return;     \
         }                                              \
     } while(0)
 
@@ -593,13 +593,13 @@ scan_next_char:
         const int32_t second_char = stream_peek(input);                 \
         if (second_char == X) {                                         \
             token_set_type(tok, TOK_TYPE_CX);                           \
-            goto pos_next__input_ignore1__token_set_pos1__pos_next__return; \
+            goto loc_next__input_ignore1__token_set_loc1__loc_next__return; \
         } else if (second_char == '=') {                                \
             token_set_type(tok, TOK_TYPE_C_EQL);                        \
-            goto pos_next__input_ignore1__token_set_pos1__pos_next__return; \
+            goto loc_next__input_ignore1__token_set_loc1__loc_next__return; \
         } else {                                                        \
             token_set_type(tok, TOK_TYPE_C);                            \
-            goto token_set_pos1__pos_next__return;                      \
+            goto token_set_loc1__loc_next__return;                      \
         }                                                               \
     } while(0)
 
@@ -610,47 +610,47 @@ scan_next_char:
         const int32_t second_char = stream_peek(input);                              \
         if (second_char == X) {                                                      \
             token_set_type(tok, TOK_TYPE_CX);                                        \
-            goto pos_next__input_ignore1__token_set_pos1__pos_next__return;          \
+            goto loc_next__input_ignore1__token_set_loc1__loc_next__return;          \
         } else if (second_char == C) {                                               \
             token_set_type(tok, TOK_TYPE_CC);                                        \
-            goto pos_next__input_ignore1__token_set_pos1__pos_next__return;          \
+            goto loc_next__input_ignore1__token_set_loc1__loc_next__return;          \
         } else if (second_char == '=') {                                             \
             token_set_type(tok, TOK_TYPE_C_EQL);                                     \
-            goto pos_next__input_ignore1__token_set_pos1__pos_next__return;          \
+            goto loc_next__input_ignore1__token_set_loc1__loc_next__return;          \
         } else {                                                                     \
             token_set_type(tok, TOK_TYPE_C);                                         \
-            goto token_set_pos1__pos_next__return;                                   \
+            goto token_set_loc1__loc_next__return;                                   \
         }                                                                            \
     } while(0)
 
     case '\t':
     case ' ':
         stream_ignore_1(input);
-        pos_next_char(l);
+        loc_next_char(l);
         goto scan_next_char;
 
     case '\n':
         token_set_type(tok, ZIS_TOK_EOS);
-        pos_next_line(l), l->column--;
-        goto input_ignore1__token_set_pos1__pos_next__return;
+        loc_next_line(l), l->column--;
+        goto input_ignore1__token_set_loc1__loc_next__return;
 
     case ';':
         token_set_type(tok, ZIS_TOK_EOS);
-        goto input_ignore1__token_set_pos1__pos_next__return;
+        goto input_ignore1__token_set_loc1__loc_next__return;
 
     case '#':
         stream_ignore_until(input, '\n');
-        pos_next_line(l);
+        loc_next_line(l);
         goto scan_next_char;
 
     case '\\':
         stream_ignore_1(input);
-        pos_next_char(l);
+        loc_next_char(l);
         first_char = stream_peek(input);
         if (first_char != '\n')
             error_unexpected_char(l, first_char);
         stream_ignore_1(input);
-        pos_next_line(l);
+        loc_next_line(l);
         goto scan_next_char;
 
     case '!': // "!", "!="
@@ -682,15 +682,15 @@ scan_next_char:
         if (stream_peek(input) == '.') {
             stream_ignore_1(input);
             if (stream_peek(input) == '.') {
-                pos_next_char(l);
+                loc_next_char(l);
                 token_set_type(tok, ZIS_TOK_ELLIPSIS);
-                goto pos_next__input_ignore1__token_set_pos1__pos_next__return;
+                goto loc_next__input_ignore1__token_set_loc1__loc_next__return;
             }
             token_set_type(tok, ZIS_TOK_DOTDOT);
-            goto pos_next__input_ignore1__token_set_pos1__pos_next__return;
+            goto loc_next__input_ignore1__token_set_loc1__loc_next__return;
         }
         token_set_type(tok, ZIS_TOK_OP_PERIOD);
-        goto token_set_pos1__pos_next__return;
+        goto token_set_loc1__loc_next__return;
     }
 
     case '/': // "/", "/="
@@ -721,7 +721,7 @@ scan_next_char:
             }
         }
         token_set_type(tok, ZIS_TOK_AT);
-        goto token_set_pos1__pos_next__return;
+        goto token_set_loc1__loc_next__return;
 
     case '^': // "^", "^="
         CASE_OPERATOR_2('^', ZIS_TOK_OP_BIT_XOR, ZIS_TOK_OP_BIT_XOR_EQL);
@@ -831,7 +831,7 @@ scan_next_char:
         }
         if (first_char == -1) {
             token_set_type(tok, ZIS_TOK_EOF);
-            goto token_set_pos1__pos_next__return;
+            goto token_set_loc1__loc_next__return;
         }
         error_unexpected_char(l, first_char);
 
@@ -844,15 +844,15 @@ scan_next_char:
     }
     return;
 
-pos_next__input_ignore1__token_set_pos1__pos_next__return:
-    pos_next_char(l);
+loc_next__input_ignore1__token_set_loc1__loc_next__return:
+    loc_next_char(l);
 
-input_ignore1__token_set_pos1__pos_next__return:
+input_ignore1__token_set_loc1__loc_next__return:
     stream_ignore_1(input);
 
-token_set_pos1__pos_next__return:
-    token_set_pos1(tok, l);
-    pos_next_char(l);
+token_set_loc1__loc_next__return:
+    token_set_loc1(tok, l);
+    loc_next_char(l);
     // return;
 }
 
@@ -892,7 +892,7 @@ void zis_lexer_next(struct zis_lexer *restrict l, struct zis_token *restrict tok
     scan_next(l, tok);
     assert(zis_object_is_smallint(l->temp_var));
     zis_debug_log(
-        TRACE, "Lexer", "token: pos=(%u,%u-%u,%u), type=%i, name=%s",
+        TRACE, "Lexer", "token: loc=(%u,%u-%u,%u), type=%i, name=%s",
         tok->line0, tok->column0, tok->line1, tok->column1, tok->type,
         zis_token_type_represent(tok->type)
     );

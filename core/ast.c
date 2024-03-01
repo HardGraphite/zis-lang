@@ -98,8 +98,8 @@ struct zis_ast_node_obj *_zis_ast_node_obj_new(
     return self;
 }
 
-struct zis_ast_node_obj_position *
-zis_ast_node_obj_position(struct zis_ast_node_obj *self) {
+struct zis_ast_node_obj_location *
+zis_ast_node_obj_location(struct zis_ast_node_obj *self) {
     const size_t slots_count = zis_smallint_from_ptr(self->_slots_num);
     assert(slots_count == zis_object_slot_count(zis_object_from(self)));
     void *const bytes = zis_object_ref_bytes(zis_object_from(self), slots_count);
@@ -109,7 +109,7 @@ zis_ast_node_obj_position(struct zis_ast_node_obj *self) {
 const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( AstNode ) = {
     .name       = NULL,
     .slots_num  = (size_t)-1,
-    .bytes_size = sizeof(struct zis_ast_node_obj_position),
+    .bytes_size = sizeof(struct zis_ast_node_obj_location),
     .fields     = NULL,
     .methods    = NULL,
     .statics    = NULL,

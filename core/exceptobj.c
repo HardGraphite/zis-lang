@@ -181,7 +181,7 @@ static int _print_stack_trace_fn(
     struct zis_stream_obj *out_stream = _arg;
     zis_unused_var(out_stream);
     char buffer[80];
-    // TODO: print pretty function name and source position.
+    // TODO: print pretty function name and source location.
     snprintf(buffer, sizeof buffer, " [%u] <Function@%p>+%u\n", index, (void *)func_obj, instr_offset);
     // TODO: print to the `out_stream`.
     fputs(buffer, stdout);

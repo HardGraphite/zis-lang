@@ -80,11 +80,11 @@ struct zis_ast_node_obj {
     struct zis_object *_type; ///< AST node type, a smallint
     struct zis_object *_data[];
     // --- BYTES ---
-    // struct zis_ast_node_obj_position position;
+    // struct zis_ast_node_obj_location location;
 };
 
-/// Node source-position info.
-struct zis_ast_node_obj_position {
+/// Node source-location info.
+struct zis_ast_node_obj_location {
     unsigned int line0, column0, line1, column1;
 };
 
@@ -103,8 +103,8 @@ zis_ast_node_obj_type(const struct zis_ast_node_obj *self) {
     return (enum zis_ast_node_type)(zis_smallint_unsigned_t)t;
 }
 
-/// Get node position.
-struct zis_ast_node_obj_position *zis_ast_node_obj_position(struct zis_ast_node_obj *self);
+/// Get node location.
+struct zis_ast_node_obj_location *zis_ast_node_obj_location(struct zis_ast_node_obj *self);
 
 /// Get reference to the node data.
 /// The `__data_type` must be a struct consisting of object pointers.

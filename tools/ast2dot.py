@@ -98,8 +98,8 @@ class AstConvertHandler(xml.sax.ContentHandler, DotWriter):
         elem_name = self._allocate_elem_id(elem_type)
         self.elem_stack.append(XmlElemInfo(elem_type, elem_name))
 
-        if 'pos' in attrs:
-            label = '"' + tag + '\\n(' + attrs['pos'] + ')"'
+        if 'loc' in attrs:
+            label = '"' + tag + '\\n(' + attrs['loc'] + ')"'
         else:
             label = tag
         if elem_type is XmlElemType.Node:

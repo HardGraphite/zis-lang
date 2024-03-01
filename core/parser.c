@@ -12,7 +12,7 @@
 #include "debug.h"
 #include "globals.h"
 #include "lexer.h"
-#include "locale.h"
+#include "locals.h"
 #include "memory.h"
 #include "object.h"
 #include "objmem.h"
@@ -109,14 +109,14 @@ static void next_token(struct zis_parser *restrict p) {
 
 #define parser_debug_log_node(__p, __type) \
     (zis_debug_log(                        \
-        TRACE, "Parser", "%-*c<%s pos=\"%u:%u\" />", \
+        TRACE, "Parser", "%-*c<%s loc=\"%u:%u\" />", \
         (int)(__p)->tree_depth + 1, ' ',       \
         (__type), (__p)->token.line0, (__p)->token.column0 \
     ))
 
 #define parser_debug_log_node_begin(__p, __type) \
     (zis_debug_log(                              \
-        TRACE, "Parser", "%-*c<%s pos=\"%u:%u\">", \
+        TRACE, "Parser", "%-*c<%s loc=\"%u:%u\">", \
         (int)++(__p)->tree_depth, ' ',             \
         (__type), (__p)->token.line0, (__p)->token.column0 \
     ))
@@ -150,12 +150,12 @@ zis_noreturn zis_noinline zis_cold_fn static void error_unexpected_node(
     struct zis_parser *restrict p,
     struct zis_ast_node_obj *node, enum zis_ast_node_type expected_nt
 ) {
-    const struct zis_ast_node_obj_position *const pos = zis_ast_node_obj_position(node);
+    const struct zis_ast_node_obj_location *const loc = zis_ast_node_obj_location(node);
     const char *node_type_s = zis_ast_node_type_represent(zis_ast_node_obj_type(node));
     if ((int)expected_nt == -1)
-        error(p, pos->line0, pos->column0, "unexpected <%s>", node_type_s);
+        error(p, loc->line0, loc->column0, "unexpected <%s>", node_type_s);
     error(
-        p, pos->line0, pos->column0, "expected <%s> but got <%s>",
+        p, loc->line0, loc->column0, "expected <%s> but got <%s>",
         zis_ast_node_type_represent(expected_nt), node_type_s
     );
 }
@@ -178,28 +178,28 @@ static void check_node_type(
         error_unexpected_node(p, node, expected_nt);
 }
 
-static void node_copy_token_pos(
+static void node_copy_token_loc(
     struct zis_ast_node_obj *restrict node, const struct zis_token *restrict tok
 ) {
-    struct zis_ast_node_obj_position *pos = zis_ast_node_obj_position(node);
-    pos->line0 = tok->line0, pos->column0 = tok->column0;
-    pos->line1 = tok->line1, pos->column1 = tok->column1;
+    struct zis_ast_node_obj_location *loc = zis_ast_node_obj_location(node);
+    loc->line0 = tok->line0, loc->column0 = tok->column0;
+    loc->line1 = tok->line1, loc->column1 = tok->column1;
 }
 
-static void node_copy_pos0(
+static void node_copy_loc0(
     struct zis_ast_node_obj *restrict node_dst, struct zis_ast_node_obj *restrict node_src
 ) {
-    struct zis_ast_node_obj_position *pos_dst = zis_ast_node_obj_position(node_dst);
-    struct zis_ast_node_obj_position *pos_src = zis_ast_node_obj_position(node_src);
-    pos_dst->line0 = pos_src->line0, pos_dst->column0 = pos_src->column0;
+    struct zis_ast_node_obj_location *loc_dst = zis_ast_node_obj_location(node_dst);
+    struct zis_ast_node_obj_location *loc_src = zis_ast_node_obj_location(node_src);
+    loc_dst->line0 = loc_src->line0, loc_dst->column0 = loc_src->column0;
 }
 
-static void node_copy_pos1(
+static void node_copy_loc1(
     struct zis_ast_node_obj *restrict node_dst, struct zis_ast_node_obj *restrict node_src
 ) {
-    struct zis_ast_node_obj_position *pos_dst = zis_ast_node_obj_position(node_dst);
-    struct zis_ast_node_obj_position *pos_src = zis_ast_node_obj_position(node_src);
-    pos_dst->line1 = pos_src->line1, pos_dst->column1 = pos_src->column1;
+    struct zis_ast_node_obj_location *loc_dst = zis_ast_node_obj_location(node_dst);
+    struct zis_ast_node_obj_location *loc_src = zis_ast_node_obj_location(node_src);
+    loc_dst->line1 = loc_src->line1, loc_dst->column1 = loc_src->column1;
 }
 
 /* ----- expression builder ------------------------------------------------- */
@@ -283,8 +283,8 @@ static void expr_builder_gen_one_expr(
             struct zis_ast_node_Pos_data *data = (struct zis_ast_node_Pos_data *)(result_node->_data);
             data->value = val_node;
             zis_object_write_barrier(result_node, val_node);
-            node_copy_pos0(result_node, val_node);
-            node_copy_pos1(result_node, val_node);
+            node_copy_loc0(result_node, val_node);
+            node_copy_loc1(result_node, val_node);
         }
         break;
 
@@ -331,8 +331,8 @@ static void expr_builder_gen_one_expr(
             data->lhs = lhs_node, data->rhs = rhs_node;
             zis_object_write_barrier(result_node, lhs_node);
             zis_object_write_barrier(result_node, rhs_node);
-            node_copy_pos0(result_node, lhs_node);
-            node_copy_pos1(result_node, rhs_node);
+            node_copy_loc0(result_node, lhs_node);
+            node_copy_loc1(result_node, rhs_node);
         }
         break;
 
@@ -369,8 +369,8 @@ static void expr_builder_gen_one_expr(
             data->lhs = lhs_node, data->rhs = rhs_node;
             zis_object_write_barrier(result_node, lhs_node);
             zis_object_write_barrier(result_node, rhs_node);
-            node_copy_pos0(result_node, lhs_node);
-            node_copy_pos1(result_node, rhs_node);
+            node_copy_loc0(result_node, lhs_node);
+            node_copy_loc1(result_node, rhs_node);
         } {
             zis_locals_decl_1(p, tmp_var, struct zis_ast_node_obj *op_node);
             tmp_var.op_node = result_node;
@@ -378,8 +378,8 @@ static void expr_builder_gen_one_expr(
             zis_ast_node_set_field(result_node, Assign, lhs, ((struct zis_ast_node_Add_data *)tmp_var.op_node->_data)->lhs);
             zis_ast_node_set_field(result_node, Assign, rhs, tmp_var.op_node);
             zis_object_write_barrier(result_node, tmp_var.op_node);
-            node_copy_pos0(result_node, tmp_var.op_node);
-            node_copy_pos1(result_node, tmp_var.op_node);
+            node_copy_loc0(result_node, tmp_var.op_node);
+            node_copy_loc1(result_node, tmp_var.op_node);
             zis_locals_drop(p, tmp_var);
         }
         break;
@@ -399,8 +399,8 @@ static void expr_builder_gen_one_expr(
             struct zis_symbol_obj *name = zis_ast_node_get_field(rhs_node, Name, value);
             zis_ast_node_set_field(result_node, Field, value, lhs_node);
             zis_ast_node_set_field(result_node, Field, name, name);
-            node_copy_pos0(result_node, lhs_node);
-            node_copy_pos1(result_node, rhs_node);
+            node_copy_loc0(result_node, lhs_node);
+            node_copy_loc1(result_node, rhs_node);
         }
         break;
 
@@ -421,8 +421,8 @@ static void expr_builder_gen_one_expr(
             zis_ast_node_set_field(result_node, Send, target, target_node);
             zis_ast_node_set_field(result_node, Send, method, method);
             zis_ast_node_set_field(result_node, Send, args, args);
-            node_copy_pos0(result_node, target_node);
-            node_copy_pos1(result_node, call_node);
+            node_copy_loc0(result_node, target_node);
+            node_copy_loc1(result_node, call_node);
         }
         break;
 
@@ -437,7 +437,7 @@ static void expr_builder_gen_one_expr(
             check_node_type(p, args_node, ZIS_AST_NODE_Call);
             result_node = args_node;
             zis_ast_node_set_field(result_node, Call, value, val_node);
-            node_copy_pos0(result_node, val_node);
+            node_copy_loc0(result_node, val_node);
         }
         break;
 
@@ -449,12 +449,12 @@ static void expr_builder_gen_one_expr(
     return;
 
 too_few_operands:;
-    // FIXME: the source position of the operator is unknown.
+    // FIXME: the source location of the operator is unknown.
     unsigned int err_ln, err_col;
     struct zis_ast_node_obj *operand = expr_builder_pop_operand(eb);
     if (operand) {
-        struct zis_ast_node_obj_position *pos = zis_ast_node_obj_position(operand);
-        err_ln = pos->line0, err_col = pos->column0;
+        struct zis_ast_node_obj_location *loc = zis_ast_node_obj_location(operand);
+        err_ln = loc->line0, err_col = loc->column0;
     } else {
         err_ln = this_token(p)->line0, err_col = this_token(p)->column0;
     }
@@ -542,9 +542,9 @@ static struct zis_ast_node_obj *expr_builder_generate_expr(
         } else {
             struct zis_object *node = zis_array_obj_pop(eb->operand_stack);
             assert(zis_object_type(node) == z->globals->type_AstNode);
-            struct zis_ast_node_obj_position *pos =
-                zis_ast_node_obj_position(zis_object_cast(node, struct zis_ast_node_obj));
-            error(p, pos->line0, pos->column0, "unexpected %s", "expression");
+            struct zis_ast_node_obj_location *loc =
+                zis_ast_node_obj_location(zis_object_cast(node, struct zis_ast_node_obj));
+            error(p, loc->line0, loc->column0, "unexpected %s", "expression");
         }
     }
 
@@ -562,7 +562,7 @@ static struct zis_ast_node_obj *parse_Nil_explicit(struct zis_parser *p) {
     assert(this_token(p)->type == ZIS_TOK_KW_NIL);
     struct zis_ast_node_obj *node = zis_ast_node_new(parser_z(p), Nil, false);
     zis_ast_node_set_field(node, Nil, value, zis_smallint_to_ptr(0));
-    node_copy_token_pos(node, this_token(p));
+    node_copy_token_loc(node, this_token(p));
     next_token(p);
     return node;
 }
@@ -577,7 +577,7 @@ static struct zis_ast_node_obj *parse_Bool_explicit(struct zis_parser *p) {
     struct zis_bool_obj *bool_v =
         tok_type == ZIS_TOK_KW_FALSE ? z->globals->val_false : z->globals->val_true;
     zis_ast_node_set_field(node, Bool, value, bool_v);
-    node_copy_token_pos(node, this_token(p));
+    node_copy_token_loc(node, this_token(p));
     next_token(p);
     return node;
 }
@@ -588,7 +588,7 @@ static struct zis_ast_node_obj *parse_Constant_explicit(struct zis_parser *p) {
     assert(zis_token_type_is_literal(this_token(p)->type));
     struct zis_ast_node_obj *node = zis_ast_node_new(parser_z(p), Constant, false);
     zis_ast_node_set_field(node, Constant, value, this_token(p)->value);
-    node_copy_token_pos(node, this_token(p));
+    node_copy_token_loc(node, this_token(p));
     next_token(p);
     return node;
 }
@@ -600,7 +600,7 @@ static struct zis_ast_node_obj *parse_Name(struct zis_parser *p) {
     struct zis_ast_node_obj *node = zis_ast_node_new(parser_z(p), Name, false);
     const struct zis_token *tok = this_token(p);
     zis_ast_node_set_field(node, Name, value, tok->value_identifier);
-    node_copy_token_pos(node, tok);
+    node_copy_token_loc(node, tok);
     next_token(p);
     return node;
 }
@@ -615,11 +615,11 @@ static struct zis_ast_node_obj *parse_expression_1(
 static void parse_list(
     struct zis_parser *p,
     enum zis_token_type beginning_tok /*=NTOK*/, enum zis_token_type end_tok, const bool pairs,
-    struct zis_array_obj *_elements_out, struct zis_ast_node_obj_position *restrict pos_out
+    struct zis_array_obj *_elements_out, struct zis_ast_node_obj_location *restrict loc_out
 ) {
     if (beginning_tok != NTOK) {
         const struct zis_token *tok = this_token(p);
-        pos_out->line0 = tok->line0, pos_out->column0 = tok->column0;
+        loc_out->line0 = tok->line0, loc_out->column0 = tok->column0;
         check_token_type_and_ignore(p, beginning_tok);
     }
 
@@ -651,7 +651,7 @@ static void parse_list(
     {
         const struct zis_token *tok = this_token(p);
         assert(tok->type == end_tok);
-        pos_out->line1 = tok->line1, pos_out->column1 = tok->column1;
+        loc_out->line1 = tok->line1, loc_out->column1 = tok->column1;
     }
     next_token(p);
 
@@ -680,18 +680,18 @@ static struct zis_ast_node_obj *parse_Tuple_rest(
 
     if (_first_element) {
         zis_array_obj_append(z, args, zis_object_from(var.first_element));
-        struct zis_ast_node_obj_position node_pos =
-            *zis_ast_node_obj_position(var.first_element);
-        parse_list(p, NTOK, ZIS_TOK_R_PAREN, false, args, &node_pos);
-        *zis_ast_node_obj_position(var.node) = node_pos;
+        struct zis_ast_node_obj_location node_loc =
+            *zis_ast_node_obj_location(var.first_element);
+        parse_list(p, NTOK, ZIS_TOK_R_PAREN, false, args, &node_loc);
+        *zis_ast_node_obj_location(var.node) = node_loc;
     } else {
-        node_copy_token_pos(var.node, this_token(p));
-        struct zis_ast_node_obj_position *pos = zis_ast_node_obj_position(var.node);
-        if (pos->column0 > 1)
-            pos->column0--;
-        if (pos->column1 > 1)
-            pos->column1--;
-        // FIXME: accurate position is unknown.
+        node_copy_token_loc(var.node, this_token(p));
+        struct zis_ast_node_obj_location *loc = zis_ast_node_obj_location(var.node);
+        if (loc->column0 > 1)
+            loc->column0--;
+        if (loc->column1 > 1)
+            loc->column1--;
+        // FIXME: accurate location is unknown.
     }
 
     parser_debug_log_node_end(p, "Tuple");
@@ -711,9 +711,9 @@ static struct zis_ast_node_obj *parse_Array(struct zis_parser *p) {
     struct zis_array_obj *args = zis_array_obj_new(z, NULL, 0);
     zis_ast_node_set_field(var.node, Array, args, args);
 
-    struct zis_ast_node_obj_position node_pos;
-    parse_list(p, ZIS_TOK_L_BRACKET, ZIS_TOK_R_BRACKET, false, args, &node_pos);
-    *zis_ast_node_obj_position(var.node) = node_pos;
+    struct zis_ast_node_obj_location node_loc;
+    parse_list(p, ZIS_TOK_L_BRACKET, ZIS_TOK_R_BRACKET, false, args, &node_loc);
+    *zis_ast_node_obj_location(var.node) = node_loc;
 
     parser_debug_log_node_end(p, "Array");
     zis_locals_drop(p, var);
@@ -732,9 +732,9 @@ static struct zis_ast_node_obj *parse_Map(struct zis_parser *p) {
     struct zis_array_obj *args = zis_array_obj_new(z, NULL, 0);
     zis_ast_node_set_field(var.node, Map, args, args);
 
-    struct zis_ast_node_obj_position node_pos;
-    parse_list(p, ZIS_TOK_L_BRACE, ZIS_TOK_R_BRACE, true, args, &node_pos);
-    *zis_ast_node_obj_position(var.node) = node_pos;
+    struct zis_ast_node_obj_location node_loc;
+    parse_list(p, ZIS_TOK_L_BRACE, ZIS_TOK_R_BRACE, true, args, &node_loc);
+    *zis_ast_node_obj_location(var.node) = node_loc;
 
     parser_debug_log_node_end(p, "Map");
     zis_locals_drop(p, var);
@@ -753,9 +753,9 @@ static struct zis_ast_node_obj *parse_Call_args(struct zis_parser *p) {
     struct zis_array_obj *args = zis_array_obj_new(z, NULL, 0);
     zis_ast_node_set_field(var.node, Call, args, args);
 
-    struct zis_ast_node_obj_position node_pos;
-    parse_list(p, ZIS_TOK_L_PAREN, ZIS_TOK_R_PAREN, false, args, &node_pos);
-    *zis_ast_node_obj_position(var.node) = node_pos;
+    struct zis_ast_node_obj_location node_loc;
+    parse_list(p, ZIS_TOK_L_PAREN, ZIS_TOK_R_PAREN, false, args, &node_loc);
+    *zis_ast_node_obj_location(var.node) = node_loc;
 
     parser_debug_log_node_end(p, "CallArgs");
     zis_locals_drop(p, var);
@@ -778,12 +778,12 @@ static struct zis_ast_node_obj *parse_Subs_args(struct zis_parser *p) {
     var.args = zis_array_obj_new(z, NULL, 0);
     zis_ast_node_set_field(var.node, Call, args, var.args);
 
-    struct zis_ast_node_obj_position node_pos;
-    parse_list(p, ZIS_TOK_L_BRACKET, ZIS_TOK_R_BRACKET, false, var.args, &node_pos);
-    *zis_ast_node_obj_position(var.node) = node_pos;
+    struct zis_ast_node_obj_location node_loc;
+    parse_list(p, ZIS_TOK_L_BRACKET, ZIS_TOK_R_BRACKET, false, var.args, &node_loc);
+    *zis_ast_node_obj_location(var.node) = node_loc;
 
     if (!zis_array_obj_length(var.args))
-        error(p, node_pos.line0, node_pos.column0, "empty subscript");
+        error(p, node_loc.line0, node_loc.column0, "empty subscript");
 
     parser_debug_log_node_end(p, "SubsArgs");
     zis_locals_drop(p, var);
@@ -958,7 +958,7 @@ static struct zis_ast_node_obj *parse_Module(struct zis_parser *p) {
     var.node = zis_ast_node_new(parser_z(p), Module, true);
     zis_ast_node_set_field(var.node, Module, file, zis_object_from(zis_string_obj_new(parser_z(p), "", 0)));
     zis_ast_node_set_field(var.node, Module, body, parse_block(p));
-    memset(zis_ast_node_obj_position(var.node), 0, sizeof(struct zis_ast_node_obj_position));
+    memset(zis_ast_node_obj_location(var.node), 0, sizeof(struct zis_ast_node_obj_location));
     parser_debug_log_node_end(p, "Module");
     zis_locals_drop(p, var);
     return var.node;
@@ -989,13 +989,13 @@ static void _parser_dump_ast(
     struct zis_ast_node_obj *node, unsigned int level
 ) {
     const enum zis_ast_node_type node_type = zis_ast_node_obj_type(node);
-    const struct zis_ast_node_obj_position *const node_pos =
-        zis_ast_node_obj_position(node);
+    const struct zis_ast_node_obj_location *const node_loc =
+        zis_ast_node_obj_location(node);
     struct zis_context_globals *const g = z->globals;
     fprintf(
-        fp, "%*c%s pos=\"%u:%u-%u:%u\">\n",
+        fp, "%*c%s loc=\"%u:%u-%u:%u\">\n",
         level, '<', zis_ast_node_type_represent(node_type),
-        node_pos->line0, node_pos->column0, node_pos->line1, node_pos->column1
+        node_loc->line0, node_loc->column0, node_loc->line1, node_loc->column1
     );
     const char *f_names[4]; struct zis_type_obj *f_types[4];
     int f_n = zis_ast_node_type_fields(z, node_type, f_names, f_types);
