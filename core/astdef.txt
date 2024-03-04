@@ -12,7 +12,7 @@
 #   - Object   ->  struct zis_object *
 #   - Xxx      ->  struct zis_xxx_obj *
 
-Nil            (Object value)
+Nil            (Object _)
 Bool           (Bool value)
 Constant       (Object value)
 Name           (Symbol value)
@@ -48,6 +48,16 @@ Send           (Node target, Symbol method, Array args)
 
 Tuple          (Array args)
 Array          (Array args)
-Map            (Array args)
+Map            (Array args) # args: key1, val1, key2, val2, ...
+
+Import         (Node value)
+Return         (Object value) # value: nil or expr-node
+Throw          (Object value) # value: nil or expr-node
+Break          (Object _)
+Continue       (Object _)
+
+Cond           (Array args) # args: cond1, body1, cond2, body2, ... [, body_else]
+While          (Node cond, Array body)
+Func           (Symbol name, Array args, Array body)
 
 Module         (Object file, Array body)

@@ -3,7 +3,7 @@
 #pragma once
 
 struct zis_ast_node_Nil_data {
-    struct zis_object *value;
+    struct zis_object *_;
 };
 
 struct zis_ast_node_Bool_data {
@@ -162,13 +162,48 @@ struct zis_ast_node_Map_data {
     struct zis_array_obj *args;
 };
 
+struct zis_ast_node_Import_data {
+    struct zis_ast_node_obj *value;
+};
+
+struct zis_ast_node_Return_data {
+    struct zis_object *value;
+};
+
+struct zis_ast_node_Throw_data {
+    struct zis_object *value;
+};
+
+struct zis_ast_node_Break_data {
+    struct zis_object *_;
+};
+
+struct zis_ast_node_Continue_data {
+    struct zis_object *_;
+};
+
+struct zis_ast_node_Cond_data {
+    struct zis_array_obj *args;
+};
+
+struct zis_ast_node_While_data {
+    struct zis_ast_node_obj *cond;
+    struct zis_array_obj *body;
+};
+
+struct zis_ast_node_Func_data {
+    struct zis_symbol_obj *name;
+    struct zis_array_obj *args;
+    struct zis_array_obj *body;
+};
+
 struct zis_ast_node_Module_data {
     struct zis_object *file;
     struct zis_array_obj *body;
 };
 
 #define ZIS_AST_NODE_LIST \
-    E(Nil            , "Object\0value\0") \
+    E(Nil            , "Object\0_\0") \
     E(Bool           , "Bool\0value\0") \
     E(Constant       , "Object\0value\0") \
     E(Name           , "Symbol\0value\0") \
@@ -202,5 +237,13 @@ struct zis_ast_node_Module_data {
     E(Tuple          , "Array\0args\0") \
     E(Array          , "Array\0args\0") \
     E(Map            , "Array\0args\0") \
+    E(Import         , "Node\0value\0") \
+    E(Return         , "Object\0value\0") \
+    E(Throw          , "Object\0value\0") \
+    E(Break          , "Object\0_\0") \
+    E(Continue       , "Object\0_\0") \
+    E(Cond           , "Array\0args\0") \
+    E(While          , "Node\0cond\0Array\0body\0") \
+    E(Func           , "Symbol\0name\0Array\0args\0Array\0body\0") \
     E(Module         , "Object\0file\0Array\0body\0") \
 // ^^^ ZIS_AST_NODE_LIST ^^^

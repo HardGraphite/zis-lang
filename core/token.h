@@ -88,6 +88,7 @@ struct zis_symbol_obj;
     E(FOR     , "for"     ) \
     E(BREAK   , "break"   ) \
     E(CONTINUE, "continue") \
+    E(IMPORT  , "import"  ) \
     E(RETURN  , "return"  ) \
     E(THROW   , "throw"   ) \
     E(END     , "end"     ) \

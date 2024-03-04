@@ -250,3 +250,89 @@ digits = {
 }
 q = seq[digits[num_to_str(pi:floor())]]
 ```
+
+### Import statement
+
+```
+import_stmt = "import" expr EOS
+```
+
+### Return statement
+
+```
+return_stmt = "return" [ expr ] EOS
+```
+
+### Throw statement
+
+```
+throw_stmt = "throw" [ expr ] EOS
+```
+
+### Break & continue statement
+
+```
+break_stmt = "break" EOS
+continue_stmt = "continue" EOS
+```
+
+### If-else statement
+
+```
+cond_stmt =
+    "if" expr EOS
+        block
+    [{ "elif" expr EOS
+        block }]
+    [ "else" expr EOS
+        block ]
+    "end" EOS;
+```
+
+Examples:
+
+```
+if num < 0
+    num = -num
+end
+
+if num < 50
+    desc = "failed"
+elif num < 70
+    desc = "passed"
+elif num < 80
+    desc = "good"
+else
+    desc = "excitant"
+end
+```
+
+### While statement
+
+```
+while_stmt =
+    "while" expr EOS
+        block
+    "end" EOS;
+```
+
+Examples:
+
+```
+while !ok
+    retry()
+end
+```
+
+### Func statement
+
+```
+func_stmt =
+    "func" identifier "(" func_arg_list ")" EOS
+        block
+    "end" EOS;
+func_arg_list
+    = (* empty *)
+    | identifier [{ "," identifier }] [ "," ]
+    ;
+```
