@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include <stdbool.h>
+
 #include "zis_config.h" // ZIS_FEATURE_SRC
 
 struct zis_context;
@@ -21,6 +23,7 @@ typedef void (*zis_lexer_error_handler_t)(struct zis_lexer *, const char *restri
 struct zis_lexer {
     unsigned int line, column;
     unsigned int ignore_eol; ///< Whether to ignore end-of-line tokens. Being 0 after started.
+    bool input_eof;
     struct zis_context *z;
     struct zis_stream_obj *input; // Stream objects will not be moved by the GC system.
     struct zis_map_obj *keywords;

@@ -837,8 +837,15 @@ scan_next_char:
             goto case_identifier;
         }
         if (first_char == -1) {
-            token_set_type(tok, ZIS_TOK_EOF);
-            goto token_set_loc1__loc_next__return;
+            if (l->input_eof) {
+                token_set_type(tok, ZIS_TOK_EOF);
+                goto token_set_loc1__loc_next__return;
+            } else {
+                l->input_eof = true;
+                token_set_type(tok, ZIS_TOK_EOS);
+                token_set_loc1(tok, l);
+                return;
+            }
         }
         error_unexpected_char(l, first_char);
 
@@ -884,6 +891,7 @@ void zis_lexer_start(
 ) {
     l->line = 1, l->column = 1;
     l->ignore_eol = 0;
+    l->input_eof = false;
     l->input = input_stream;
     l->temp_var = zis_smallint_to_ptr(0);
     l->error_handler = error_handler;
