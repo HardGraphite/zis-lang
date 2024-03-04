@@ -377,7 +377,10 @@ static void expr_builder_gen_one_expr(
             zis_locals_decl_1(p, tmp_var, struct zis_ast_node_obj *op_node);
             tmp_var.op_node = result_node;
             result_node = zis_ast_node_new(z, Assign, false);
-            zis_ast_node_set_field(result_node, Assign, lhs, ((struct zis_ast_node_Add_data *)tmp_var.op_node->_data)->lhs);
+            zis_ast_node_set_field(
+                result_node, Assign, lhs,
+                _zis_ast_node_obj_data_as(tmp_var.op_node, struct zis_ast_node_Add_data)->lhs
+            );
             zis_ast_node_set_field(result_node, Assign, rhs, tmp_var.op_node);
             zis_object_write_barrier(result_node, tmp_var.op_node);
             node_copy_loc0(result_node, tmp_var.op_node);
@@ -528,8 +531,6 @@ zis_nodiscard static bool expr_builder_put_r_paren(
 static struct zis_ast_node_obj *expr_builder_generate_expr(
     struct expr_builder_state *eb, struct zis_parser *p
 ) {
-    struct zis_context *z = parser_z(p);
-
     while (zis_array_obj_length(eb->operator_stack)) {
         expr_builder_gen_one_expr(eb, p);
     }
@@ -543,7 +544,7 @@ static struct zis_ast_node_obj *expr_builder_generate_expr(
             );
         } else {
             struct zis_object *node = zis_array_obj_pop(eb->operand_stack);
-            assert(zis_object_type(node) == z->globals->type_AstNode);
+            assert(zis_object_type(node) == parser_z(p)->globals->type_AstNode);
             struct zis_ast_node_obj_location *loc =
                 zis_ast_node_obj_location(zis_object_cast(node, struct zis_ast_node_obj));
             error(p, loc->line0, loc->column0, "unexpected %s", "expression");
@@ -552,7 +553,7 @@ static struct zis_ast_node_obj *expr_builder_generate_expr(
 
     struct zis_object *node = zis_array_obj_pop(eb->operand_stack);
     assert(node);
-    assert(zis_object_type(node) == z->globals->type_AstNode);
+    assert(zis_object_type(node) == parser_z(p)->globals->type_AstNode);
     return zis_object_cast(node, struct zis_ast_node_obj);
 }
 
