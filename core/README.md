@@ -21,9 +21,10 @@ Source code for the runtime core.
     - [`invoke.h`](invoke.h), [`invoke.c`](invoke.c)
     - [`loader.h`](loader.h), [`loader.c`](loader.c)
     - [`stack.h`](stack.h), [`stack.c`](stack.c)
-+ compiling:
++ bytecode compiler:
     - [`assembly.h`](assembly.h), [`assembly.c`](assembly.c)
     - [`ast.h`](ast.h), [`ast.c`](ast.c)
+    - [`codegen.h`](codegen.h), [`codegen.c`](codegen.c)
     - [`compile.h`](compile.h), [`compile.c`](compile.c)
     - [`lexer.h`](lexer.h), [`lexer.c`](lexer.c)
     - [`parser.h`](parser.c), [`parser.c`](parser.c)
