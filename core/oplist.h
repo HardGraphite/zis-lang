@@ -2,7 +2,7 @@
 
 #pragma once
 
-#define ZIS_OP_LIST_LEN  34
+#define ZIS_OP_LIST_LEN  63
 
 #define ZIS_OP_LIST_MAX_LEN  (127 + 1)
 
@@ -42,17 +42,68 @@
     E(0x25, STELM   ) \
     E(0x26, LDELMI  ) \
     E(0x27, STELMI  ) \
+    E(0x28, JMP     ) \
+    E(0x29, JMPT    ) \
+    E(0x2a, JMPF    ) \
+    E(0x2b, JMPLE   ) \
+    E(0x2c, JMPLT   ) \
+    E(0x2d, JMPEQ   ) \
+    E(0x2e, JMPGT   ) \
+    E(0x2f, JMPGE   ) \
+    E(0x30, JMPNE   ) \
+    E(0x31, CMP     ) \
+    E(0x32, CMPLE   ) \
+    E(0x33, CMPLT   ) \
+    E(0x34, CMPEQ   ) \
+    E(0x35, CMPGT   ) \
+    E(0x36, CMPGE   ) \
+    E(0x37, CMPNE   ) \
+    E(0x38, ADD     ) \
+    E(0x39, SUB     ) \
+    E(0x3a, MUL     ) \
+    E(0x3b, DIV     ) \
+    E(0x3c, REM     ) \
+    E(0x3d, POW     ) \
+    E(0x3e, SHL     ) \
+    E(0x3f, SHR     ) \
+    E(0x40, BITAND  ) \
+    E(0x41, BITOR   ) \
+    E(0x42, BITXOR  ) \
+    E(0x44, NOT     ) \
+    E(0x45, BITNOT  ) \
 // ^^^ ZIS_OP_LIST ^^^
 
 /// List of ops (sorted by names, undefined ones included).
 #define ZIS_OP_LIST_FULL \
+    E(0x38, ADD     , ABC  ) \
     E(0x01, ARG     , Aw   ) \
+    E(0x40, BITAND  , ABC  ) \
+    E(0x45, BITNOT  , ABw  ) \
+    E(0x41, BITOR   , ABC  ) \
+    E(0x42, BITXOR  , ABC  ) \
     E(0x03, BRK     , Aw   ) \
     E(0x13, CALL    , Aw   ) \
     E(0x16, CALLP   , ABw  ) \
     E(0x15, CALLV   , ABC  ) \
+    E(0x31, CMP     , ABC  ) \
+    E(0x34, CMPEQ   , ABC  ) \
+    E(0x36, CMPGE   , ABC  ) \
+    E(0x35, CMPGT   , ABC  ) \
+    E(0x32, CMPLE   , ABC  ) \
+    E(0x33, CMPLT   , ABC  ) \
+    E(0x37, CMPNE   , ABC  ) \
+    E(0x3b, DIV     , ABC  ) \
     E(0x18, IMP     , ABw  ) \
     E(0x19, IMPSUB  , ABw  ) \
+    E(0x28, JMP     , Aw   ) \
+    E(0x2d, JMPEQ   , ABC  ) \
+    E(0x2a, JMPF    , ABw  ) \
+    E(0x2f, JMPGE   , ABC  ) \
+    E(0x2e, JMPGT   , ABC  ) \
+    E(0x2b, JMPLE   , ABC  ) \
+    E(0x2c, JMPLT   , ABC  ) \
+    E(0x30, JMPNE   , ABC  ) \
+    E(0x29, JMPT    , ABw  ) \
     E(0x05, LDBLN   , ABw  ) \
     E(0x06, LDCON   , ABw  ) \
     E(0x24, LDELM   , ABC  ) \
@@ -69,9 +120,15 @@
     E(0x08, MKINT   , ABsw ) \
     E(0x0c, MKMAP   , ABC  ) \
     E(0x0a, MKTUP   , ABC  ) \
+    E(0x3a, MUL     , ABC  ) \
     E(0x00, NOP     , Aw   ) \
+    E(0x44, NOT     , ABw  ) \
+    E(0x3d, POW     , ABC  ) \
+    E(0x3c, REM     , ABC  ) \
     E(0x12, RET     , Aw   ) \
     E(0x11, RETNIL  , Aw   ) \
+    E(0x3e, SHL     , ABC  ) \
+    E(0x3f, SHR     , ABC  ) \
     E(0x25, STELM   , ABC  ) \
     E(0x27, STELMI  , AsBC ) \
     E(0x23, STFLDX  , ABC  ) \
@@ -79,6 +136,7 @@
     E(0x1d, STGLB   , ABw  ) \
     E(0x1f, STGLBX  , ABw  ) \
     E(0x1b, STLOC   , ABw  ) \
+    E(0x39, SUB     , ABC  ) \
     E(0x10, THR     , Aw   ) \
     E(0x02,         , X    ) \
     E(0x0d,         , X    ) \
@@ -86,36 +144,7 @@
     E(0x0f,         , X    ) \
     E(0x14,         , X    ) \
     E(0x17,         , X    ) \
-    E(0x28,         , X    ) \
-    E(0x29,         , X    ) \
-    E(0x2a,         , X    ) \
-    E(0x2b,         , X    ) \
-    E(0x2c,         , X    ) \
-    E(0x2d,         , X    ) \
-    E(0x2e,         , X    ) \
-    E(0x2f,         , X    ) \
-    E(0x30,         , X    ) \
-    E(0x31,         , X    ) \
-    E(0x32,         , X    ) \
-    E(0x33,         , X    ) \
-    E(0x34,         , X    ) \
-    E(0x35,         , X    ) \
-    E(0x36,         , X    ) \
-    E(0x37,         , X    ) \
-    E(0x38,         , X    ) \
-    E(0x39,         , X    ) \
-    E(0x3a,         , X    ) \
-    E(0x3b,         , X    ) \
-    E(0x3c,         , X    ) \
-    E(0x3d,         , X    ) \
-    E(0x3e,         , X    ) \
-    E(0x3f,         , X    ) \
-    E(0x40,         , X    ) \
-    E(0x41,         , X    ) \
-    E(0x42,         , X    ) \
     E(0x43,         , X    ) \
-    E(0x44,         , X    ) \
-    E(0x45,         , X    ) \
     E(0x46,         , X    ) \
     E(0x47,         , X    ) \
     E(0x48,         , X    ) \

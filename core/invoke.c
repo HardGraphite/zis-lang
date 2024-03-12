@@ -865,6 +865,122 @@ _interp_loop:
         goto panic_ill; // Not implemented.
     }
 
+    OP_DEFINE(JMP) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(JMPT) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(JMPF) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(JMPLE) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(JMPLT) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(JMPEQ) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(JMPGT) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(JMPGE) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(JMPNE) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(CMP) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(CMPLE) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(CMPLT) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(CMPEQ) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(CMPGT) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(CMPGE) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(CMPNE) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(ADD) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(SUB) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(MUL) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(DIV) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(REM) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(POW) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(SHL) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(SHR) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(BITAND) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(BITOR) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(BITXOR) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(NOT) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(BITNOT) {
+        goto panic_ill; // Not implemented.
+    }
+
     OP_UNDEFINED {
         zis_debug_log(FATAL, "Interp", "unknown opcode %#04x", zis_instr_extract_opcode(this_instr));
         goto panic_ill;

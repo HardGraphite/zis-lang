@@ -13,6 +13,7 @@
 #   - K (constant index)
 #   - Y (symbol index)
 #   - G (global index)
+#   - J (jump offset)
 #   - I (signed integer)
 #   - U (unsigned integer)
 # the <SIZE> is one of:
@@ -79,3 +80,36 @@
 0x25  STELM     key:R9,elm:R8,obj:R8             # Store an element: (REG[obj])[ REG[key] ] <- REG[elm].
 0x26  LDELMI    key:I9,elm:R8,obj:R8             # Load an element by an integer key: REG[elm] <- (REG[obj])[ key ].
 0x27  STELMI    key:I9,elm:R8,obj:R8             # Store an element by an integer key: (REG[obj])[ key ] <- REG[elm].
+
+0x28  JMP       offset:J25                       # Jump: IP <- IP + offset
+0x29  JMPT      offset:J9,cond:R16               # Conditional jump: if REG[cond] = true then IP <- IP + offset.
+0x2a  JMPF      offset:J9,cond:R16               # Conditional jump: if REG[cond] = false then IP <- IP + offset.
+0x2b  JMPLE     offset:J9,lhs:R8,rhs:R8          # Compare and jump: if REG[lhs] <= REG[rhs] then IP <- IP + offset.
+0x2c  JMPLT     offset:J9,lhs:R8,rhs:R8          # Compare and jump: if REG[lhs] < REG[rhs] then IP <- IP + offset.
+0x2d  JMPEQ     offset:J9,lhs:R8,rhs:R8          # Compare and jump: if REG[lhs] = REG[rhs] then IP <- IP + offset.
+0x2e  JMPGT     offset:J9,lhs:R8,rhs:R8          # Compare and jump: if REG[lhs] > REG[rhs] then IP <- IP + offset.
+0x2f  JMPGE     offset:J9,lhs:R8,rhs:R8          # Compare and jump: if REG[lhs] >= REG[rhs] then IP <- IP + offset.
+0x30  JMPNE     offset:J9,lhs:R8,rhs:R8          # Compare and jump: if REG[lhs] != REG[rhs] then IP <- IP + offset.
+
+0x31  CMP       tgt:R9,lhs:R8,rhs:R8             # Compare: REG[tgt] <- (REG[lhs] <=> REG[rhs]).
+0x32  CMPLE     tgt:R9,lhs:R8,rhs:R8             # Compare: REG[tgt] <- (REG[lhs] <= REG[rhs] ? true : false).
+0x33  CMPLT     tgt:R9,lhs:R8,rhs:R8             # Compare: REG[tgt] <- (REG[lhs] < REG[rhs] ? true : false).
+0x34  CMPEQ     tgt:R9,lhs:R8,rhs:R8             # Compare: REG[tgt] <- (REG[lhs] = REG[rhs] ? true : false).
+0x35  CMPGT     tgt:R9,lhs:R8,rhs:R8             # Compare: REG[tgt] <- (REG[lhs] > REG[rhs] ? true : false).
+0x36  CMPGE     tgt:R9,lhs:R8,rhs:R8             # Compare: REG[tgt] <- (REG[lhs] >= REG[rhs] ? true : false).
+0x37  CMPNE     tgt:R9,lhs:R8,rhs:R8             # Compare: REG[tgt] <- (REG[lhs] != REG[rhs] ? true : false).
+
+0x38  ADD       tgt:R9,lhs:R8,rhs:R8             # REG[tgt] <- REG[lhs] + REG[rhs].
+0x39  SUB       tgt:R9,lhs:R8,rhs:R8             # REG[tgt] <- REG[lhs] - REG[rhs].
+0x3a  MUL       tgt:R9,lhs:R8,rhs:R8             # REG[tgt] <- REG[lhs] * REG[rhs].
+0x3b  DIV       tgt:R9,lhs:R8,rhs:R8             # REG[tgt] <- REG[lhs] / REG[rhs].
+0x3c  REM       tgt:R9,lhs:R8,rhs:R8             # REG[tgt] <- REG[lhs] % REG[rhs].
+0x3d  POW       tgt:R9,lhs:R8,rhs:R8             # REG[tgt] <- REG[lhs] ** REG[rhs].
+0x3e  SHL       tgt:R9,lhs:R8,rhs:R8             # REG[tgt] <- REG[lhs] << REG[rhs].
+0x3f  SHR       tgt:R9,lhs:R8,rhs:R8             # REG[tgt] <- REG[lhs] >> REG[rhs].
+0x40  BITAND    tgt:R9,lhs:R8,rhs:R8             # REG[tgt] <- REG[lhs] & REG[rhs].
+0x41  BITOR     tgt:R9,lhs:R8,rhs:R8             # REG[tgt] <- REG[lhs] | REG[rhs].
+0x42  BITXOR    tgt:R9,lhs:R8,rhs:R8             # REG[tgt] <- REG[lhs] ^ REG[rhs].
+
+0x44  NOT       tgt:R9,val:R16                   # REG[tgt] <- ! REG[val]
+0x45  BITNOT    tgt:R9,val:R16                   # REG[tgt] <- ~ REG[val]
