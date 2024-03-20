@@ -71,6 +71,7 @@ file(CONFIGURE OUTPUT "${zis_core_conf_header_dir}/zis_config.h" @ONLY CONTENT [
 #cmakedefine01  ZIS_USE_COMPUTED_GOTO
 #cmakedefine01  ZIS_DEBUG
 #cmakedefine01  ZIS_DEBUG_LOGGING
+#cmakedefine01  ZIS_DEBUG_DUMPBT
 #cmakedefine01  ZIS_FEATURE_ASM
 #cmakedefine01  ZIS_FEATURE_DIS
 #cmakedefine01  ZIS_FEATURE_SRC

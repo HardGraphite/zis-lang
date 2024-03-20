@@ -60,5 +60,18 @@ void _zis_debug_log(
 
 #define zis_debug_log(level, group, ...) ((void)0)
 #define zis_debug_log_1(level, group, prompt, var, stmt) ((void)0)
+#define zis_debug_log_stream(level, group) ((void *)0)
 
 #endif // ZIS_DEBUG_LOGGING
+
+#if ZIS_DEBUG_DUMPBT
+
+#include <stdio.h>
+
+void zis_debug_dump_backtrace(FILE *stream);
+
+#else // !ZIS_DEBUG_DUMPBT
+
+#define zis_debug_dump_backtrace(stream) ((void)0)
+
+#endif // ZIS_DEBUG_DUMPBT

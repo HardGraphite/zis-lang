@@ -149,8 +149,135 @@ FILE *zis_debug_log_stream(enum zis_debug_log_level level, const char *group) {
 
 #endif // ZIS_DEBUG_LOGGING
 
+#if ZIS_DEBUG_DUMPBT
+
+#include <stdio.h>
+#include <signal.h>
+
+#include "attributes.h"
+
+#if ZIS_SYSTEM_WINDOWS
+
+#include <wchar.h>
+#include <Windows.h>
+#include <DbgHelp.h>
+#include <processthreadsapi.h>
+#define BT_WINDOWS 1
+#pragma comment(lib, "DbgHelp")
+
+#elif ZIS_SYSTEM_POSIX && defined(__has_include) && __has_include(<execinfo.h>)
+
+#include <execinfo.h>
+#include <unistd.h>
+#define BT_EXECINFO 1
+
+#else
+
+#pragma message "zis_debug_dump_backtrace() is not available"
+
+#endif
+
+zis_cold_fn void zis_debug_dump_backtrace(FILE *stream) {
+#if BT_WINDOWS
+
+    HANDLE proc = GetCurrentProcess();
+    SymInitialize(proc, NULL, TRUE);
+
+    void *bt_buf[62];
+    const unsigned int n_bt =
+        CaptureStackBackTrace(1, sizeof bt_buf / sizeof bt_buf[0], bt_buf, NULL);
+
+    struct { SYMBOL_INFOW info; wchar_t _name_buf[80]; } sym_info;
+    sym_info.info.SizeOfStruct = sizeof sym_info.info;
+    sym_info.info.MaxNameLen = sizeof sym_info._name_buf / sizeof(wchar_t);
+    IMAGEHLP_LINEW64 line_info;
+    line_info.SizeOfStruct = sizeof line_info;
+    for (unsigned int i = 0; i < n_bt; i++) {
+        DWORD64 sym_addr_off;
+        const wchar_t *sym_name;
+        int sym_name_len;
+        void *sym_addr;
+        if (SymFromAddrW(proc, (DWORD64)(bt_buf[i]), &sym_addr_off, &sym_info.info)) {
+            sym_name = sym_info.info.Name;
+            sym_name_len = sym_info.info.NameLen;
+            sym_addr = (void *)sym_info.info.Address;
+        } else {
+            sym_name = L"???";
+            sym_name_len = 3;
+            sym_addr = NULL;
+            sym_addr_off = 0U;
+        }
+        const wchar_t *file_name;
+        unsigned long line_num;
+        if (sym_addr && SymGetLineFromAddrW64(proc, sym_info.info.Address, &(DWORD){0}, &line_info)) {
+            file_name = line_info.FileName;
+            line_num = line_info.LineNumber;
+        } else {
+            file_name = L"???";
+            line_num = 0;
+        }
+        fwprintf(
+            stream, L"%2u: %ls(%u): %.*ls+%#x [%p]\n",
+            i, file_name, line_num, sym_name_len,
+            sym_name, (unsigned int)sym_addr_off, sym_addr
+        );
+    }
+
+#elif BT_EXECINFO
+
+    void *bt_buf[64];
+    const int n_bt = backtrace(bt_buf, (int)(sizeof bt_buf / sizeof bt_buf[0]));
+    if (n_bt)
+        backtrace_symbols_fd(bt_buf + 1, n_bt - 1, fileno(stream));
+
+#else
+
+    zis_unused_var(stream);
+
+#endif
+}
+
+zis_cold_fn static void dump_bt_sig_handler(int sig) {
+    char msg_buf[32];
+    FILE *stream = stderr;
+#if ZIS_DEBUG_LOGGING
+    if (logging_stream)
+        stream = logging_stream;
+#endif // ZIS_DEBUG_LOGGING
+    const int msg_len =
+        snprintf(msg_buf, sizeof msg_buf, "!! Signal %i raised, backtrace:\n", sig);
+    fwrite(msg_buf, 1, (size_t)msg_len, stream);
+    zis_debug_dump_backtrace(stream);
+    signal(sig, SIG_DFL);
+    raise(sig);
+    _Exit(EXIT_FAILURE);
+    // FIXME: some of the used functions are not safe to call in a signal handler.
+}
+
+static void dump_bt_init(void) {
+    const int sig_list[] = {
+        SIGSEGV,
+        SIGINT,
+        SIGILL,
+        SIGABRT,
+        SIGFPE,
+    };
+    for (unsigned int i = 0; i < sizeof sig_list / sizeof sig_list[0]; i++) {
+        void (*old_fn)(int) = signal(sig_list[i], dump_bt_sig_handler);
+        if (old_fn != SIG_DFL)
+            signal(sig_list[i], old_fn);
+        else
+            zis_debug_log(INFO, "Debug", "signal(%i, %s)", sig_list[i], "dump_bt_sig_handler");
+    }
+}
+
+#endif // ZIS_DEBUG_DUMPBT
+
 void zis_debug_try_init(void) {
 #if ZIS_DEBUG_LOGGING
     logging_init();
 #endif // ZIS_DEBUG_LOGGING
+#if ZIS_DEBUG_DUMPBT
+    dump_bt_init();
+#endif // ZIS_DEBUG_DUMPBT
 }
