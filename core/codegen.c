@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <limits.h>
+#include <math.h>
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
@@ -18,7 +19,10 @@
 #include "memory.h"
 #include "objmem.h"
 
+#include "arrayobj.h"
 #include "exceptobj.h"
+#include "floatobj.h"
+#include "funcobj.h"
 #include "mapobj.h"
 #include "symbolobj.h"
 
@@ -98,6 +102,7 @@ static void frame_scope__free_regs_list_remove(
 ) {
     struct frame_scope_free_regs *const free_regs_list = fs->free_regs_list;
     const size_t free_regs_list_len = fs->free_regs_list_len;
+    assert(free_regs_list);
     assert(position < free_regs_list_len);
     if (position != free_regs_list_len - 1) {
         memmove(
@@ -112,7 +117,7 @@ static void frame_scope__free_regs_list_insert(
     struct frame_scope *restrict fs, size_t position,
     struct frame_scope_free_regs data
 ) {
-    struct frame_scope_free_regs *const free_regs_list = fs->free_regs_list;
+    struct frame_scope_free_regs *free_regs_list = fs->free_regs_list;
     const size_t free_regs_list_len = fs->free_regs_list_len;
 
     assert(position <= fs->free_regs_list_len);
@@ -121,10 +126,10 @@ static void frame_scope__free_regs_list_insert(
 
     if (position && free_regs_list[position - 1].end == data.start) {
         if (position != free_regs_list_len && data.end == free_regs_list[position].start) {
-            free_regs_list[position - 1].end += free_regs_list[position].end;
+            free_regs_list[position - 1].end = free_regs_list[position].end;
             frame_scope__free_regs_list_remove(fs, position);
         } else {
-            free_regs_list[position - 1].end += data.end;
+            free_regs_list[position - 1].end = data.end;
         }
         return;
     }
@@ -138,10 +143,11 @@ static void frame_scope__free_regs_list_insert(
     if (free_regs_list_len == fs->free_regs_list_cap) {
         const size_t old_cap = fs->free_regs_list_cap;
         const size_t new_cap = old_cap ? old_cap * 2 : 4;
-        fs->free_regs_list = zis_mem_realloc(
+        free_regs_list = zis_mem_realloc(
             fs->free_regs_list,
             new_cap * sizeof(struct frame_scope_free_regs)
         );
+        fs->free_regs_list = free_regs_list;
         fs->free_regs_list_cap = new_cap;
     }
 
@@ -170,6 +176,7 @@ static unsigned int frame_scope_alloc_regs(
             if (regs_i_n == n) {
                 const unsigned int reg_start = regs_i->start;
                 frame_scope__free_regs_list_remove(fs, i);
+                zis_debug_log(TRACE, "CGen", "frame_scope_alloc_regs(%u) -> %u (free_list[%zu])", n, reg_start, i);
                 return reg_start;
             }
             if (regs_i_n < min_n && regs_i_n >= n) {
@@ -177,15 +184,19 @@ static unsigned int frame_scope_alloc_regs(
                 min_n_i = i;
             }
         }
-        free_regs_list[min_n_i].end -= n;
-        return free_regs_list[min_n_i].start;
+        const unsigned int reg = free_regs_list[min_n_i].start;
+        free_regs_list[min_n_i].start = reg + n;
+        assert(free_regs_list[min_n_i].start < free_regs_list[min_n_i].end);
+        zis_debug_log(TRACE, "CGen", "frame_scope_alloc_regs(%u) -> %u (free_list[%zu][0:%u])", n, reg, min_n_i, n);
+        return reg;
     }
 
     const unsigned int reg = fs->reg_allocated_max + 1;
     fs->reg_allocated_max += n;
-    assert(fs->reg_allocated_max > reg);
+    assert(fs->reg_allocated_max >= reg);
     if (fs->reg_allocated_max > fs->reg_touched_max)
         fs->reg_touched_max = fs->reg_allocated_max;
+    zis_debug_log(TRACE, "CGen", "frame_scope_alloc_regs(%u) -> %u (new)", n, reg);
     return reg;
 }
 
@@ -213,6 +224,7 @@ static void frame_scope_free_regs(
 
     if (freed_regs.end - 1 == fs->reg_allocated_max) {
         fs->reg_allocated_max -= n;
+        zis_debug_log(TRACE, "CGen", "frame_scope_free_regs(%u, %u) (shrink tail)", regs_start, n);
         return;
     }
 
@@ -221,11 +233,13 @@ static void frame_scope_free_regs(
 
     if (!free_regs_list_len || freed_regs.start < free_regs_list[0].start) {
         frame_scope__free_regs_list_insert(fs, 0, freed_regs);
+        zis_debug_log(TRACE, "CGen", "frame_scope_free_regs(%u, %u) (insert front)", regs_start, n);
         return;
     }
 
     if (freed_regs.start > free_regs_list[free_regs_list_len - 1].end) {
         frame_scope__free_regs_list_insert(fs, free_regs_list_len, freed_regs);
+        zis_debug_log(TRACE, "CGen", "frame_scope_free_regs(%u, %u) (insert back)", regs_start, n);
         return;
     }
 
@@ -236,6 +250,7 @@ static void frame_scope_free_regs(
             assert(freed_regs.end <= free_regs_m->start);
             if (index_m > 0 && freed_regs.start > free_regs_list[index_m - 1].start) {
                 frame_scope__free_regs_list_insert(fs, index_m, freed_regs);
+                zis_debug_log(TRACE, "CGen", "frame_scope_free_regs(%u, %u) (insert @%u)", regs_start, n, index_m);
                 return;
             }
             index_r = index_m - 1;
@@ -244,7 +259,8 @@ static void frame_scope_free_regs(
             assert(freed_regs.start >= free_regs_m->end);
             if (index_m + 1 < free_regs_list_len && freed_regs.start < free_regs_list[index_m + 1].start) {
                 frame_scope__free_regs_list_insert(fs, index_m + 1, freed_regs);
-                break;
+                zis_debug_log(TRACE, "CGen", "frame_scope_free_regs(%u, %u) (insert @%u)", regs_start, n, index_m + 1);
+                return;
             }
             index_l = index_m + 1;
         }
@@ -272,6 +288,36 @@ static unsigned int frame_scope_find_var(
         return 0; // no such a variable
     assert(zis_object_is_smallint(reg_smi));
     return (unsigned int)zis_smallint_from_ptr(reg_smi);
+}
+
+/// Update func_meta with argc. Fails (false) if there are too many args.
+zis_nodiscard static bool frame_scope_set_argc(
+    struct frame_scope *fs, size_t n_args, size_t n_opt_args
+) {
+    struct zis_assembler *as = fs->as;
+    if (zis_unlikely(n_args > UCHAR_MAX || (n_opt_args > UCHAR_MAX && n_opt_args != SIZE_MAX)))
+        return false;
+    zis_assembler_func_meta(as, &(struct zis_func_obj_meta){
+        .na = (unsigned char)n_args,
+        .no = (unsigned char)n_opt_args,
+        .nr = 0,
+    });
+    return true;
+}
+
+/// Generate function object. Fails (NULL) if too many registers are used.
+zis_nodiscard static struct zis_func_obj *frame_scope_gen_func(
+    struct frame_scope *fs,
+    struct zis_context *z
+) {
+    const unsigned int reg_max = fs->reg_touched_max;
+    if (zis_unlikely(reg_max >= USHRT_MAX))
+        return NULL;
+    struct zis_assembler *as = fs->as;
+    struct zis_func_obj_meta func_meta = *zis_assembler_func_meta(as, NULL);
+    func_meta.nr = (unsigned short)(reg_max + 1);
+    zis_assembler_func_meta(as, &func_meta);
+    return zis_assembler_finish(as, z);
 }
 
 /// Variable scope.
@@ -379,7 +425,8 @@ static void scope_stack_fini(struct scope_stack *restrict ss, struct zis_context
     scopes[3]       = ss->_scopes;
 
     for (unsigned int i = 0; i < sizeof scopes / sizeof scopes[0]; i++) {
-        for (union scope_ptr s = scopes[i]; s.any; s = s.any->_parent_scope) {
+        for (union scope_ptr s = scopes[i]; s.any; ) {
+            const union scope_ptr next_s = s.any->_parent_scope;
             switch (s.any->type) {
             case SCOPE_LOOP:
                 loop_scope_destory(s.loop);
@@ -393,6 +440,7 @@ static void scope_stack_fini(struct scope_stack *restrict ss, struct zis_context
             default:
                 zis_unreachable();
             }
+            s = next_s;
         }
     }
 }
@@ -521,6 +569,18 @@ static union scope_ptr scope_stack_last_frame_or_var_scope(
     return s;
 }
 
+static struct frame_scope *scope_stack_last_frame_scope(
+    struct scope_stack *restrict ss
+) {
+    union scope_ptr s = ss->_scopes;
+    assert(s.any);
+    while (s.any->type != SCOPE_FRAME) {
+        s = s.any->_parent_scope;
+        assert(s.any);
+    }
+    return s.frame;
+}
+
 static struct loop_scope *scope_stack_last_loop_scope(
     struct scope_stack *restrict ss
 ) {
@@ -589,6 +649,53 @@ zis_noreturn zis_noinline zis_cold_fn static void error_not_implemented(
     error(cg, err_node, "not implemented: %s()", fn);
 }
 
+zis_noreturn zis_noinline zis_cold_fn static void error_too_many_args(
+    struct zis_codegen *restrict cg, struct zis_ast_node_obj *err_node
+) {
+    error(cg, err_node, "too many arguments");
+}
+
+zis_noreturn zis_noinline zis_cold_fn static void error_too_many_regs(
+    struct zis_codegen *restrict cg, struct zis_ast_node_obj *err_node
+) {
+    error(cg, err_node, "too many registers are used");
+}
+
+/// Check whether `obj` is an AST node object. Throws and error if not.
+static void check_obj_is_node(
+    struct zis_codegen *restrict cg,
+    struct zis_ast_node_obj *parent_node, struct zis_object *obj
+) {
+    if (zis_unlikely(zis_object_is_smallint(obj) || zis_object_type(obj) != cg->z->globals->type_AstNode))
+        error(cg, parent_node, "sub-node is not a node object");
+}
+
+/// Check whether target register `tgt` is `NTGT`. Throws and error if not.
+static void check_tgt_is_ntgt(
+    struct zis_codegen *restrict cg,
+    struct zis_ast_node_obj *parent_node, unsigned int tgt
+) {
+    if (zis_unlikely(tgt != UINT_MAX))
+        error(cg, parent_node, "unexpected target register");
+}
+
+/// Check whether the node is a Nil, a Bool, or a Constant.
+zis_nodiscard static bool node_is_constant(struct zis_ast_node_obj *node) {
+    enum zis_ast_node_type t = zis_ast_node_obj_type(node);
+    return t == ZIS_AST_NODE_Constant || t == ZIS_AST_NODE_Bool || t == ZIS_AST_NODE_Nil;
+}
+
+/// Get reg index of a local variable. Returns 0 if not found.
+static struct zis_assembler *scope_assembler(struct zis_codegen *restrict cg) {
+    union scope_ptr scope = scope_stack_last_frame_or_var_scope(&cg->scope_stack);
+    if (scope.any->type == SCOPE_VAR) {
+        return scope.var->frame->as;
+    } else {
+        assert(scope.any->type == SCOPE_FRAME);
+        return scope.frame->as;
+    }
+}
+
 /// Get reg index of a local variable. Returns 0 if not found.
 static unsigned int scope_find_var(
     struct zis_codegen *restrict cg,
@@ -603,6 +710,16 @@ static unsigned int scope_find_var(
         fs = scope.frame;
     }
     return frame_scope_find_var(fs, name);
+}
+
+/// Get reg index of a local variable if `name_node` is a Name node. Returns 0 if not found.
+static unsigned int scope_find_var_by_node(
+    struct zis_codegen *cg,
+    struct zis_ast_node_obj *name_node
+) {
+    if (zis_ast_node_obj_type(name_node) != ZIS_AST_NODE_Name)
+        return 0;
+    return scope_find_var(cg, zis_ast_node_get_field(name_node, Name, value));
 }
 
 /// Get reg index of a local variable. Allocate one if not found.
@@ -655,27 +772,68 @@ static void emit_any(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsi
 }
 
 static void emit_Nil(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
-    zis_unused_var(cg), zis_unused_var(node), zis_unused_var(tgt_reg);
+    zis_unused_var(node);
     assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Nil);
-    error_not_implemented(cg, __func__, node);
+    if (zis_unlikely(tgt_reg == NTGT))
+        return;
+    struct zis_assembler *const as = scope_assembler(cg);
+    zis_assembler_append_ABw(as, ZIS_OPC_LDNIL, tgt_reg, 1);
 }
 
 static void emit_Bool(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
-    zis_unused_var(cg), zis_unused_var(node), zis_unused_var(tgt_reg);
     assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Bool);
-    error_not_implemented(cg, __func__, node);
+    if (zis_unlikely(tgt_reg == NTGT))
+        return;
+    struct zis_assembler *const as = scope_assembler(cg);
+    struct zis_bool_obj *true_v = codegen_z(cg)->globals->val_true;
+    const bool x = zis_ast_node_get_field(node, Bool, value) == true_v;
+    zis_assembler_append_ABw(as, ZIS_OPC_LDBLN, tgt_reg, x ? 1 : 0);
 }
 
 static void emit_Constant(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
-    zis_unused_var(cg), zis_unused_var(node), zis_unused_var(tgt_reg);
     assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Constant);
-    error_not_implemented(cg, __func__, node);
+    if (zis_unlikely(tgt_reg == NTGT))
+        return;
+    struct zis_assembler *const as = scope_assembler(cg);
+    struct zis_object *v = zis_ast_node_get_field(node, Constant, value);
+    if (zis_object_is_smallint(v)) {
+        const zis_smallint_t x = zis_smallint_from_ptr(v);
+        if (ZIS_INSTR_I16_MIN <= x && x <= ZIS_INSTR_I16_MAX) {
+            zis_assembler_append_ABsw(as, ZIS_OPC_MKINT, tgt_reg, (int32_t)x);
+            return;
+        }
+    } else if (zis_object_type(v) == codegen_z(cg)->globals->type_Float) {
+        const double x = zis_float_obj_value(zis_object_cast(v, struct zis_float_obj));
+        double frac; int exp; // x = frac * pow2(exp)
+        frac = frexp(x, &exp);
+        const double frac_x128 = frac * 128;
+        const int exp_p7 = exp + 7;
+        if (
+            (trunc(frac_x128) == frac_x128) &&
+            (ZIS_INSTR_I8_MIN <= frac_x128 && frac_x128 <= ZIS_INSTR_I8_MAX) &&
+            (ZIS_INSTR_I8_MIN <= exp_p7 && exp_p7 <= ZIS_INSTR_I8_MAX)
+        ) {
+            zis_assembler_append_ABsCs(as, ZIS_OPC_MKFLT, tgt_reg, (int)frac_x128, exp_p7);
+            return;
+        }
+    }
+    const unsigned int cid = zis_assembler_func_constant(as, codegen_z(cg), v);
+    zis_assembler_append_ABw(as, ZIS_OPC_LDCON, tgt_reg, cid);
 }
 
 static void emit_Name(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
-    zis_unused_var(cg), zis_unused_var(node), zis_unused_var(tgt_reg);
     assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Name);
-    error_not_implemented(cg, __func__, node);
+    if (zis_unlikely(tgt_reg == NTGT))
+        return;
+    struct zis_assembler *const as = scope_assembler(cg);
+    struct zis_symbol_obj *name = zis_ast_node_get_field(node, Name, value);
+    const unsigned int reg = scope_find_var(cg, name);
+    if (reg) {
+        zis_assembler_append_ABw(as, ZIS_OPC_LDLOC, tgt_reg, reg);
+    } else {
+        const unsigned int yid = zis_assembler_func_symbol(as, codegen_z(cg), name);
+        zis_assembler_append_ABw(as, ZIS_OPC_LDGLB, tgt_reg, yid);
+    }
 }
 
 static void emit_Pos(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
@@ -702,28 +860,67 @@ static void emit_Not(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsi
     error_not_implemented(cg, __func__, node);
 }
 
+/// Handle a binary operator node.
+static void emit_bin_op_node(
+    struct zis_codegen *cg, struct zis_ast_node_obj *_node, unsigned int tgt_reg,
+    enum zis_opcode opcode
+) {
+    struct zis_ast_node_Add_data *_node_data = (void *)_node->_data;
+    if (zis_unlikely(tgt_reg == NTGT)) {
+        if (node_is_constant(_node_data->lhs) && node_is_constant(_node_data->rhs))
+            return;
+        tgt_reg = 0;
+    }
+    zis_locals_decl(
+        cg, var,
+        struct zis_ast_node_obj *lhs, *rhs;
+    );
+    var.lhs = _node_data->lhs, var.rhs = _node_data->rhs;
+    unsigned int lhs_reg = scope_find_var_by_node(cg, var.lhs);
+    unsigned int rhs_reg = scope_find_var_by_node(cg, var.rhs);
+    bool lhs_reg_allocated, rhs_reg_allocated;
+    struct frame_scope *fs = scope_stack_last_frame_scope(&cg->scope_stack);
+    if (lhs_reg) {
+        lhs_reg_allocated = false;
+    } else {
+        lhs_reg_allocated = true;
+        lhs_reg = frame_scope_alloc_regs(fs, 1);
+        emit_any(cg, var.lhs, lhs_reg);
+    }
+    if (rhs_reg) {
+        rhs_reg_allocated = false;
+    } else {
+        rhs_reg_allocated = true;
+        rhs_reg = frame_scope_alloc_regs(fs, 1);
+        emit_any(cg, var.rhs, rhs_reg);
+    }
+    if (rhs_reg_allocated)
+        frame_scope_free_regs(fs, rhs_reg, 1);
+    if (lhs_reg_allocated)
+        frame_scope_free_regs(fs, lhs_reg, 1);
+    struct zis_assembler *const as = scope_assembler(cg);
+    zis_assembler_append_ABC(as, opcode, tgt_reg, lhs_reg, rhs_reg);
+    zis_locals_drop(cg, var);
+}
+
 static void emit_Add(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
-    zis_unused_var(cg), zis_unused_var(node), zis_unused_var(tgt_reg);
     assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Add);
-    error_not_implemented(cg, __func__, node);
+    emit_bin_op_node(cg, node, tgt_reg, ZIS_OPC_ADD);
 }
 
 static void emit_Sub(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
-    zis_unused_var(cg), zis_unused_var(node), zis_unused_var(tgt_reg);
     assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Sub);
-    error_not_implemented(cg, __func__, node);
+    emit_bin_op_node(cg, node, tgt_reg, ZIS_OPC_SUB);
 }
 
 static void emit_Mul(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
-    zis_unused_var(cg), zis_unused_var(node), zis_unused_var(tgt_reg);
     assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Mul);
-    error_not_implemented(cg, __func__, node);
+    emit_bin_op_node(cg, node, tgt_reg, ZIS_OPC_MUL);
 }
 
 static void emit_Div(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
-    zis_unused_var(cg), zis_unused_var(node), zis_unused_var(tgt_reg);
     assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Div);
-    error_not_implemented(cg, __func__, node);
+    emit_bin_op_node(cg, node, tgt_reg, ZIS_OPC_DIV);
 }
 
 static void emit_Rem(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
@@ -907,9 +1104,38 @@ static void emit_Func(struct zis_codegen *cg, struct zis_ast_node_obj *node, uns
 }
 
 static void emit_Module(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
-    zis_unused_var(cg), zis_unused_var(node), zis_unused_var(tgt_reg);
+    zis_unused_var(tgt_reg);
     assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Module);
-    error_not_implemented(cg, __func__, node);
+    error(cg, node, "nested module");
+}
+
+/// Generate bytecode from a module. Should be used instead of `emit_Module()`.
+static struct zis_func_obj *gen_module(struct zis_codegen *cg, struct zis_ast_node_obj *_node) {
+    assert(zis_ast_node_obj_type(_node) == ZIS_AST_NODE_Module);
+    scope_stack_push_frame_scope(&cg->scope_stack, codegen_z(cg));
+    assert(scope_stack_current_scope(&cg->scope_stack).any->type == SCOPE_FRAME);
+    if (!frame_scope_set_argc(scope_stack_current_scope(&cg->scope_stack).frame, 0, 0))
+        zis_unreachable();
+    zis_locals_decl(
+        cg, var,
+        struct zis_ast_node_obj *node;
+        struct zis_array_obj *body;
+    );
+    var.node = _node;
+    var.body = zis_ast_node_get_field(var.node, Module, body);
+    for (size_t i = 0; i < zis_array_obj_length(var.body); i++) {
+        struct zis_object *sub_node = zis_array_obj_get(var.body, i);
+        check_obj_is_node(cg, var.node, sub_node);
+        emit_any(cg, zis_object_cast(sub_node, struct zis_ast_node_obj), NTGT);
+    }
+    assert(scope_stack_current_scope(&cg->scope_stack).any->type == SCOPE_FRAME);
+    struct zis_func_obj *const result =
+        frame_scope_gen_func(scope_stack_current_scope(&cg->scope_stack).frame, codegen_z(cg));
+    if (!result)
+        error_too_many_regs(cg, var.node);
+    zis_locals_drop(cg, var);
+    scope_stack_pop_frame_scope(&cg->scope_stack);
+    return result;
 }
 
 /* ----- public functions --------------------------------------------------- */
@@ -939,8 +1165,9 @@ struct zis_func_obj *zis_codegen_generate(
 
     struct zis_func_obj *result;
     if (!codegen_error_setjmp(cg)) {
-        emit_any(cg, ast, NTGT);
-        error_not_implemented(cg, __func__, ast);
+        if (zis_ast_node_obj_type(ast) != ZIS_AST_NODE_Module)
+            error(cg, ast, "the toplevel node must be a Module");
+        result = gen_module(cg, ast);
     } else {
         zis_locals_root_reset(&cg->locals_root);
         result = NULL;
