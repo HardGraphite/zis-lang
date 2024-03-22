@@ -368,7 +368,15 @@ struct zis_func_obj *zis_assembler_finish(struct zis_assembler *as, struct zis_c
     zis_assembler_clear(as);
 
     zis_debug_log_1(DUMP, "Asm", "zis_disassemble_bytecode()", fp, {
+        fprintf(fp, "# disassembly of function@%p\n", (void *)func_obj);
+        fprintf(
+            fp, "# meta = {.na = %u, .no = %u, .nr = %u}\n# constants.len = %zu, symbols.len = %zu\n",
+            func_obj->meta.na, func_obj->meta.no, func_obj->meta.nr,
+            zis_array_slots_obj_length(func_obj->_constants),
+            zis_array_slots_obj_length(func_obj->_symbols)
+        );
         zis_disassemble_bytecode(z, func_obj, _as_finish_debug_dump_fn, fp);
+        fprintf(fp, "# end of function@%p\n", (void *)func_obj);
     });
 
     return func_obj;
