@@ -14,7 +14,7 @@ set(ZIS_MALLOC_LINK "" CACHE FILEPATH
 set(ZIS_FILENAME_EXTENSION_SRC ".zis" CACHE STRING "File name extension for source code.")
 set(ZIS_FILENAME_EXTENSION_NDL ".zso" CACHE STRING "File name extension for native dynamic libraries.")
 set(ZIS_FILENAME_EXTENSION_BYT ".zsc" CACHE STRING "File name extension for bytecode dumps.")
-set(ZIS_FILENAME_EXTENSION_ASM ".zsa" CACHE STRING "File name extension for assembly code.")
+set(ZIS_FILENAME_EXTENSION_ASM ".zss" CACHE STRING "File name extension for assembly code.")
 
 string(TOUPPER ${ZIS_OUTPUT_NAME} zis_name_upper)
 set(ZIS_ENVIRON_NAME_PATH "${zis_name_upper}_PATH" CACHE STRING
