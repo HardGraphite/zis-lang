@@ -2,7 +2,7 @@
 
 #pragma once
 
-#define ZIS_OP_LIST_LEN  63
+#define ZIS_OP_LIST_LEN  65
 
 #define ZIS_OP_LIST_MAX_LEN  (127 + 1)
 
@@ -26,6 +26,7 @@
     E(0x13, CALL    ) \
     E(0x15, CALLV   ) \
     E(0x16, CALLP   ) \
+    E(0x17, LDMTH   ) \
     E(0x18, IMP     ) \
     E(0x19, IMPSUB  ) \
     E(0x1a, LDLOC   ) \
@@ -70,7 +71,8 @@
     E(0x41, BITOR   ) \
     E(0x42, BITXOR  ) \
     E(0x44, NOT     ) \
-    E(0x45, BITNOT  ) \
+    E(0x45, NEG     ) \
+    E(0x46, BITNOT  ) \
 // ^^^ ZIS_OP_LIST ^^^
 
 /// List of ops (sorted by names, undefined ones included).
@@ -78,7 +80,7 @@
     E(0x38, ADD     , ABC  ) \
     E(0x01, ARG     , Aw   ) \
     E(0x40, BITAND  , ABC  ) \
-    E(0x45, BITNOT  , ABw  ) \
+    E(0x46, BITNOT  , ABw  ) \
     E(0x41, BITOR   , ABC  ) \
     E(0x42, BITXOR  , ABC  ) \
     E(0x03, BRK     , Aw   ) \
@@ -95,15 +97,15 @@
     E(0x3b, DIV     , ABC  ) \
     E(0x18, IMP     , ABw  ) \
     E(0x19, IMPSUB  , ABw  ) \
-    E(0x28, JMP     , Aw   ) \
-    E(0x2d, JMPEQ   , ABC  ) \
-    E(0x2a, JMPF    , ABw  ) \
-    E(0x2f, JMPGE   , ABC  ) \
-    E(0x2e, JMPGT   , ABC  ) \
-    E(0x2b, JMPLE   , ABC  ) \
-    E(0x2c, JMPLT   , ABC  ) \
-    E(0x30, JMPNE   , ABC  ) \
-    E(0x29, JMPT    , ABw  ) \
+    E(0x28, JMP     , Asw  ) \
+    E(0x2d, JMPEQ   , AsBC ) \
+    E(0x2a, JMPF    , AsBw ) \
+    E(0x2f, JMPGE   , AsBC ) \
+    E(0x2e, JMPGT   , AsBC ) \
+    E(0x2b, JMPLE   , AsBC ) \
+    E(0x2c, JMPLT   , AsBC ) \
+    E(0x30, JMPNE   , AsBC ) \
+    E(0x29, JMPT    , AsBw ) \
     E(0x05, LDBLN   , ABw  ) \
     E(0x06, LDCON   , ABw  ) \
     E(0x24, LDELM   , ABC  ) \
@@ -113,6 +115,7 @@
     E(0x1c, LDGLB   , ABw  ) \
     E(0x1e, LDGLBX  , ABw  ) \
     E(0x1a, LDLOC   , ABw  ) \
+    E(0x17, LDMTH   , ABw  ) \
     E(0x04, LDNIL   , ABw  ) \
     E(0x07, LDSYM   , ABw  ) \
     E(0x0b, MKARR   , ABC  ) \
@@ -121,6 +124,7 @@
     E(0x0c, MKMAP   , ABC  ) \
     E(0x0a, MKTUP   , ABC  ) \
     E(0x3a, MUL     , ABC  ) \
+    E(0x45, NEG     , ABw  ) \
     E(0x00, NOP     , Aw   ) \
     E(0x44, NOT     , ABw  ) \
     E(0x3d, POW     , ABC  ) \
@@ -143,9 +147,7 @@
     E(0x0e,         , X    ) \
     E(0x0f,         , X    ) \
     E(0x14,         , X    ) \
-    E(0x17,         , X    ) \
     E(0x43,         , X    ) \
-    E(0x46,         , X    ) \
     E(0x47,         , X    ) \
     E(0x48,         , X    ) \
     E(0x49,         , X    ) \

@@ -331,7 +331,7 @@ struct zis_func_obj *zis_assembler_finish(struct zis_assembler *as, struct zis_c
             enum zis_opcode last_op = (enum zis_opcode)zis_instr_extract_opcode(
                 as->instr_buffer.data[as->instr_buffer.length - 1]
             );
-            if (last_op == ZIS_OPC_RET || last_op == ZIS_OPC_RETNIL)
+            if (last_op == ZIS_OPC_RET || last_op == ZIS_OPC_RETNIL || last_op == ZIS_OPC_THR)
                 break;
         }
         zis_assembler_append_Aw(as, ZIS_OPC_RETNIL, 0);
@@ -472,6 +472,14 @@ void zis_assembler_append_ABw(
     zis_assembler_append(as, zis_instr_make_ABw(opcode, A, Bw));
 }
 
+void zis_assembler_append_AsBw(
+    struct zis_assembler *as, enum zis_opcode opcode,
+    int32_t As, uint32_t Bw
+) {
+    assert_op_type_(opcode, == ZIS_OP_AsBw);
+    zis_assembler_append(as, zis_instr_make_AsBw(opcode, As, Bw));
+}
+
 void zis_assembler_append_ABsw(
     struct zis_assembler *as, enum zis_opcode opcode,
     uint32_t A, int32_t Bsw
@@ -486,6 +494,14 @@ void zis_assembler_append_ABC(
 ) {
     assert_op_type_(opcode, == ZIS_OP_ABC);
     zis_assembler_append(as, zis_instr_make_ABC(opcode, A, B, C));
+}
+
+void zis_assembler_append_AsBC(
+    struct zis_assembler *as, enum zis_opcode opcode,
+    int32_t As, uint32_t B, uint32_t C
+) {
+    assert_op_type_(opcode, == ZIS_OP_AsBC);
+    zis_assembler_append(as, zis_instr_make_AsBC(opcode, As, B, C));
 }
 
 void zis_assembler_append_ABsCs(
@@ -659,6 +675,15 @@ static struct zis_func_obj *tas_parse_func(
                     (uint32_t)line_result.instr.operands[1]
                 );
                 break;
+            case ZIS_OP_AsBw:
+                if (line_result.instr.operand_count != 2)
+                    goto bad_operands;
+                zis_assembler_append_AsBw(
+                    as, line_result.instr.opcode,
+                    (int32_t)line_result.instr.operands[0],
+                    (uint32_t)line_result.instr.operands[1]
+                );
+                break;
             case ZIS_OP_ABsw:
                 if (line_result.instr.operand_count != 2)
                     goto bad_operands;
@@ -674,6 +699,16 @@ static struct zis_func_obj *tas_parse_func(
                 zis_assembler_append_ABC(
                     as, line_result.instr.opcode,
                     (uint32_t)line_result.instr.operands[0],
+                    (uint32_t)line_result.instr.operands[1],
+                    (uint32_t)line_result.instr.operands[2]
+                );
+                break;
+            case ZIS_OP_AsBC:
+                if (line_result.instr.operand_count != 3)
+                    goto bad_operands;
+                zis_assembler_append_ABsCs(
+                    as, line_result.instr.opcode,
+                    line_result.instr.operands[0],
                     (uint32_t)line_result.instr.operands[1],
                     (uint32_t)line_result.instr.operands[2]
                 );
@@ -820,6 +855,10 @@ static void dump_instr(
         result->operands[0] = (int32_t)u[0], result->operands[1] = (int32_t)u[1],
         result->operands[2] = INT32_MIN;
         break;
+    case ZIS_OP_AsBw:
+        zis_instr_extract_operands_AsBw(instr, result->operands[0], u[1]);
+        result->operands[1] = (int32_t)u[1], result->operands[2] = INT32_MIN;
+        break;
     case ZIS_OP_ABsw:
         zis_instr_extract_operands_ABsw(instr, u[0], result->operands[1]);
         result->operands[0] = (int32_t)u[0], result->operands[2] = INT32_MIN;
@@ -828,6 +867,10 @@ static void dump_instr(
         zis_instr_extract_operands_ABC(instr, u[0], u[1], u[2]);
         result->operands[0] = (int32_t)u[0], result->operands[1] = (int32_t)u[1],
         result->operands[2] = (int32_t)u[2];
+        break;
+    case ZIS_OP_AsBC:
+        zis_instr_extract_operands_AsBC(instr, result->operands[0], u[1], u[2]);
+        result->operands[1] = (int32_t)u[1], result->operands[2] = (int32_t)u[2];
         break;
     case ZIS_OP_ABsCs:
         zis_instr_extract_operands_ABsCs(instr, u[0], result->operands[1], result->operands[2]);

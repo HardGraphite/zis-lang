@@ -86,6 +86,11 @@ void zis_assembler_append_ABw(
     uint32_t A, uint32_t Bw
 );
 
+void zis_assembler_append_AsBw(
+    struct zis_assembler *as, enum zis_opcode opcode,
+    int32_t As, uint32_t Bw
+);
+
 void zis_assembler_append_ABsw(
     struct zis_assembler *as, enum zis_opcode opcode,
     uint32_t A, int32_t Bsw
@@ -94,6 +99,11 @@ void zis_assembler_append_ABsw(
 void zis_assembler_append_ABC(
     struct zis_assembler *as, enum zis_opcode opcode,
     uint32_t A, uint32_t B, uint32_t C
+);
+
+void zis_assembler_append_AsBC(
+    struct zis_assembler *as, enum zis_opcode opcode,
+    int32_t As, uint32_t B, uint32_t C
 );
 
 void zis_assembler_append_ABsCs(

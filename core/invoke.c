@@ -654,6 +654,10 @@ _interp_loop:
         goto _do_call_func_obj;
     }
 
+    OP_DEFINE(LDMTH) {
+        goto panic_ill; // Not implemented.
+    }
+
     OP_DEFINE(IMP) {
         uint32_t tgt, name;
         zis_instr_extract_operands_ABw(this_instr, tgt, name);
@@ -974,6 +978,10 @@ _interp_loop:
     }
 
     OP_DEFINE(NOT) {
+        goto panic_ill; // Not implemented.
+    }
+
+    OP_DEFINE(NEG) {
         goto panic_ill; // Not implemented.
     }
 

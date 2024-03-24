@@ -60,6 +60,8 @@
 0x15  CALLV     ret:R9,arg_start:R8,arg_count:U8 # Call REG[0] with a vector of arguments REG[arg_start, ..., arg_start+arg_count-1].
 0x16  CALLP     ret:R9,args:R16                  # Call REG[0] with packed arguments REG[arg].
 
+0x17 LDMTH      obj:R9,name:Y16                  # Load method: REG[0] <- find_method( REG[obj] , SYMBOLS[name] )
+
 0x18  IMP       tgt:R9,name:Y16                  # Import a module by name: REG[tgt] <- import( SYMBOLS[name] ).
 0x19  IMPSUB    top:R9,sub_name:Y16              # Import a submodule by name: REG[0], REG[top].SYMBOLS[name] <- import_sub(REG[top], SYMBOLS[name]).
 
@@ -112,4 +114,5 @@
 0x42  BITXOR    tgt:R9,lhs:R8,rhs:R8             # REG[tgt] <- REG[lhs] ^ REG[rhs].
 
 0x44  NOT       tgt:R9,val:R16                   # REG[tgt] <- ! REG[val]
-0x45  BITNOT    tgt:R9,val:R16                   # REG[tgt] <- ~ REG[val]
+0x45  NEG       tgt:R9,val:R16                   # REG[tgt] <- - REG[val]
+0x46  BITNOT    tgt:R9,val:R16                   # REG[tgt] <- ~ REG[val]

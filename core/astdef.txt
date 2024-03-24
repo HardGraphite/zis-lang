@@ -56,7 +56,7 @@ Throw          (Object value) # value: nil or expr-node
 Break          (Object _)
 Continue       (Object _)
 
-Cond           (Array args) # args: cond1, body1, cond2, body2, ... [, body_else]
+Cond           (Array args) # args: cond1, body1, cond2, body2, ...
 While          (Node cond, Array body)
 Func           (Symbol name, Array args, Array body)
 

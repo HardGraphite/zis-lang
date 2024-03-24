@@ -22,6 +22,7 @@ enum zis_op_type {
     ZIS_OP_Aw,
     ZIS_OP_Asw,
     ZIS_OP_ABw,
+    ZIS_OP_AsBw,
     ZIS_OP_ABsw,
     ZIS_OP_ABC,
     ZIS_OP_AsBC,
@@ -53,6 +54,9 @@ enum zis_op_type {
 #define zis_instr_make_ABw(OP, A, Bw) \
     ((uint32_t)(OP) | ((uint32_t)(A) & 0x1ff) << 7 | (uint32_t)(Bw) << 16)
 
+#define zis_instr_make_AsBw(OP, As, Bw) \
+    ((uint32_t)(OP) | ((int32_t)(As) & 0x1ff) << 7 | (uint32_t)(Bw) << 16)
+
 #define zis_instr_make_ABsw(OP, A, Bsw) \
     ((uint32_t)(OP) | ((uint32_t)(A) & 0x1ff) << 7 | (int32_t)(Bsw) << 16)
 
@@ -78,16 +82,22 @@ do {                                           \
     Asw = (int32_t)(I) >> 7;                   \
 } while (0)
 
+#define zis_instr_extract_operands_ABw(I, A, Bw) \
+do {                                             \
+    A = (uint32_t)(I) >> 7 & 0x1ff;              \
+    Bw = (uint32_t)(I) >> 16;                    \
+} while (0)
+
+#define zis_instr_extract_operands_AsBw(I, As, Bw) \
+do {                                               \
+    As = (int32_t)(I) >> 7 & 0x1ff;                \
+    Bw = (uint32_t)(I) >> 16;                      \
+} while (0)
+
 #define zis_instr_extract_operands_ABsw(I, A, Bsw) \
 do {                                               \
     A = (uint32_t)(I) >> 7 & 0x1ff;                \
     Bsw = (int32_t)(I) >> 16;                      \
-} while (0)
-
-#define zis_instr_extract_operands_ABw(I, A, Bsw) \
-do {                                              \
-    A = (uint32_t)(I) >> 7 & 0x1ff;               \
-    Bsw = (uint32_t)(I) >> 16;                    \
 } while (0)
 
 #define zis_instr_extract_operands_ABC(I, A, B, C) \

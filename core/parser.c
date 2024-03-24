@@ -1044,6 +1044,9 @@ static struct zis_ast_node_obj *parse_Cond(struct zis_parser *p) {
 
     if (this_token(p)->type == ZIS_TOK_KW_ELSE) {
         next_token(p);
+        struct zis_ast_node_obj *node_true = zis_ast_node_new(z, Bool, 0);
+        zis_ast_node_set_field(node_true, Bool, value, z->globals->val_true);
+        zis_array_obj_append(z, var.args, zis_object_from(node_true));
         check_token_type_and_ignore(p, ZIS_TOK_EOS);
         struct zis_array_obj *body_node = parse_block(p);
         zis_array_obj_append(z, var.args, zis_object_from(body_node));

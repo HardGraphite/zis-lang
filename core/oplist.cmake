@@ -41,7 +41,7 @@ function(_zis_oplist_parse_operands operand_list out_i_type)
         set(size ${CMAKE_MATCH_3})
         list(GET abc_list ${index} x)
         string(APPEND i_type ${x})
-        if(type STREQUAL "I")
+        if(type STREQUAL "I" OR type STREQUAL "J")
             string(APPEND i_type "s") # signed
         endif()
         if(size GREATER 10)
