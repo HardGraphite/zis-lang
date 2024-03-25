@@ -14,6 +14,7 @@ enum zis_opcode {
 #define E(CODE, NAME)  ZIS_OPC_##NAME = CODE ,
     ZIS_OP_LIST
 #undef E
+    _ZIS_OPC_COUNT
 };
 
 /// Instruction type (operands type).

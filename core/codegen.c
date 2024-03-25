@@ -1025,7 +1025,7 @@ zis_nodiscard static int emit_branch(
     const int atgt = emit_any(cg, cond_node, ATGT); // TODO: more efficient test and jump.
     atgt_free1(scope_stack_last_frame_scope(&cg->scope_stack), atgt);
     const enum zis_opcode opcode = jump_when ? ZIS_OPC_JMPT : ZIS_OPC_JMPF;
-    zis_assembler_append_AsBw(as, opcode, jump_to_label, atgt_abs(atgt)); // FIXME: label is not the offset.
+    zis_assembler_append_jump_AsBw(as, opcode, jump_to_label, atgt_abs(atgt));
     return 0;
 }
 
@@ -1241,6 +1241,8 @@ static int emit_Assign(struct zis_codegen *cg, struct zis_ast_node_obj *_node, u
                 atgt = 0;
                 zis_assembler_append_ABw(as, ZIS_OPC_LDLOC, tgt_reg, var_reg);
             }
+        } else {
+            atgt = 0;
         }
     } else {
         int rhs_atgt; unsigned int rhs_reg;
@@ -1362,7 +1364,7 @@ static int emit_And(struct zis_codegen *cg, struct zis_ast_node_obj *_node, unsi
         else
             atgt = 0;
         atgt = emit_any(cg, var.lhs, tgt_reg);
-        zis_assembler_append_AsBw(as, ZIS_OPC_JMPF, label1, tgt_reg); // FIXME: label is not the offset.
+        zis_assembler_append_jump_AsBw(as, ZIS_OPC_JMPF, label1, tgt_reg);
         emit_any(cg, var.rhs, tgt_reg);
         zis_assembler_place_label(as, label1);
     } else {
@@ -1398,7 +1400,7 @@ static int emit_Or(struct zis_codegen *cg, struct zis_ast_node_obj *_node, unsig
         else
             atgt = 0;
         atgt = emit_any(cg, var.lhs, tgt_reg);
-        zis_assembler_append_AsBw(as, ZIS_OPC_JMPT, label1, tgt_reg); // FIXME: label is not the offset.
+        zis_assembler_append_jump_AsBw(as, ZIS_OPC_JMPT, label1, tgt_reg);
         emit_any(cg, var.rhs, tgt_reg);
         zis_assembler_place_label(as, label1);
     } else {
@@ -1600,7 +1602,7 @@ static int emit_Break(struct zis_codegen *cg, struct zis_ast_node_obj *node, uns
     if (!ls)
         error_outside_xxx(cg, node, "loop");
     struct zis_assembler *const as = scope_assembler(cg);
-    zis_assembler_append_Asw(as, ZIS_OPC_JMP, ls->label_break); // FIXME: label is not the offset.
+    zis_assembler_append_jump_Asw(as, ZIS_OPC_JMP, ls->label_break);
     return 0;
 }
 
@@ -1612,7 +1614,7 @@ static int emit_Continue(struct zis_codegen *cg, struct zis_ast_node_obj *node, 
     if (!ls)
         error_outside_xxx(cg, node, "loop");
     struct zis_assembler *const as = scope_assembler(cg);
-    zis_assembler_append_Asw(as, ZIS_OPC_JMP, ls->label_continue); // FIXME: label is not the offset.
+    zis_assembler_append_jump_Asw(as, ZIS_OPC_JMP, ls->label_continue);
     return 0;
 }
 
@@ -1659,7 +1661,7 @@ static int emit_Cond(struct zis_codegen *cg, struct zis_ast_node_obj *_node, uns
         const int bx = emit_branch(cg, var.branch_cond, false, label_next_branch);
         if (bx >= 0)
             emit_block(cg, var.node, var.branch_body);
-        zis_assembler_append_Asw(as, ZIS_OPC_JMP, bx <= 0 ? label_next_branch : label_end); // FIXME: label is not the offset.
+        zis_assembler_append_jump_Asw(as, ZIS_OPC_JMP, bx <= 0 ? label_next_branch : label_end);
     }
     zis_assembler_place_label(as, label_next_branch);
     zis_assembler_place_label(as, label_end);
@@ -1687,7 +1689,7 @@ static int emit_While(struct zis_codegen *cg, struct zis_ast_node_obj *_node, un
     zis_assembler_place_label(as, ls->label_continue);
     if (emit_branch(cg, var.cond, false, ls->label_break) >= 0) {
         emit_block(cg, var.node, var.body);
-        zis_assembler_append_Asw(as, ZIS_OPC_JMP, ls->label_continue); // FIXME: label is not the offset.
+        zis_assembler_append_jump_Asw(as, ZIS_OPC_JMP, ls->label_continue);
     }
     zis_assembler_place_label(as, ls->label_break);
     scope_stack_pop_loop_scope(&cg->scope_stack);

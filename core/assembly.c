@@ -24,7 +24,7 @@ static const uint8_t op_types[] = {
 };
 
 #define op_type_of(opcode) \
-    (assert((int)opcode < 128), (enum zis_op_type)op_types[(int)opcode])
+    (assert((int)(opcode) < 128), (enum zis_op_type)op_types[(int)(opcode)])
 
 #define assert_op_type_(opcode, type_expr) \
     (assert(op_type_of(opcode) type_expr))
@@ -153,8 +153,19 @@ static void instr_buffer_append(struct instr_buffer *ib, zis_instr_word_t x) {
     ib->data[ib->length++] = x;
 }
 
+static void instr_buffer_insert(struct instr_buffer *ib, size_t pos, zis_instr_word_t x) {
+    assert(pos <= ib->length);
+    instr_buffer_append(ib, x);
+    if (pos < ib->length) {
+        zis_instr_word_t *const p = ib->data + pos;
+        const size_t n = ib->length - pos - 1;
+        memmove(p + 1, p, n * sizeof *p);
+        *p = x;
+    }
+}
+
 struct label_table {
-    uint32_t *labels; // UINT32_MAX for unused.
+    uint32_t *labels;
     size_t length, capacity;
 };
 
@@ -170,37 +181,21 @@ static void label_table_fini(struct label_table *lt) {
 
 static int label_table_alloc(struct label_table *restrict lt) {
     assert(lt->length <= lt->capacity);
-    if (lt->length < lt->capacity) {
-        const size_t id = lt->length++;
-        assert(id <= INT_MAX);
-        return (int)id;
-    }
-    for (size_t i = 0, n = lt->capacity; i < n; i++) {
-        if (lt->labels[i] == UINT32_MAX) {
-            lt->labels[i] = 0;
-            assert(i <= INT_MAX);
-            return (int)i;
-        }
-    }
-    {
+    if (zis_unlikely(lt->length == lt->capacity)) {
         const size_t new_cap = lt->capacity ? lt->capacity * 2 : 8;
         lt->labels = zis_mem_realloc(lt->labels, new_cap * sizeof(uint32_t));
         assert(lt->labels);
         lt->capacity = new_cap;
-        return label_table_alloc(lt);
     }
+    const size_t id = lt->length++;
+    assert(id <= INT_MAX);
+    return (int)id;
 }
 
-static void label_table_free(struct label_table *lt, int id) {
+static uint32_t label_table_get(const struct label_table *lt, int id) {
     assert(lt->length <= lt->capacity);
     assert(id >= 0 && (size_t)id < lt->length);
-    if ((size_t)id == lt->length - 1) {
-        lt->length--;
-        while (lt->length && lt->labels[lt->length - 1] == UINT32_MAX)
-            lt->length--;
-    } else {
-        lt->labels[id] = UINT32_MAX;
-    }
+    return lt->labels[id];
 }
 
 static uint32_t *label_table_ref(struct label_table *lt, int id) {
@@ -219,6 +214,79 @@ static void label_table_clear(struct label_table *lt) {
     }
 }
 
+static void label_table_shift(struct label_table *lt, uint32_t addr_start) {
+    uint32_t *labels = lt->labels;
+    for (size_t i = 0, n = lt->length; i < n; i++) {
+        const uint32_t x = labels[i];
+        if (x >= addr_start)
+            labels[i] = x + 1U;
+    }
+}
+
+struct jumpinstr_table_entry {
+    uint32_t address;
+    int label;
+    zis_instr_word_t instr[2]; // { [0] = `instr`, [1] = `extended_instr` or `UINT32_MAX` }
+};
+
+static bool jumpinstr_table_entry_is_extended(const struct jumpinstr_table_entry *e) {
+    return e->instr[1] != UINT32_MAX;
+}
+
+struct jumpinstr_table {
+    struct jumpinstr_table_entry *data;
+    size_t length, capacity;
+};
+
+static void jumpinstr_table_init(struct jumpinstr_table *jt) {
+    jt->data = NULL;
+    jt->length = 0;
+    jt->capacity = 0;
+}
+
+static void jumpinstr_table_fini(struct jumpinstr_table *jt) {
+    zis_mem_free(jt->data);
+}
+
+static void jumpinstr_table_clear(struct jumpinstr_table *jt) {
+    jt->length = 0;
+}
+
+static unsigned int jumpinstr_table_add(
+    struct jumpinstr_table *jt, uint32_t addr, zis_instr_word_t instr, int label
+) {
+    assert(jt->length <= jt->capacity);
+    if (zis_unlikely(jt->length == jt->capacity)) {
+        const size_t new_cap = jt->capacity ? jt->capacity * 2 : 4;
+        jt->data = zis_mem_realloc(jt->data, new_cap * sizeof(struct jumpinstr_table));
+        assert(jt->data);
+        jt->capacity = new_cap;
+    }
+    size_t index = jt->length++;
+    struct jumpinstr_table_entry *entry = &jt->data[index];
+    entry->address = addr;
+    entry->label = label;
+    entry->instr[0] = instr, entry->instr[1] = UINT_MAX;
+    assert(index <= UINT_MAX);
+    return (unsigned int)index;
+}
+
+static struct jumpinstr_table_entry *jumpinstr_table_get(
+    struct jumpinstr_table *jt, unsigned int index
+) {
+    assert((size_t)index < jt->length);
+    return &jt->data[index];
+}
+
+static void jumpinstr_table_shift(struct jumpinstr_table *jt, uint32_t addr_start) {
+    struct jumpinstr_table_entry *data = jt->data;
+    for (size_t i = 0, n = jt->length; i < n; i++) {
+        const uint32_t x = data[i].address;
+        if (x >= addr_start)
+            data[i].address = x + 1U;
+    }
+}
+
 struct zis_assembler {
 #define AS_OBJ_MEMBER_BEGIN func_constants
     struct zis_array_obj *func_constants;
@@ -227,6 +295,7 @@ struct zis_assembler {
 #define AS_OBJ_MEMBER_END instr_buffer
     struct instr_buffer instr_buffer;
     struct label_table  label_table;
+    struct jumpinstr_table jumpinstr_table;
     struct zis_func_obj_meta func_meta;
     struct zis_assembler *_as_list_next;
 };
@@ -250,6 +319,7 @@ struct zis_assembler *zis_assembler_create(
     as->temp_object = zis_object_from(z->globals->val_nil);
     instr_buffer_init(&as->instr_buffer);
     label_table_init(&as->label_table);
+    jumpinstr_table_init(&as->jumpinstr_table);
     as->func_meta.na = 0, as->func_meta.no = 0, as->func_meta.nr = 0;
     as->_as_list_next = NULL;
 
@@ -280,6 +350,7 @@ void zis_assembler_destroy(
 
     instr_buffer_fini(&as->instr_buffer);
     label_table_fini(&as->label_table);
+    jumpinstr_table_fini(&as->jumpinstr_table);
     zis_mem_free(as);
 }
 
@@ -288,16 +359,8 @@ void zis_assembler_clear(struct zis_assembler *as) {
     zis_map_obj_clear(as->func_symbols);
     instr_buffer_clear(&as->instr_buffer);
     label_table_clear(&as->label_table);
+    jumpinstr_table_clear(&as->jumpinstr_table);
     as->func_meta.na = 0, as->func_meta.no = 0, as->func_meta.nr = 0;
-}
-
-static int _as_finish_id_map_to_slots(struct zis_object *k, struct zis_object *v, void *_slots) {
-    struct zis_array_slots_obj *slots = _slots;
-    assert(zis_object_is_smallint(v));
-    const zis_smallint_t id = zis_smallint_from_ptr(v);
-    assert(id >= 0 && (size_t)id < zis_array_slots_obj_length(slots));
-    zis_array_slots_obj_set(slots, (size_t)id, k);
-    return 0;
 }
 
 #if ZIS_DEBUG_LOGGING
@@ -308,7 +371,7 @@ static int _as_finish_debug_dump_fn(const struct zis_disassemble_result *dis, vo
     int buffer_used = 0, n;
     n = snprintf(
         buffer, sizeof buffer, "%04x:  %08x  %-6s %i",
-        dis->address, dis->instr, dis->op_name, dis->operands[0]
+        dis->address, dis->instr, *dis->op_name ? dis->op_name : "??", dis->operands[0]
     );
     assert(n > 0);
     buffer_used += n;
@@ -325,7 +388,34 @@ static int _as_finish_debug_dump_fn(const struct zis_disassemble_result *dis, vo
 
 #endif // ZIS_DEBUG_LOGGING
 
+static const enum zis_opcode _opposite_jump_instr_table[] = {
+    [(unsigned)ZIS_OPC_JMPT  - (unsigned)ZIS_OPC_JMP - 1U] = ZIS_OPC_JMPF,
+    [(unsigned)ZIS_OPC_JMPF  - (unsigned)ZIS_OPC_JMP - 1U] = ZIS_OPC_JMPT,
+    [(unsigned)ZIS_OPC_JMPLE - (unsigned)ZIS_OPC_JMP - 1U] = ZIS_OPC_JMPGT,
+    [(unsigned)ZIS_OPC_JMPLT - (unsigned)ZIS_OPC_JMP - 1U] = ZIS_OPC_JMPGE,
+    [(unsigned)ZIS_OPC_JMPEQ - (unsigned)ZIS_OPC_JMP - 1U] = ZIS_OPC_JMPNE,
+    [(unsigned)ZIS_OPC_JMPGT - (unsigned)ZIS_OPC_JMP - 1U] = ZIS_OPC_JMPLE,
+    [(unsigned)ZIS_OPC_JMPGE - (unsigned)ZIS_OPC_JMP - 1U] = ZIS_OPC_JMPLT,
+    [(unsigned)ZIS_OPC_JMPNE - (unsigned)ZIS_OPC_JMP - 1U] = ZIS_OPC_JMPEQ,
+};
+
+static enum zis_opcode _as_finish_opposite_jump_instr(enum zis_opcode opcode) {
+    const unsigned int index = (unsigned int)opcode - (unsigned int)ZIS_OPC_JMP - 1U;
+    assert(index < sizeof _opposite_jump_instr_table / sizeof opcode);
+    return _opposite_jump_instr_table[index];
+}
+
+static int _as_finish_id_map_to_slots(struct zis_object *k, struct zis_object *v, void *_slots) {
+    struct zis_array_slots_obj *slots = _slots;
+    assert(zis_object_is_smallint(v));
+    const zis_smallint_t id = zis_smallint_from_ptr(v);
+    assert(id >= 0 && (size_t)id < zis_array_slots_obj_length(slots));
+    zis_array_slots_obj_set(slots, (size_t)id, k);
+    return 0;
+}
+
 struct zis_func_obj *zis_assembler_finish(struct zis_assembler *as, struct zis_context *z) {
+    // Append a RETNIL instrcution at the end of the function.
     do {
         if (as->instr_buffer.length) {
             enum zis_opcode last_op = (enum zis_opcode)zis_instr_extract_opcode(
@@ -337,10 +427,75 @@ struct zis_func_obj *zis_assembler_finish(struct zis_assembler *as, struct zis_c
         zis_assembler_append_Aw(as, ZIS_OPC_RETNIL, 0);
     } while (false);
 
+    // Fill the jump instructions and apply them to the bytecode.
+    {
+    _re_fill_jump_instr:;
+        zis_instr_word_t *const instr_seq = as->instr_buffer.data;
+        // Fill instructions in the jumpinstr_table.
+        for (size_t jt_i = 0, jt_n = as->jumpinstr_table.length; jt_i < jt_n; jt_i++) {
+            struct jumpinstr_table_entry *jt_entry =
+                jumpinstr_table_get(&as->jumpinstr_table, jt_i);
+            const uint32_t instr_i = jt_entry->address;
+            assert(instr_i < as->instr_buffer.length);
+            assert(zis_instr_extract_opcode(instr_seq[instr_i]) == _ZIS_OPC_COUNT);
+            const int32_t jump_offset =
+                (int32_t)(label_table_get(&as->label_table, jt_entry->label) - instr_i);
+            enum zis_opcode opcode = zis_instr_extract_opcode(jt_entry->instr[0]);
+            switch (op_type_of(opcode)) {
+            case ZIS_OP_Asw:
+                assert(!jumpinstr_table_entry_is_extended(jt_entry));
+                if (jump_offset < ZIS_INSTR_I25_MIN || ZIS_INSTR_I25_MAX < jump_offset)
+                    zis_context_panic(z, ZIS_CONTEXT_PANIC_ABORT);
+                jt_entry->instr[0] = zis_instr_make_Asw(opcode, jump_offset);
+                break;
+            case ZIS_OP_AsBw:
+            case ZIS_OP_AsBC:
+                if (!jumpinstr_table_entry_is_extended(jt_entry)) {
+                    uint32_t _operand0, operand; zis_unused_var(_operand0);
+                    zis_instr_extract_operands_AsBw(jt_entry->instr[0], _operand0, operand);
+                    if (jump_offset < ZIS_INSTR_I9_MIN || ZIS_INSTR_I9_MAX < jump_offset) {
+                        opcode = _as_finish_opposite_jump_instr(opcode);
+                        jt_entry->instr[0] = zis_instr_make_AsBw(opcode, 2, operand);
+                        jt_entry->instr[1] = zis_instr_make_Asw(ZIS_OPC_JMP, jump_offset); // extended
+                        assert(jumpinstr_table_entry_is_extended(jt_entry));
+                        instr_buffer_insert(&as->instr_buffer, instr_i + 1, zis_instr_make_Asw(_ZIS_OPC_COUNT, jt_i));
+                        label_table_shift(&as->label_table, instr_i + 1);
+                        jumpinstr_table_shift(&as->jumpinstr_table, instr_i + 1);
+                        goto _re_fill_jump_instr;
+                    }
+                    jt_entry->instr[0] = zis_instr_make_AsBw(opcode, jump_offset, operand);
+                } else {
+                    assert(zis_instr_extract_opcode(jt_entry->instr[1]) == ZIS_OPC_JMP);
+                    if (jump_offset < ZIS_INSTR_I25_MIN || ZIS_INSTR_I25_MAX < jump_offset)
+                        zis_context_panic(z, ZIS_CONTEXT_PANIC_ABORT);
+                    jt_entry->instr[1] = zis_instr_make_Asw(ZIS_OPC_JMP, jump_offset);
+                }
+                break;
+            default:
+                zis_unreachable();
+            }
+        }
+        // Copy instructions from the jumpinstr_table to the instr_buffer.
+        for (size_t jt_i = 0, jt_n = as->jumpinstr_table.length; jt_i < jt_n; jt_i++) {
+            struct jumpinstr_table_entry *jt_entry =
+                jumpinstr_table_get(&as->jumpinstr_table, jt_i);
+            const uint32_t instr_i = jt_entry->address;
+            assert(instr_i < as->instr_buffer.length);
+            assert(zis_instr_extract_opcode(instr_seq[instr_i]) == _ZIS_OPC_COUNT);
+            instr_seq[instr_i] = jt_entry->instr[0];
+            if (jumpinstr_table_entry_is_extended(jt_entry)) {
+                assert(zis_instr_extract_opcode(instr_seq[instr_i + 1]) == _ZIS_OPC_COUNT);
+                instr_seq[instr_i + 1] = jt_entry->instr[1];
+            }
+        }
+    }
+
+    // Create a function object from the bytecode.
     struct zis_func_obj *func_obj = zis_func_obj_new_bytecode(
         z, as->func_meta, as->instr_buffer.data, as->instr_buffer.length
     );
 
+    // Add constants & symbols to the function object.
     assert(as->temp_object == zis_object_from(z->globals->val_nil));
     as->temp_object = zis_object_from(func_obj);
     if (zis_array_obj_length(as->func_constants)) {
@@ -365,8 +520,10 @@ struct zis_func_obj *zis_assembler_finish(struct zis_assembler *as, struct zis_c
         func_obj = zis_object_cast(as->temp_object, struct zis_func_obj);
     as->temp_object = zis_object_from(z->globals->val_nil);
 
+    // Reset the assembler.
     zis_assembler_clear(as);
 
+    // Dump the bytecode.
     zis_debug_log_1(DUMP, "Asm", "zis_disassemble_bytecode()", fp, {
         fprintf(fp, "# disassembly of function@%p\n", (void *)func_obj);
         fprintf(
@@ -428,22 +585,20 @@ unsigned int zis_assembler_func_symbol(
 }
 
 int zis_assembler_alloc_label(struct zis_assembler *as) {
-    return label_table_alloc(&as->label_table);
+    const int id = label_table_alloc(&as->label_table);
+    zis_debug_log(TRACE, "Asm", "new label #%i", id);
+    return id;
 }
 
 int zis_assembler_place_label(struct zis_assembler *as, int id) {
     const size_t addr = as->instr_buffer.length;
     assert(addr <= UINT32_MAX);
     *label_table_ref(&as->label_table, id) = (uint32_t)addr;
+    zis_debug_log(TRACE, "Asm", "place label #%i at +%zu", id, addr);
     return id;
 }
 
-void zis_assembler_free_label(struct zis_assembler *as, int id) {
-    label_table_free(&as->label_table, id);
-}
-
 void zis_assembler_append(struct zis_assembler *as, zis_instr_word_t instr) {
-    assert_op_type_(zis_instr_extract_opcode(instr), != ZIS_OP_X);
     zis_debug_log(TRACE, "Asm", "append instruction %08x", instr);
     instr_buffer_append(&as->instr_buffer, instr);
 }
@@ -512,6 +667,39 @@ void zis_assembler_append_ABsCs(
     zis_assembler_append(as, zis_instr_make_ABsCs(opcode, A, Bs, Cs));
 }
 
+void zis_assembler_append_jump_Asw(
+    struct zis_assembler *as, enum zis_opcode opcode,
+    int label
+) {
+    assert_op_type_(opcode, == ZIS_OP_Asw);
+    const zis_instr_word_t instr = zis_instr_make_Asw(opcode, 0);
+    const uint32_t addr = (uint32_t)as->instr_buffer.length;
+    const unsigned int ji = jumpinstr_table_add(&as->jumpinstr_table, addr, instr, label);
+    zis_assembler_append(as, zis_instr_make_Aw(_ZIS_OPC_COUNT, ji));
+}
+
+void zis_assembler_append_jump_AsBw(
+    struct zis_assembler *as, enum zis_opcode opcode,
+    int label, uint32_t Bw
+) {
+    assert_op_type_(opcode, == ZIS_OP_AsBw);
+    const zis_instr_word_t instr = zis_instr_make_AsBw(opcode, 0, Bw);
+    const uint32_t addr = (uint32_t)as->instr_buffer.length;
+    const unsigned int ji = jumpinstr_table_add(&as->jumpinstr_table, addr, instr, label);
+    zis_assembler_append(as, zis_instr_make_Aw(_ZIS_OPC_COUNT, ji));
+}
+
+void zis_assembler_append_jump_AsBC(
+    struct zis_assembler *as, enum zis_opcode opcode,
+    int label, uint32_t B, uint32_t C
+) {
+    assert_op_type_(opcode, == ZIS_OP_AsBC);
+    const zis_instr_word_t instr = zis_instr_make_AsBC(opcode, 0, B, C);
+    const uint32_t addr = (uint32_t)as->instr_buffer.length;
+    const unsigned int ji = jumpinstr_table_add(&as->jumpinstr_table, addr, instr, label);
+    zis_assembler_append(as, zis_instr_make_Aw(_ZIS_OPC_COUNT, ji));
+}
+
 #endif // ZIS_FEATURE_ASM || ZIS_FEATURE_SRC
 
 /* ----- module assembler --------------------------------------------------- */
@@ -542,7 +730,7 @@ zis_cold_fn static void tas_record_error(struct tas_context *tas, const char *s)
 }
 
 zis_cold_fn static struct zis_exception_obj * tas_error_exception(struct tas_context *tas) {
-    return zis_exception_obj_format(tas->z, "syntax", NULL, tas->line_buffer);
+    return zis_exception_obj_format(tas->z, "syntax", NULL, "%s", tas->line_buffer);
 }
 
 enum tas_parse_line_status {
@@ -680,7 +868,7 @@ static struct zis_func_obj *tas_parse_func(
                     goto bad_operands;
                 zis_assembler_append_AsBw(
                     as, line_result.instr.opcode,
-                    (int32_t)line_result.instr.operands[0],
+                    line_result.instr.operands[0],
                     (uint32_t)line_result.instr.operands[1]
                 );
                 break;
@@ -706,7 +894,7 @@ static struct zis_func_obj *tas_parse_func(
             case ZIS_OP_AsBC:
                 if (line_result.instr.operand_count != 3)
                     goto bad_operands;
-                zis_assembler_append_ABsCs(
+                zis_assembler_append_AsBC(
                     as, line_result.instr.opcode,
                     line_result.instr.operands[0],
                     (uint32_t)line_result.instr.operands[1],

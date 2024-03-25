@@ -2,11 +2,11 @@
 
 #pragma once
 
-#include "zis_config.h" // ZIS_FEATURE_ASM, ZIS_FEATURE_DIS, ZIS_FEATURE_SRC
-
 #include <stdint.h>
 
 #include "instr.h"
+
+#include "zis_config.h" // ZIS_FEATURE_ASM, ZIS_FEATURE_DIS, ZIS_FEATURE_SRC
 
 struct zis_context;
 struct zis_func_obj;
@@ -65,9 +65,6 @@ int zis_assembler_alloc_label(struct zis_assembler *as);
 /// The label must not be placed before.
 int zis_assembler_place_label(struct zis_assembler *as, int id);
 
-/// Deallocate a label. `zis_assembler_clear()` also deletes tables.
-void zis_assembler_free_label(struct zis_assembler *as, int id);
-
 /// Append an instruction.
 void zis_assembler_append(struct zis_assembler *as, zis_instr_word_t instr);
 
@@ -109,6 +106,21 @@ void zis_assembler_append_AsBC(
 void zis_assembler_append_ABsCs(
     struct zis_assembler *as, enum zis_opcode opcode,
     uint32_t A, int32_t Bs, int32_t Cs
+);
+
+void zis_assembler_append_jump_Asw(
+    struct zis_assembler *as, enum zis_opcode opcode,
+    int label
+);
+
+void zis_assembler_append_jump_AsBw(
+    struct zis_assembler *as, enum zis_opcode opcode,
+    int label, uint32_t Bw
+);
+
+void zis_assembler_append_jump_AsBC(
+    struct zis_assembler *as, enum zis_opcode opcode,
+    int label, uint32_t B, uint32_t C
 );
 
 #endif // ZIS_FEATURE_ASM || ZIS_FEATURE_SRC
