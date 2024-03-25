@@ -275,6 +275,32 @@ struct zis_object *zis_module_obj_get(
     return zis_array_slots_obj_get(self->_variables, (size_t)index_smi);
 }
 
+struct _parent_get_state {
+    struct zis_symbol_obj *name;
+    struct zis_object *variable;
+};
+
+static int _parent_get_fn(struct zis_module_obj *modules[2], void *_arg) {
+    struct _parent_get_state *state = _arg;
+    struct zis_object *v = zis_module_obj_get(modules[1], state->name);
+    if (!v)
+        return 0;
+    state->variable = v;
+    return 1;
+}
+
+struct zis_object *zis_module_obj_parent_get(
+    struct zis_context *z,
+    struct zis_module_obj *_self, struct zis_symbol_obj *_name
+) {
+    zis_locals_decl(z, var, struct _parent_get_state state;);
+    zis_locals_zero(var);
+    var.state.name = _name;
+    const bool found = zis_module_obj_foreach_parent(z, _self, _parent_get_fn, &var.state);
+    zis_locals_drop(z, var);
+    return found ? var.state.variable : NULL;
+}
+
 int zis_module_obj_do_init(
     struct zis_context *z,
     struct zis_func_obj *initializer

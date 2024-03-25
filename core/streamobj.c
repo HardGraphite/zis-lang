@@ -436,6 +436,26 @@ size_t zis_stream_obj_read_line(
     return i;
 }
 
+bool zis_stream_obj_write_chars(
+    struct zis_stream_obj *restrict self, const char *restrict _str, size_t size
+) {
+    // TODO: write to the buffer directly instead of one by one.
+
+    for (
+        const zis_char8_t *str = (const zis_char8_t *)_str, *const str_end = str + size;
+        str < str_end;
+    ) {
+        zis_wchar_t c;
+        const size_t n = zis_u8char_to_code(&c, str, str_end);
+        if (zis_unlikely(!n))
+            return false;
+        str += n;
+        if (zis_unlikely(!zis_stream_obj_write_char(self, c)))
+            return false;
+    }
+    return true;
+}
+
 char *zis_stream_obj_char_buf_ptr(
     struct zis_stream_obj *restrict self,
     size_t move_offset, size_t *restrict rest_size_p

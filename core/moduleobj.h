@@ -44,7 +44,7 @@ void zis_module_obj_add_parent(
 
 /// Iterate over the module parents.
 /// The first argument (`mods`) of callback function (`visitor`) is an array of modules,
-/// where the first element is the module itself and the second it a parent module.
+/// where the first element is the module itself and the second is a parent module.
 int zis_module_obj_foreach_parent(
     struct zis_context *z, struct zis_module_obj *self,
     int (*visitor)(struct zis_module_obj *mods[2], void *arg), void *visitor_arg
@@ -87,6 +87,12 @@ size_t zis_module_obj_set(
 struct zis_object *zis_module_obj_get(
     struct zis_module_obj *self,
     struct zis_symbol_obj *name
+);
+
+/// Get parent module global variable. Return NULL if it does not exist.
+struct zis_object *zis_module_obj_parent_get(
+    struct zis_context *z,
+    struct zis_module_obj *self, struct zis_symbol_obj *name
 );
 
 /// Call module initializer function.

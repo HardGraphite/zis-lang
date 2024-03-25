@@ -706,11 +706,16 @@ _interp_loop:
         zis_instr_extract_operands_ABw(this_instr, val, name);
         FUNC_ENSURE;
         BOUND_CHECK_SYM(name);
-        const size_t id =
+        size_t id =
             zis_module_obj_find(func_obj->_module, zis_func_obj_symbol(func_obj, name));
         if (zis_unlikely(id == (size_t)-1)) {
-            format_error_global_not_found(z, func_obj, name);
-            THROW_REG0;
+            struct zis_object *v =
+                zis_module_obj_parent_get(z, func_obj->_module, zis_func_obj_symbol(func_obj, name));
+            if (!v) {
+                format_error_global_not_found(z, func_obj, name);
+                THROW_REG0;
+            }
+            id = zis_module_obj_set(z, func_obj->_module, zis_func_obj_symbol(func_obj, name), v);
         }
         if (zis_likely(id <= ZIS_INSTR_U16_MAX)) {
             assert(*ip == this_instr);
