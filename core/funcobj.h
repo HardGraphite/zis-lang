@@ -57,7 +57,14 @@ struct zis_func_obj *zis_func_obj_new_bytecode(
     const zis_func_obj_bytecode_word_t *code, size_t code_len
 );
 
-/// Set parent module of a function. Shall only be used after function created.
+/// Set module's of a function. Both `symbols` and `constants` can be NULL
+/// Shall only be used immediately after function created.
+void zis_func_obj_set_resources(
+    struct zis_func_obj *self,
+    struct zis_array_slots_obj *symbols /*=NULL*/, struct zis_array_slots_obj *constants /*=NULL*/
+);
+
+/// Set parent module of a function. Shall only be used immediately after function created.
 void zis_func_obj_set_module(
     struct zis_context *z,
     struct zis_func_obj *self, struct zis_module_obj *mod

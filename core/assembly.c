@@ -499,16 +499,13 @@ struct zis_func_obj *zis_assembler_finish(struct zis_assembler *as, struct zis_c
     if (zis_array_obj_length(as->func_constants)) {
         struct zis_array_slots_obj *const tbl =
             zis_array_slots_obj_new2(z, zis_array_obj_length(as->func_constants), as->func_constants->_data);
-        var.func_obj->_constants = tbl;
-        zis_object_write_barrier(var.func_obj, tbl);
+        zis_func_obj_set_resources(var.func_obj, NULL, tbl);
     }
     if (zis_map_obj_length(as->func_symbols)) {
         struct zis_array_slots_obj *const tbl =
             zis_array_slots_obj_new(z, NULL, zis_map_obj_length(as->func_symbols));
-        var.func_obj->_symbols = tbl;
-        zis_object_write_barrier(var.func_obj, tbl);
+        zis_func_obj_set_resources(var.func_obj, tbl, NULL);
         zis_map_obj_foreach(z, as->func_symbols, _as_finish_id_map_to_slots, tbl);
-        assert(tbl == var.func_obj->_symbols);
     }
 
     // Reset the assembler.

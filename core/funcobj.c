@@ -42,9 +42,9 @@ static struct zis_func_obj *func_obj_alloc(
         ),
         struct zis_func_obj
     );
-    self->_symbols = z->globals->val_empty_array_slots;
-    self->_constants = z->globals->val_empty_array_slots;
-    self->_module = z->globals->val_mod_unnamed;
+    struct zis_context_globals *g = z->globals;
+    zis_func_obj_set_resources(self, g->val_empty_array_slots, g->val_empty_array_slots);
+    self->_module = g->val_mod_unnamed;
     return self;
 }
 
@@ -70,6 +70,20 @@ struct zis_func_obj *zis_func_obj_new_bytecode(
     assert(self->_bytes_size >= FUN_OBJ_BYTES_FIXED_SIZE + code_sz);
     memcpy(self->bytecode, code, code_sz);
     return self;
+}
+
+void zis_func_obj_set_resources(
+    struct zis_func_obj *self,
+    struct zis_array_slots_obj *symbols /*=NULL*/, struct zis_array_slots_obj *constants /*=NULL*/
+) {
+    if (symbols) {
+        self->_symbols = symbols;
+        zis_object_write_barrier(self, symbols);
+    }
+    if (constants) {
+        self->_constants = constants;
+        zis_object_write_barrier(self, constants);
+    }
 }
 
 void zis_func_obj_set_module(
