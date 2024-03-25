@@ -251,6 +251,16 @@ digits = {
 q = seq[digits[num_to_str(pi:floor())]]
 ```
 
+#### Assignment
+
+```
+assign_expr
+    = identifier           ASSIGN_OP expr
+    | expr "." identifier  ASSIGN_OP expr
+    | subscript_expr       ASSIGN_OP expr
+    ;
+```
+
 ### Import statement
 
 ```
@@ -336,3 +346,14 @@ func_arg_list
     | identifier [{ "," identifier }] [ "," ]
     ;
 ```
+
+## Variables and scopes
+
+A variable is defined in current scope at the first time it is assigned to.
+To look up for a variable, the local scope is first search, and then the global scope.
+
+A function body introduces a new variable scope.
+The followings introduce weak variable scopes (scopes that inherit from the parent function scope):
+
+- `for` block (loop)
+- `while` block (loop)
