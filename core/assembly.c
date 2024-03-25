@@ -291,7 +291,6 @@ struct zis_assembler {
 #define AS_OBJ_MEMBER_BEGIN func_constants
     struct zis_array_obj *func_constants;
     struct zis_map_obj *func_symbols; // { symbol -> id }
-    struct zis_object  *temp_object; // nil when not in use
 #define AS_OBJ_MEMBER_END instr_buffer
     struct instr_buffer instr_buffer;
     struct label_table  label_table;
@@ -316,7 +315,6 @@ struct zis_assembler *zis_assembler_create(
 
     as->func_constants = zis_object_cast(z->globals->val_nil, struct zis_array_obj);
     as->func_symbols = zis_object_cast(z->globals->val_nil, struct zis_map_obj);
-    as->temp_object = zis_object_from(z->globals->val_nil);
     instr_buffer_init(&as->instr_buffer);
     label_table_init(&as->label_table);
     jumpinstr_table_init(&as->jumpinstr_table);
@@ -491,52 +489,46 @@ struct zis_func_obj *zis_assembler_finish(struct zis_assembler *as, struct zis_c
     }
 
     // Create a function object from the bytecode.
-    struct zis_func_obj *func_obj = zis_func_obj_new_bytecode(
+    zis_locals_decl_1(z, var, struct zis_func_obj *func_obj);
+    zis_locals_zero_1(var, func_obj);
+    var.func_obj = zis_func_obj_new_bytecode(
         z, as->func_meta, as->instr_buffer.data, as->instr_buffer.length
     );
 
     // Add constants & symbols to the function object.
-    assert(as->temp_object == zis_object_from(z->globals->val_nil));
-    as->temp_object = zis_object_from(func_obj);
     if (zis_array_obj_length(as->func_constants)) {
         struct zis_array_slots_obj *const tbl =
             zis_array_slots_obj_new2(z, zis_array_obj_length(as->func_constants), as->func_constants->_data);
-        if ((void *)func_obj != (void *)as->temp_object)
-            func_obj = zis_object_cast(as->temp_object, struct zis_func_obj);
-        func_obj->_constants = tbl;
-        zis_object_write_barrier(func_obj, tbl);
+        var.func_obj->_constants = tbl;
+        zis_object_write_barrier(var.func_obj, tbl);
     }
     if (zis_map_obj_length(as->func_symbols)) {
         struct zis_array_slots_obj *const tbl =
             zis_array_slots_obj_new(z, NULL, zis_map_obj_length(as->func_symbols));
-        if ((void *)func_obj != (void *)as->temp_object)
-            func_obj = zis_object_cast(as->temp_object, struct zis_func_obj);
-        func_obj->_symbols = tbl;
-        zis_object_write_barrier(func_obj, tbl);
+        var.func_obj->_symbols = tbl;
+        zis_object_write_barrier(var.func_obj, tbl);
         zis_map_obj_foreach(z, as->func_symbols, _as_finish_id_map_to_slots, tbl);
-        assert(tbl == func_obj->_symbols);
+        assert(tbl == var.func_obj->_symbols);
     }
-    if ((void *)func_obj != (void *)as->temp_object)
-        func_obj = zis_object_cast(as->temp_object, struct zis_func_obj);
-    as->temp_object = zis_object_from(z->globals->val_nil);
 
     // Reset the assembler.
     zis_assembler_clear(as);
 
     // Dump the bytecode.
     zis_debug_log_1(DUMP, "Asm", "zis_disassemble_bytecode()", fp, {
-        fprintf(fp, "# disassembly of function@%p\n", (void *)func_obj);
+        fprintf(fp, "# disassembly of function@%p\n", (void *)var.func_obj);
         fprintf(
             fp, "# meta = {.na = %u, .no = %u, .nr = %u}\n# constants.len = %zu, symbols.len = %zu\n",
-            func_obj->meta.na, func_obj->meta.no, func_obj->meta.nr,
-            zis_array_slots_obj_length(func_obj->_constants),
-            zis_array_slots_obj_length(func_obj->_symbols)
+            var.func_obj->meta.na, var.func_obj->meta.no, var.func_obj->meta.nr,
+            zis_array_slots_obj_length(var.func_obj->_constants),
+            zis_array_slots_obj_length(var.func_obj->_symbols)
         );
-        zis_disassemble_bytecode(z, func_obj, _as_finish_debug_dump_fn, fp);
-        fprintf(fp, "# end of function@%p\n", (void *)func_obj);
+        zis_disassemble_bytecode(z, var.func_obj, _as_finish_debug_dump_fn, fp);
+        fprintf(fp, "# end of function@%p\n", (void *)var.func_obj);
     });
 
-    return func_obj;
+    zis_locals_drop(z, var);
+    return var.func_obj;
 }
 
 const struct zis_func_obj_meta *zis_assembler_func_meta(
@@ -562,8 +554,6 @@ unsigned int zis_assembler_func_constant(
 unsigned int zis_assembler_func_symbol(
     struct zis_assembler *as, struct zis_context *z, struct zis_symbol_obj *v
 ) {
-    assert(as->temp_object == zis_object_from(z->globals->val_nil));
-    as->temp_object = zis_object_from(v);
     struct zis_object *id_o = zis_map_obj_sym_get(as->func_symbols, v);
     unsigned int id;
     if (id_o) {
@@ -572,15 +562,12 @@ unsigned int zis_assembler_func_symbol(
         assert(id_smi >= 0 && id_smi <= UINT_MAX);
         id = (unsigned int)id_smi;
     } else {
-        if ((void *)v != (void *)as->temp_object)
-            v = zis_object_cast(as->temp_object, struct zis_symbol_obj);
         const size_t n = zis_map_obj_length(as->func_symbols);
         assert(n <= ZIS_SMALLINT_MAX);
         zis_map_obj_sym_set(z, as->func_symbols, v, zis_smallint_to_ptr((zis_smallint_t)n));
         assert(n <= UINT_MAX);
         id = (unsigned int)n;
     }
-    as->temp_object = zis_object_from(z->globals->val_nil);
     return id;
 }
 
