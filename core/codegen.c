@@ -10,8 +10,8 @@
 #include <string.h>
 
 #include "assembly.h"
-#include "attributes.h"
 #include "ast.h"
+#include "attributes.h"
 #include "context.h"
 #include "debug.h"
 #include "globals.h"
@@ -68,7 +68,7 @@ static struct frame_scope *frame_scope_create(struct zis_context *z) {
     struct frame_scope *fs = zis_mem_alloc(sizeof(struct frame_scope));
     fs->type = SCOPE_FRAME;
     fs->as = zis_assembler_create(z, NULL); // FIXME: the parameter `parent`.
-    fs->var_map = zis_map_obj_new(z, 0.0f, 0);
+    fs->var_map = zis_map_obj_new(z, 0.0F, 0);
     fs->reg_touched_max = 0, fs->reg_allocated_max = 0;
     fs->free_regs_list = NULL, fs->free_regs_list_len = 0, fs->free_regs_list_cap = 0;
     return fs;
@@ -788,11 +788,6 @@ zis_static_force_inline unsigned int atgt_abs(int reg) {
     return (unsigned int)(reg >= 0 ? reg : -reg); // abs()
 }
 
-/// Check if an ATGT return value is negative. See `codegen_node_handler_t`.
-zis_static_force_inline bool atgt_is_neg(int reg) {
-    return reg < 0;
-}
-
 /// Free an ATGT returned register if it is negative. See `codegen_node_handler_t`.
 zis_static_force_inline void atgt_free1(struct frame_scope *fs, int reg) {
     if (reg < 0)
@@ -978,7 +973,7 @@ static int emit_call_node(
         for (unsigned int i = 0; i < argc; i++) {
             struct zis_object *arg = zis_array_obj_get(var.args, i);
             check_obj_is_node(cg, var.node, arg);
-            const unsigned int arg_atgt =
+            const int arg_atgt =
                 emit_any(cg, zis_object_cast(arg, struct zis_ast_node_obj), ATGT);
             arg_atgt_list[i] = arg_atgt;
             operand_args |= (atgt_abs(arg_atgt) & 63) << (6 * i);
@@ -1361,7 +1356,7 @@ static int emit_And(struct zis_codegen *cg, struct zis_ast_node_obj *_node, unsi
     if (lhs_bx == 0) {
         struct zis_assembler *const as = scope_assembler(cg);
         struct frame_scope *fs = scope_stack_last_frame_scope(&cg->scope_stack);
-        const unsigned int label1 = zis_assembler_alloc_label(as);
+        const int label1 = zis_assembler_alloc_label(as);
         if (tgt_reg == ATGT)
             tgt_reg = frame_scope_alloc_regs(fs, 1), atgt = -(int)tgt_reg;
         else
@@ -1397,7 +1392,7 @@ static int emit_Or(struct zis_codegen *cg, struct zis_ast_node_obj *_node, unsig
     if (lhs_bx == 0) {
         struct zis_assembler *const as = scope_assembler(cg);
         struct frame_scope *fs = scope_stack_last_frame_scope(&cg->scope_stack);
-        const unsigned int label1 = zis_assembler_alloc_label(as);
+        const int label1 = zis_assembler_alloc_label(as);
         if (tgt_reg == ATGT)
             tgt_reg = frame_scope_alloc_regs(fs, 1), atgt = -(int)tgt_reg;
         else
@@ -1563,7 +1558,7 @@ static int emit_Return(struct zis_codegen *cg, struct zis_ast_node_obj *node, un
             emit_any(cg, value_node, 0);
             value_reg = 0;
         } else {
-            const unsigned int value_atgt = emit_any(cg, value_node, ATGT);
+            const int value_atgt = emit_any(cg, value_node, ATGT);
             atgt_free1(fs, value_atgt);
             value_reg = atgt_abs(value_atgt);
         }
@@ -1588,7 +1583,7 @@ static int emit_Throw(struct zis_codegen *cg, struct zis_ast_node_obj *node, uns
             emit_any(cg, value_node, 0);
             value_reg = 0;
         } else {
-            const unsigned int value_atgt = emit_any(cg, value_node, ATGT);
+            const int value_atgt = emit_any(cg, value_node, ATGT);
             atgt_free1(scope_stack_last_frame_scope(&cg->scope_stack), value_atgt);
             value_reg = atgt_abs(value_atgt);
         }
