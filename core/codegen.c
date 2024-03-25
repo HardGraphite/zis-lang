@@ -739,7 +739,17 @@ static struct zis_assembler *scope_assembler(struct zis_codegen *restrict cg) {
     }
 }
 
+/// Check whether in the toplevel frame scope. `fs` is optional.
+static bool scope_frame_is_toplevel(
+    struct zis_codegen *restrict cg, struct frame_scope *fs /* = NULL */
+) {
+    if (!fs)
+        fs = scope_stack_last_frame_scope(&cg->scope_stack);
+    return !fs->_parent_scope.any;
+}
+
 /// Get reg index of a local variable. Allocate one if not found.
+/// If in the toplevel frame, returns 0 when variable is not found.
 static unsigned int scope_find_or_alloc_var(
     struct zis_codegen *restrict cg, struct zis_context *z,
     struct zis_symbol_obj *name
@@ -748,12 +758,12 @@ static unsigned int scope_find_or_alloc_var(
     union scope_ptr scope = scope_stack_last_frame_or_var_scope(&cg->scope_stack);
     if (scope.any->type == SCOPE_VAR) {
         reg = frame_scope_find_var(scope.var->frame, name);
-        if (!reg)
+        if (!reg && !scope_frame_is_toplevel(cg, scope.var->frame))
             reg = var_scope_alloc_var(scope.var, z, name);
     } else {
         assert(scope.any->type == SCOPE_FRAME);
         reg = frame_scope_find_var(scope.frame, name);
-        if (!reg)
+        if (!reg && !scope_frame_is_toplevel(cg, scope.frame))
             reg = frame_scope_alloc_var(scope.frame, z, name);
     }
     return reg;
@@ -764,15 +774,6 @@ static unsigned int scope_find_or_alloc_var(
 static unsigned int scope_alloc_regs(struct zis_codegen *restrict cg, unsigned int n) {
     struct frame_scope *fs = scope_stack_last_frame_scope(&cg->scope_stack);
     return frame_scope_alloc_regs(fs, n);
-}
-
-/// Check whether in the toplevel frame scope. `fs` is optional.
-static bool scope_frame_is_toplevel(
-    struct zis_codegen *restrict cg, struct frame_scope *fs /* = NULL */
-) {
-    if (!fs)
-        fs = scope_stack_last_frame_scope(&cg->scope_stack);
-    return !fs->_parent_scope.any;
 }
 
 /* ----- handlers for different AST nodes ----------------------------------- */
@@ -1231,18 +1232,33 @@ static int emit_Assign(struct zis_codegen *cg, struct zis_ast_node_obj *_node, u
     const enum zis_ast_node_type lhs_type = zis_ast_node_obj_type(var.lhs);
     struct zis_assembler *const as = scope_assembler(cg);
     if (lhs_type == ZIS_AST_NODE_Name) {
-        struct zis_symbol_obj *const var_name = zis_ast_node_get_field(var.lhs, Name, value);
-        const unsigned int var_reg = scope_find_or_alloc_var(cg, codegen_z(cg), var_name);
-        emit_any(cg, var.rhs, var_reg);
-        if (tgt_reg != NTGT) {
-            if (tgt_reg == ATGT) {
-                atgt = (int)var_reg;
-            } else {
-                atgt = 0;
-                zis_assembler_append_ABw(as, ZIS_OPC_LDLOC, tgt_reg, var_reg);
+        unsigned int var_reg = scope_find_or_alloc_var(
+            cg, codegen_z(cg),
+            zis_ast_node_get_field(var.lhs, Name, value)
+        );
+        if (var_reg) {
+            emit_any(cg, var.rhs, var_reg);
+        } else {
+            const bool rhs_atgt_valid =
+                zis_ast_node_obj_type(var.rhs) == ZIS_AST_NODE_Name || tgt_reg == ATGT;
+            const int rhs_atgt = emit_any(cg, var.rhs, rhs_atgt_valid ? ATGT : 0);
+            if (rhs_atgt_valid) {
+                atgt_free1(scope_stack_last_frame_scope(&cg->scope_stack), rhs_atgt);
+                var_reg = atgt_abs(rhs_atgt);
             }
+            const unsigned int name_cid = zis_assembler_func_symbol(
+                as, codegen_z(cg),
+                zis_ast_node_get_field(var.lhs, Name, value)
+            );
+            zis_assembler_append_ABw(as, ZIS_OPC_STGLB, var_reg, name_cid);
+        }
+        if (tgt_reg == NTGT) {
+            atgt = 0;
+        } else if (tgt_reg == ATGT) {
+            atgt = (int)var_reg;
         } else {
             atgt = 0;
+            zis_assembler_append_ABw(as, ZIS_OPC_LDLOC, tgt_reg, var_reg);
         }
     } else {
         int rhs_atgt; unsigned int rhs_reg;
@@ -1534,6 +1550,8 @@ static int emit_Import(struct zis_codegen *cg, struct zis_ast_node_obj *_node, u
         const unsigned int value_reg =
             scope_find_or_alloc_var(cg, codegen_z(cg), zis_ast_node_get_field(var.what, Name, value));
         zis_assembler_append_ABw(as, ZIS_OPC_IMP, value_reg, name_sid);
+        if (value_reg == 0)
+            zis_assembler_append_ABw(as, ZIS_OPC_STGLB, 0, name_sid);
     } else {
         error_not_implemented(cg, __func__, var.what);
         // TODO: complex import statement.
@@ -1743,6 +1761,10 @@ static int emit_Func(struct zis_codegen *cg, struct zis_ast_node_obj *_node, uns
     const unsigned int name_reg =
         scope_find_or_alloc_var(cg, codegen_z(cg), var.name);
     zis_assembler_append_ABw(as, ZIS_OPC_LDCON, name_reg, func_cid);
+    if (name_reg == 0) {
+        const unsigned int name_sid = zis_assembler_func_symbol(as, codegen_z(cg), var.name);
+        zis_assembler_append_ABw(as, ZIS_OPC_STGLB, 0, name_sid);
+    }
 
     zis_locals_drop(cg, var);
     return 0;
