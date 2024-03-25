@@ -145,7 +145,7 @@ void zis_module_obj_add_parent(
 ) {
     if (self->_parent == zis_smallint_to_ptr(0)) {
         self->_parent = zis_object_from(new_parent);
-        zis_object_assert_no_write_barrier(new_parent);
+        zis_object_assert_no_write_barrier(self->_parent);
         return;
     }
 

@@ -31,7 +31,7 @@ struct zis_array_slots_obj *zis_array_slots_obj_new(
 
     if (v) {
         zis_object_vec_copy(self->_data, v, n);
-        zis_object_assert_no_write_barrier(self);
+        zis_object_write_barrier_n(self, v, n);
     } else {
         zis_object_vec_zero(self->_data, n);
     }
@@ -57,7 +57,7 @@ struct zis_array_slots_obj *zis_array_slots_obj_new2(
     if (n > len)
         n = len;
     zis_object_vec_copy(self->_data, v, n);
-    zis_object_assert_no_write_barrier(self);
+    zis_object_write_barrier_n(self, v, n);
     zis_object_vec_zero(self->_data + n, len - n);
 
     zis_locals_drop(z, var);
@@ -208,7 +208,7 @@ bool zis_array_obj_insert(
         self->_data = self_data;
         zis_object_write_barrier(self, self_data);
         zis_object_vec_copy(self_data->_data, old_data, pos);
-        zis_object_assert_no_write_barrier(self_data);
+        zis_object_write_barrier_n(self_data, old_data, pos);
     }
     zis_object_vec_move(self_data->_data + pos + 1, old_data + pos, old_len - pos);
     zis_array_slots_obj_set(self_data, pos, v);
@@ -245,7 +245,7 @@ bool zis_array_obj_remove(
         self->_data = self_data;
         zis_object_write_barrier(self, self_data);
         zis_object_vec_copy(self_data->_data, old_data, pos);
-        zis_object_assert_no_write_barrier(self_data);
+        zis_object_write_barrier_n(self_data, old_data, pos);
     }
     const size_t new_len = old_len - 1;
     zis_object_vec_move(self_data->_data + pos, old_data + pos + 1, new_len - pos);

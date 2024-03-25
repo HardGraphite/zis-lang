@@ -172,7 +172,7 @@ zis_static_force_inline bool invocation_pass_args_pac(
     argv = zis_object_cast(arg_list[argc_min], struct zis_tuple_obj)->_data;
     arg_list[argc_min] = zis_object_from(va_list_);
     zis_object_vec_copy(va_list_->_data, argv + argc_min, rest_n);
-    zis_object_assert_no_write_barrier(va_list_);
+    zis_object_write_barrier_n(va_list_, argv + argc_min, rest_n);
 
     return true;
 }
@@ -230,7 +230,7 @@ zis_static_force_inline bool invocation_pass_args_dis(
             struct zis_tuple_obj *const va_list_ = zis_tuple_obj_new(z, NULL, rest_n);
             arg_list[argc_min] = zis_object_from(va_list_);
             _invocation_pass_args_dis_copy(va_list_->_data, caller_frame, args_prev_frame_regs + argc_min, rest_n);
-            zis_object_assert_no_write_barrier(va_list_);
+            zis_object_assert_no_write_barrier(va_list_); // FIXME: write barrier may be needed here.
         }
     }
 
