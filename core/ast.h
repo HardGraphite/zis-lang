@@ -50,9 +50,9 @@ enum zis_ast_node_type {
 #define zis_ast_node_set_field(__node, __type, __field, __value) \
 do {                                                             \
     (void)sizeof((((struct zis_ast_node_##__type##_data *)0)->__field = (__value)) ? 1 : 0); \
+    void *const __value_1 = (__value);                           \
     struct zis_ast_node_obj *const __node_1 = (__node);          \
     assert(zis_ast_node_obj_type(__node_1) == ZIS_AST_NODE_##__type); \
-    void *const __value_1 = (__value);                           \
     _zis_ast_node_obj_data_as(__node_1, struct zis_ast_node_##__type##_data)->__field = __value_1; \
     zis_object_write_barrier(__node_1, __value_1);               \
 } while (0)                                                      \
