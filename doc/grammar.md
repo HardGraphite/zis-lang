@@ -347,7 +347,9 @@ func_arg_list
     ;
 ```
 
-## Variables and scopes
+## Concepts
+
+### Variables and scopes
 
 A variable is defined in current scope at the first time it is assigned to.
 To look up for a variable, the local scope is first search, and then the global scope.
@@ -357,3 +359,26 @@ The followings introduce weak variable scopes (scopes that inherit from the pare
 
 - `for` block (loop)
 - `while` block (loop)
+
+### The `main()` function
+
+The `main()` function is a module's top level function named "`main`".
+It is optional.
+It is automatically called after module being initialized
+if the module is run as the entry point.
+
+The function may accept one argument, an array of command line arguments.
+Or it can take on argument, which does not cause an error.
+
+Here is an example:
+
+```
+$ cat test.zis
+print("TEST")
+func main(args)
+    print(args)
+end
+
+$ zis test.zis "Hello, world!"
+["test.zis", "Hello, world!"]
+```

@@ -1244,10 +1244,8 @@ static int api_import_call_main(zis_t z, struct zis_object **res_ref) {
         zis_symbol_registry_get(z, "main", (size_t)-1)
     );
     if (!main_fn || zis_object_type(main_fn) != z->globals->type_Function) {
-        zis_context_set_reg0(z, zis_object_from(zis_exception_obj_format(
-            z, NULL, *res_ref, "the main function is not defined"
-        )));
-        return ZIS_THR;
+        zis_debug_log(WARN, "API", "the main function is not defined");
+        return ZIS_OK;
     }
 
     int status;
