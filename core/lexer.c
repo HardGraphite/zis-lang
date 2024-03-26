@@ -1,7 +1,7 @@
 #include "lexer.h"
 
 #include <ctype.h>
-#include <math.h> // HUGE_VAL
+#include <math.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -305,21 +305,27 @@ scan_floating_point:
 
     stream_ignore_1(input); // "."
     loc_next_char(l);
-    unsigned int fractional_count = 0;
-    for (double weight = 1.0 / digit_base; ; weight /= digit_base, fractional_count++) {
+    uint64_t fractional_part = 0; // as integer
+    unsigned int fractional_part_len = 0; // number of digits added to `fractional_part`
+    unsigned int fractional_char_count = 0; // total number of characters
+    for (; ; fractional_char_count++) {
         c = stream_peek(input);
         const unsigned int x = zis_char_digit((zis_wchar_t)c);
         if (x >= digit_base) {
             if (c == '_')
                 continue;
-            if (!fractional_count)
+            if (!fractional_char_count)
                 error_unexpected_end_of(l, "number literal");
             break;
         }
         stream_ignore_1(input);
-        float_value += (double)x * weight;
+        if (fractional_part < UINT64_MAX / digit_base) {
+            fractional_part = fractional_part * digit_base + x;
+            fractional_part_len++;
+        }
     }
-    loc_next_char_n(l, fractional_count);
+    loc_next_char_n(l, fractional_char_count);
+    float_value += (double)fractional_part / pow(digit_base, fractional_part_len);
 
     token_set_loc1(tok, l), tok->column1--;
     tok->value_float = zis_float_obj_new(z, float_value);
