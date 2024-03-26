@@ -16,6 +16,7 @@
 #include <core/stack.h>
 
 #include <core/arrayobj.h>
+#include <core/floatobj.h>
 #include <core/intobj.h>
 #include <core/streamobj.h>
 #include <core/stringobj.h>
@@ -39,6 +40,9 @@ static void F_print__print_1(zis_t z, struct zis_object *value, struct zis_strea
             snprintf(buffer, sizeof buffer, "%f", zis_int_obj_value_f(v));
         else
             buffer[n] = 0;
+    } else if (type == g->type_Float) {
+        struct zis_float_obj *v = zis_object_cast(value, struct zis_float_obj);
+        snprintf(buffer, sizeof buffer, "%f", zis_float_obj_value(v));
     } else if (type == g->type_String) {
         struct zis_string_obj *v = zis_object_cast(value, struct zis_string_obj);
         const size_t n = zis_string_obj_value(v, buffer, sizeof buffer - 1);

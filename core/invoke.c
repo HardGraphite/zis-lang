@@ -278,6 +278,15 @@ format_error_field_not_exists(
     zis_context_set_reg0(z, zis_object_from(exc));
 }
 
+zis_noinline zis_cold_fn static void
+format_error_cond_is_not_bool(
+    struct zis_context *z, struct zis_object *value
+) {
+    struct zis_exception_obj *exc =
+        zis_exception_obj_format(z, "type", value, "condition expression is not boolean");
+    zis_context_set_reg0(z, zis_object_from(exc));
+}
+
 /// Run the bytecode in the function object.
 /// Then pop the current frame and handles the return value.
 zis_hot_fn static int invoke_bytecode_func(
@@ -882,15 +891,46 @@ _interp_loop:
     }
 
     OP_DEFINE(JMP) {
-        goto panic_ill; // Not implemented.
+        int32_t offset;
+        zis_instr_extract_operands_Asw(this_instr, offset);
+        IP_JUMP_TO(ip + offset);
+        OP_DISPATCH;
     }
 
     OP_DEFINE(JMPT) {
-        goto panic_ill; // Not implemented.
+        int32_t offset; uint32_t cond;
+        zis_instr_extract_operands_AsBw(this_instr, offset, cond);
+        struct zis_object **cond_p = bp + cond;
+        BOUND_CHECK_REG(cond_p);
+        struct zis_object *cond_v = *cond_p;
+        if (cond_v == zis_object_from(g->val_true)) {
+            IP_JUMP_TO(ip + offset);
+        } else {
+            if (zis_unlikely(cond_v != zis_object_from(g->val_false))) {
+                format_error_cond_is_not_bool(z, cond_v);
+                THROW_REG0;
+            }
+            IP_ADVANCE;
+        }
+        OP_DISPATCH;
     }
 
     OP_DEFINE(JMPF) {
-        goto panic_ill; // Not implemented.
+        int32_t offset; uint32_t cond;
+        zis_instr_extract_operands_AsBw(this_instr, offset, cond);
+        struct zis_object **cond_p = bp + cond;
+        BOUND_CHECK_REG(cond_p);
+        struct zis_object *cond_v = *cond_p;
+        if (cond_v == zis_object_from(g->val_false)) {
+            IP_JUMP_TO(ip + offset);
+        } else {
+            if (zis_unlikely(cond_v != zis_object_from(g->val_true))) {
+                format_error_cond_is_not_bool(z, cond_v);
+                THROW_REG0;
+            }
+            IP_ADVANCE;
+        }
+        OP_DISPATCH;
     }
 
     OP_DEFINE(JMPLE) {
@@ -926,7 +966,29 @@ _interp_loop:
     }
 
     OP_DEFINE(CMPLT) {
-        goto panic_ill; // Not implemented.
+        uint32_t tgt, lhs, rhs;
+        zis_instr_extract_operands_ABC(this_instr, tgt, lhs, rhs);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        if (zis_object_is_smallint(lhs_v) && zis_object_is_smallint(rhs_v)) {
+            const zis_smallint_t lhs_smi = zis_smallint_from_ptr(lhs_v);
+            const zis_smallint_t rhs_smi = zis_smallint_from_ptr(rhs_v);
+            *tgt_p = zis_object_from(lhs_smi < rhs_smi ? g->val_true : g->val_false);
+        } else {
+            // TODO: other types
+            goto panic_ill; // Not implemented.
+        }
+        IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(CMPEQ) {
@@ -946,15 +1008,84 @@ _interp_loop:
     }
 
     OP_DEFINE(ADD) {
-        goto panic_ill; // Not implemented.
+        uint32_t tgt, lhs, rhs;
+        zis_instr_extract_operands_ABC(this_instr, tgt, lhs, rhs);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        if (zis_object_is_smallint(lhs_v) && zis_object_is_smallint(rhs_v)) {
+            const zis_smallint_t lhs_smi = zis_smallint_from_ptr(lhs_v);
+            const zis_smallint_t rhs_smi = zis_smallint_from_ptr(rhs_v);
+            *tgt_p = zis_smallint_to_ptr(lhs_smi + rhs_smi);
+            // FIXME: overflow check
+        } else {
+            // TODO: other types
+            goto panic_ill; // Not implemented.
+        }
+        IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(SUB) {
-        goto panic_ill; // Not implemented.
+        uint32_t tgt, lhs, rhs;
+        zis_instr_extract_operands_ABC(this_instr, tgt, lhs, rhs);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        if (zis_object_is_smallint(lhs_v) && zis_object_is_smallint(rhs_v)) {
+            const zis_smallint_t lhs_smi = zis_smallint_from_ptr(lhs_v);
+            const zis_smallint_t rhs_smi = zis_smallint_from_ptr(rhs_v);
+            *tgt_p = zis_smallint_to_ptr(lhs_smi - rhs_smi);
+            // FIXME: overflow check
+        } else {
+            // TODO: other types
+            goto panic_ill; // Not implemented.
+        }
+        IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(MUL) {
-        goto panic_ill; // Not implemented.
+        uint32_t tgt, lhs, rhs;
+        zis_instr_extract_operands_ABC(this_instr, tgt, lhs, rhs);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        if (zis_object_is_smallint(lhs_v) && zis_object_is_smallint(rhs_v)) {
+            const zis_smallint_t lhs_smi = zis_smallint_from_ptr(lhs_v);
+            const zis_smallint_t rhs_smi = zis_smallint_from_ptr(rhs_v);
+            *tgt_p = zis_smallint_to_ptr(lhs_smi * rhs_smi);
+            // FIXME: overflow check
+        } else {
+            // TODO: other types
+            goto panic_ill; // Not implemented.
+        }
+        IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(DIV) {
