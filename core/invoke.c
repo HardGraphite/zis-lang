@@ -606,6 +606,7 @@ _interp_loop:
             assert(status == ZIS_OK);
             zis_instr_word_t *ip0 = invocation_leave(z, bp[0]);
             assert(ip0 == ip), zis_unused_var(ip0);
+            BP_SP_CHANGED;
             FUNC_CHANGED;
             IP_ADVANCE;
         } else {
