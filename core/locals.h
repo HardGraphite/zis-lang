@@ -48,7 +48,7 @@ void _zis_locals_root_gc_visit(struct zis_locals_root *lr, int op);
 /// );
 /// ```
 #define zis_locals_decl(__root_parent, __namespace, ...) \
-    _zis_locals_drop_check_decl_(__namespace)            \
+    _zis_locals_drop_check_decl_(__root_parent, __namespace)           \
     struct { struct _zis_locals_head _head; __VA_ARGS__ } __namespace; \
 do {                                                     \
     __namespace._head._next = (__root_parent)->locals_root._list;      \
@@ -76,7 +76,7 @@ do {                                 \
 #define zis_locals_zero_1(__namespace, __name) \
 do {                                           \
     assert(sizeof __namespace == __namespace._head._size); \
-    assert(sizeof __namespace == sizeof(struct _zis_locals_head) + sizeof(void *)); \
+    static_assert(sizeof __namespace == sizeof(struct _zis_locals_head) + sizeof(void *), ""); \
     __namespace.__name = (void *)zis_smallint_to_ptr(0);   \
 } while (0)                                    \
 // ^^^ zis_locals_zero() ^^^
@@ -85,7 +85,7 @@ do {                                           \
 /// The variables must be dropped in the reverse order of declaration.
 #define zis_locals_drop(__root_parent, __namespace) \
 do {                                                \
-    _zis_locals_drop_check_drop_(__namespace)                         \
+    _zis_locals_drop_check_drop_(__root_parent, __namespace)          \
     assert((__root_parent)->locals_root._list == &__namespace._head); \
     (__root_parent)->locals_root._list = __namespace._head._next;     \
 } while (0)                                         \
@@ -99,11 +99,11 @@ struct _zis_locals_head {
 };
 
 #ifdef NDEBUG
-#    define _zis_locals_drop_check_decl_(__namespace)
-#    define _zis_locals_drop_check_drop_(__namespace)
+#    define _zis_locals_drop_check_decl_(__root_parent, __namespace)
+#    define _zis_locals_drop_check_drop_(__root_parent, __namespace)
 #else // NDEBUG
-#    define _zis_locals_drop_check_decl_(__namespace)  int __##__namespace##_not_dropped;
-#    define _zis_locals_drop_check_drop_(__namespace)  ((void)__##__namespace##_not_dropped);
+#    define _zis_locals_drop_check_decl_(__root_parent, __namespace)  int __##__root_parent##__namespace##_not_dropped;
+#    define _zis_locals_drop_check_drop_(__root_parent, __namespace)  ((void)__##__root_parent##__namespace##_not_dropped);
 #endif // NDEBUG
 
 void _zis_locals_block_zero(struct _zis_locals_head *h, size_t n);
