@@ -1105,15 +1105,17 @@ static int emit_Constant(struct zis_codegen *cg, struct zis_ast_node_obj *node, 
     } else if (zis_object_type(v) == codegen_z(cg)->globals->type_Float) {
         const double x = zis_float_obj_value(zis_object_cast(v, struct zis_float_obj));
         double frac; int exp; // x = frac * pow2(exp)
-        frac = frexp(x, &exp);
-        const double frac_x128 = frac * 128;
-        const int exp_p7 = exp + 7;
+        frac = frexp(x, &exp); // frexp(~, ~) \in (-1,-0.5] \cup [0.5,1)
+        if (frac != 0.0) {
+            frac = frac * 128; // \in (-128,-64] \cup [64,128)
+            exp  = exp - 7;
+        }
         if (
-            (trunc(frac_x128) == frac_x128) &&
-            (ZIS_INSTR_I8_MIN <= frac_x128 && frac_x128 <= ZIS_INSTR_I8_MAX) &&
-            (ZIS_INSTR_I8_MIN <= exp_p7 && exp_p7 <= ZIS_INSTR_I8_MAX)
+            (trunc(frac) == frac) &&
+            (ZIS_INSTR_I8_MIN <= exp && exp <= ZIS_INSTR_I8_MAX)
         ) {
-            zis_assembler_append_ABsCs(as, ZIS_OPC_MKFLT, tgt_reg, (int)frac_x128, exp_p7);
+            assert(ZIS_INSTR_I8_MIN <= frac && frac <= ZIS_INSTR_I8_MAX);
+            zis_assembler_append_ABsCs(as, ZIS_OPC_MKFLT, tgt_reg, (int)frac, exp);
             return atgt;
         }
     }

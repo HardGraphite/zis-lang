@@ -481,7 +481,7 @@ _interp_loop:
         zis_instr_extract_operands_ABsCs(this_instr, tgt, frac, exp);
         struct zis_object **tgt_p = bp + tgt;
         BOUND_CHECK_REG(tgt_p);
-        *tgt_p = zis_object_from(zis_float_obj_new(z, ldexp(frac, exp - 7)));
+        *tgt_p = zis_object_from(zis_float_obj_new(z, ldexp(frac, exp)));
         IP_ADVANCE;
         OP_DISPATCH;
     }
