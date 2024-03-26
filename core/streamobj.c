@@ -348,8 +348,11 @@ static int32_t _stream_obj_peek_char_slow_impl(
                 self->_ops_data, self->_b_buf + rest_size,
                 ZIS_STREAM_OBJ_BUF_SZ - rest_size
             );
-            if (n == (size_t)-1)
+            if (n == (size_t)-1) {
+                if (char_len)
+                    *char_len = 0;
                 return -1;
+            }
             self->_b_end = self->_b_buf + rest_size + n;
             self->_b_cur = self->_b_end;
             self->_c_cur = self->_b_buf;

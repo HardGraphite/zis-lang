@@ -72,17 +72,6 @@ zis_static_force_inline int32_t stream_peek(struct zis_stream_obj *restrict stre
     return zis_stream_obj_peek_char(stream);
 }
 
-/// Read next character.
-zis_static_force_inline int32_t stream_read(struct zis_stream_obj *restrict stream) {
-    return zis_stream_obj_read_char(stream);
-}
-
-/// Ignore next character.
-zis_static_force_inline void stream_ignore(struct zis_stream_obj *restrict stream) {
-    const int32_t c = zis_stream_obj_read_char(stream);
-    assert(c != -1), zis_unused_var(c);
-}
-
 /// Ignore next 1-byte character.
 zis_static_force_inline void stream_ignore_1(struct zis_stream_obj *restrict stream) {
     // See `zis_stream_obj_peek_char()`.
