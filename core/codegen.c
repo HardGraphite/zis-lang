@@ -1656,11 +1656,10 @@ static int emit_Cond(struct zis_codegen *cg, struct zis_ast_node_obj *_node, uns
     struct zis_assembler *const as = scope_assembler(cg);
     label_next_branch = zis_assembler_alloc_label(as);
     label_end = zis_assembler_alloc_label(as);
-    for (size_t i = 0; ; i += 2) {
+    for (size_t i = 0, n = zis_array_obj_length(var.args); i < n ; i += 2) {
         {
             struct zis_object *x0 = zis_array_obj_get(var.args, i);
-            if (!x0)
-                break;
+            assert(x0);
             struct zis_object *x1 = zis_array_obj_get(var.args, i + 1);
             if (zis_unlikely(!x1)) {
                 error(
@@ -1681,9 +1680,11 @@ static int emit_Cond(struct zis_codegen *cg, struct zis_ast_node_obj *_node, uns
         zis_assembler_place_label(as, label_next_branch);
         label_next_branch = zis_assembler_alloc_label(as);
         const int bx = emit_branch(cg, var.branch_cond, false, label_next_branch);
-        if (bx >= 0)
+        if (bx >= 0) {
             emit_block(cg, var.node, var.branch_body);
-        zis_assembler_append_jump_Asw(as, ZIS_OPC_JMP, bx <= 0 ? label_next_branch : label_end);
+            if (i + 2 < n) // the last branch does not need a trailing jump.
+                zis_assembler_append_jump_Asw(as, ZIS_OPC_JMP, label_end);
+        }
     }
     zis_assembler_place_label(as, label_next_branch);
     zis_assembler_place_label(as, label_end);
