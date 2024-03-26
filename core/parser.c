@@ -1008,8 +1008,8 @@ static struct zis_ast_node_obj *parse_Break(struct zis_parser *p) {
 static struct zis_array_obj *parse_block(struct zis_parser *p);
 
 static struct zis_ast_node_obj *parse_Continue(struct zis_parser *p) {
-    assert(this_token(p)->type == ZIS_TOK_KW_BREAK);
-    struct zis_ast_node_obj *_node = zis_ast_node_new(parser_z(p), Break, true);
+    assert(this_token(p)->type == ZIS_TOK_KW_CONTINUE);
+    struct zis_ast_node_obj *_node = zis_ast_node_new(parser_z(p), Continue, true);
     zis_locals_decl_1(p, var, struct zis_ast_node_obj *node);
     var.node = _node;
     node_copy_token_loc(var.node, this_token(p));
