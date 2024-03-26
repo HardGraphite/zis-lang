@@ -558,6 +558,7 @@ _interp_loop:
         ip = invocation_leave(z, zis_object_from(g->val_nil));
         if (zis_unlikely(!ip))
             return ZIS_OK;
+        BP_SP_CHANGED;
         FUNC_CHANGED;
         IP_ADVANCE;
         OP_DISPATCH;
@@ -571,6 +572,7 @@ _interp_loop:
         ip = invocation_leave(z, *ret_p);
         if (zis_unlikely(!ip))
             return ZIS_OK;
+        BP_SP_CHANGED;
         FUNC_CHANGED;
         IP_ADVANCE;
         OP_DISPATCH;
@@ -585,13 +587,14 @@ _interp_loop:
         struct invocation_info ii;
         if (zis_unlikely(!invocation_enter(z, ip, ret_p, &ii)))
             THROW_REG0;
-        FUNC_CHANGED_TO(zis_object_cast(ii.caller_frame[0], struct zis_func_obj));
         unsigned int indices[3];
         for (uint32_t i = 0; i < argc; i++) {
             const unsigned int idx = (this_instr >> (7 + 6 * i)) & 63;
             BOUND_CHECK_REG(ii.caller_frame + idx);
             indices[i] = idx;
         }
+        BP_SP_CHANGED;
+        FUNC_CHANGED_TO(zis_object_cast(ii.caller_frame[0], struct zis_func_obj));
         if (zis_unlikely(!invocation_pass_args_dis(z, indices, argc, &ii)))
             THROW_REG0;
     } {
@@ -621,6 +624,7 @@ _interp_loop:
         struct invocation_info ii;
         if (zis_unlikely(!invocation_enter(z, ip, ret_p, &ii)))
             THROW_REG0;
+        BP_SP_CHANGED;
         FUNC_CHANGED_TO(zis_object_cast(ii.caller_frame[0], struct zis_func_obj));
         if (zis_unlikely(!invocation_pass_args_vec(z, arg_p, arg_count, &ii)))
             THROW_REG0;
@@ -649,6 +653,7 @@ _interp_loop:
         struct invocation_info ii;
         if (zis_unlikely(!invocation_enter(z, ip, ret_p, &ii)))
             THROW_REG0;
+        BP_SP_CHANGED;
         FUNC_CHANGED_TO(zis_object_cast(ii.caller_frame[0], struct zis_func_obj));
         if (zis_unlikely(!invocation_pass_args_pac(z, *arg_p, argc, &ii)))
             THROW_REG0;
