@@ -148,7 +148,7 @@ struct zis_func_obj *zis_assemble_func_from_text(
 
 /// Disassemble result of one instruction.
 struct zis_disassemble_result {
-    unsigned int      address; ///< Instruction index.
+    uint32_t         address; ///< Instruction index.
     zis_instr_word_t  instr;   ///< The instruction.
     enum zis_opcode   opcode;  ///< Opcode.
     const char       *op_name; ///< Operation name.
@@ -160,5 +160,14 @@ int zis_disassemble_bytecode(
     struct zis_context *z, const struct zis_func_obj *func_obj,
     int (*fn)(const struct zis_disassemble_result *, void *), void *fn_arg
 );
+
+#if ZIS_DEBUG_LOGGING
+
+void zis_debug_dump_bytecode(
+    struct zis_context *z, const struct zis_func_obj *func_obj,
+    uint32_t highlight_offset, void *restrict FILE_p
+);
+
+#endif // ZIS_DEBUG_LOGGING
 
 #endif // ZIS_FEATURE_DIS

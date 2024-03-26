@@ -2,6 +2,7 @@
 
 #include <math.h>
 
+#include "assembly.h" // zis_debug_dump_bytecode()
 #include "attributes.h"
 #include "context.h"
 #include "debug.h"
@@ -1007,6 +1008,9 @@ _interp_loop:
 #undef BOUND_CHECK_FLD
 
 panic_ill:
+    zis_debug_log_1(DUMP, "Interp", "zis_debug_dump_bytecode()", fp, {
+        zis_debug_dump_bytecode(z, func_obj, (uint32_t)(ip - func_obj->bytecode), fp);
+    });
     zis_context_panic(z, ZIS_CONTEXT_PANIC_ILL);
 
 #if OP_DISPATCH_USE_COMPUTED_GOTO // vvv

@@ -361,31 +361,6 @@ void zis_assembler_clear(struct zis_assembler *as) {
     as->func_meta.na = 0, as->func_meta.no = 0, as->func_meta.nr = 0;
 }
 
-#if ZIS_DEBUG_LOGGING
-
-static int _as_finish_debug_dump_fn(const struct zis_disassemble_result *dis, void *_file) {
-    FILE *fp = _file;
-    char buffer[80];
-    int buffer_used = 0, n;
-    n = snprintf(
-        buffer, sizeof buffer, "%04x:  %08x  %-6s %i",
-        dis->address, dis->instr, *dis->op_name ? dis->op_name : "??", dis->operands[0]
-    );
-    assert(n > 0);
-    buffer_used += n;
-    for (int i = 1; i <= 2 && dis->operands[i] != INT32_MIN; i++) {
-        assert(sizeof buffer > (size_t)buffer_used);
-        n = snprintf(buffer + buffer_used, sizeof buffer - buffer_used, ", %i", dis->operands[i]);
-        assert(n > 0);
-        buffer_used += n;
-    }
-    buffer[buffer_used++] = '\n';
-    fwrite(buffer, 1, (size_t)buffer_used, fp);
-    return 0;
-}
-
-#endif // ZIS_DEBUG_LOGGING
-
 static const enum zis_opcode _opposite_jump_instr_table[] = {
     [(unsigned)ZIS_OPC_JMPT  - (unsigned)ZIS_OPC_JMP - 1U] = ZIS_OPC_JMPF,
     [(unsigned)ZIS_OPC_JMPF  - (unsigned)ZIS_OPC_JMP - 1U] = ZIS_OPC_JMPT,
@@ -516,16 +491,8 @@ struct zis_func_obj *zis_assembler_finish(
     zis_assembler_clear(as);
 
     // Dump the bytecode.
-    zis_debug_log_1(DUMP, "Asm", "zis_disassemble_bytecode()", fp, {
-        fprintf(fp, "# disassembly of function@%p\n", (void *)var.func_obj);
-        fprintf(
-            fp, "# meta = {.na = %u, .no = %u, .nr = %u}\n# constants.len = %zu, symbols.len = %zu\n",
-            var.func_obj->meta.na, var.func_obj->meta.no, var.func_obj->meta.nr,
-            zis_array_slots_obj_length(var.func_obj->_constants),
-            zis_array_slots_obj_length(var.func_obj->_symbols)
-        );
-        zis_disassemble_bytecode(z, var.func_obj, _as_finish_debug_dump_fn, fp);
-        fprintf(fp, "# end of function@%p\n", (void *)var.func_obj);
+    zis_debug_log_1(DUMP, "Asm", "zis_debug_dump_bytecode()", fp, {
+        zis_debug_dump_bytecode(z, var.func_obj, (uint32_t)-1, fp);
     });
 
     zis_locals_drop(z, var);
@@ -1084,7 +1051,7 @@ int zis_disassemble_bytecode(
     for (size_t i = 0, n = zis_func_obj_bytecode_length(var.func_obj); i < n; i++) {
         const zis_instr_word_t instr = var.func_obj->bytecode[i];
         dump_instr(instr, &dis_res);
-        dis_res.address = (unsigned int)i;
+        dis_res.address = (uint32_t)i;
         if ((fn_ret = fn(&dis_res, fn_arg)))
             return fn_ret;
     }
@@ -1092,5 +1059,56 @@ int zis_disassemble_bytecode(
     zis_locals_drop(z, var);
     return fn_ret;
 }
+
+#if ZIS_DEBUG_LOGGING
+
+struct _debug_dump_bytecode_state {
+    FILE *stream;
+    uint32_t highlight_address;
+};
+
+static int _debug_dump_bytecode_fn(const struct zis_disassemble_result *dis, void *arg) {
+    struct _debug_dump_bytecode_state *const state = arg;
+    char buffer[80];
+    int buffer_used = 0, n;
+    n = snprintf(
+        buffer, sizeof buffer, "%04x%s%08x  %-6s %i",
+        dis->address, dis->address == state->highlight_address ? "==>" : ":  ", dis->instr,
+        *dis->op_name ? dis->op_name : "??", dis->operands[0]
+    );
+    assert(n > 0);
+    buffer_used += n;
+    for (int i = 1; i <= 2 && dis->operands[i] != INT32_MIN; i++) {
+        assert(sizeof buffer > (size_t)buffer_used);
+        n = snprintf(buffer + buffer_used, sizeof buffer - buffer_used, ", %i", dis->operands[i]);
+        assert(n > 0);
+        buffer_used += n;
+    }
+    buffer[buffer_used++] = '\n';
+    fwrite(buffer, 1, (size_t)buffer_used, state->stream);
+    return 0;
+}
+
+void zis_debug_dump_bytecode(
+    struct zis_context *z, const struct zis_func_obj *func_obj,
+    uint32_t highlight_offset, void *restrict FILE_p
+) {
+    FILE *const restrict fp = FILE_p;
+    struct _debug_dump_bytecode_state state = {
+        .stream = fp,
+        .highlight_address = highlight_offset,
+    };
+    fprintf(fp, "# disassembly of function@%p\n", (void *)func_obj);
+    fprintf(
+        fp, "# meta = {.na = %u, .no = %u, .nr = %u}\n# constants.len = %zu, symbols.len = %zu\n",
+        func_obj->meta.na, func_obj->meta.no, func_obj->meta.nr,
+        zis_array_slots_obj_length(func_obj->_constants),
+        zis_array_slots_obj_length(func_obj->_symbols)
+    );
+    zis_disassemble_bytecode(z, func_obj, _debug_dump_bytecode_fn, &state);
+    fprintf(fp, "# end of function@%p\n", (void *)func_obj);
+}
+
+#endif // ZIS_DEBUG_LOGGING
 
 #endif // ZIS_FEATURE_DIS
