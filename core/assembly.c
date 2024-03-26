@@ -412,7 +412,10 @@ static int _as_finish_id_map_to_slots(struct zis_object *k, struct zis_object *v
     return 0;
 }
 
-struct zis_func_obj *zis_assembler_finish(struct zis_assembler *as, struct zis_context *z) {
+struct zis_func_obj *zis_assembler_finish(
+    struct zis_assembler *as,
+    struct zis_context *z, struct zis_module_obj *_module
+) {
     // Append a RETNIL instrcution at the end of the function.
     do {
         if (as->instr_buffer.length) {
@@ -494,6 +497,7 @@ struct zis_func_obj *zis_assembler_finish(struct zis_assembler *as, struct zis_c
     var.func_obj = zis_func_obj_new_bytecode(
         z, as->func_meta, as->instr_buffer.data, as->instr_buffer.length
     );
+    zis_func_obj_set_module(z, var.func_obj, _module); // No GC should have been triggered before this.
 
     // Add constants & symbols to the function object.
     if (zis_array_obj_length(as->func_constants)) {
@@ -705,6 +709,7 @@ void zis_assembler_append_jump_AsBC(
 struct tas_context {
     struct zis_context *z;
     struct zis_stream_obj *input;
+    struct zis_module_obj **module_ref;
     unsigned int line_number;
     char line_buffer[128];
 };
@@ -961,21 +966,31 @@ static struct zis_func_obj *tas_parse_func(
         }
     }
 finish:
-    return zis_assembler_finish(as, tas->z);
+    return zis_assembler_finish(as, tas->z, *tas->module_ref);
 }
 
 struct zis_func_obj *zis_assemble_func_from_text(
-    struct zis_context *z, struct zis_stream_obj *input
+    struct zis_context *z, struct zis_stream_obj *input,
+    struct zis_module_obj *_module
 ) {
     // NOTE: `input`(zis_stream_obj) won't be moved during GC.
+
+    zis_locals_decl(
+        z, var,
+        struct zis_stream_obj *input;
+        struct zis_module_obj *module;
+    );
+    var.input = input, var.module = _module;
 
     struct tas_context context = {
         .z = z,
         .input = input,
+        .module_ref = &var.module,
         .line_number = 0,
     };
 
     struct zis_exception_obj *exc_obj = NULL;
+    struct zis_func_obj *func_obj = NULL;
 
     union tas_parse_line_result line_result;
     enum tas_parse_line_status line_status = tas_parse_line(&context, &line_result);
@@ -984,14 +999,15 @@ struct zis_func_obj *zis_assemble_func_from_text(
         exc_obj = tas_error_exception(&context);
     } else {
         struct zis_assembler *as = zis_assembler_create(z, NULL);
-        struct zis_func_obj *func_obj =
-            tas_parse_func(&context, line_result.pseudo.operands, as);
+        func_obj = tas_parse_func(&context, line_result.pseudo.operands, as);
         zis_assembler_destroy(as, z, NULL);
-        if (func_obj)
-            return func_obj;
-        exc_obj = tas_error_exception(&context);
+        if (!func_obj)
+            exc_obj = tas_error_exception(&context);
     }
 
+    zis_locals_drop(z, var);
+    if (func_obj)
+        return func_obj;
     zis_context_set_reg0(z, zis_object_from(exc_obj));
     return NULL;
 }

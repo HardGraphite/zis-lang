@@ -11,6 +11,7 @@
 struct zis_context;
 struct zis_func_obj;
 struct zis_func_obj_meta;
+struct zis_module_obj;
 struct zis_object;
 struct zis_stream_obj;
 struct zis_symbol_obj;
@@ -41,7 +42,10 @@ void zis_assembler_clear(struct zis_assembler *as);
 
 /// Finish the assembling and output the generated function.
 /// `zis_assembler_clear()` will be called.
-struct zis_func_obj *zis_assembler_finish(struct zis_assembler *as, struct zis_context *z);
+struct zis_func_obj *zis_assembler_finish(
+    struct zis_assembler *as,
+    struct zis_context *z, struct zis_module_obj *module
+);
 
 /// Get or update the function meta. `m` is optional.
 const struct zis_func_obj_meta *zis_assembler_func_meta(
@@ -132,7 +136,8 @@ void zis_assembler_append_jump_AsBC(
 /// Generate a function from the assemble text stream.
 /// On failure, formats an exception (REG-0) and returns NULL.
 struct zis_func_obj *zis_assemble_func_from_text(
-    struct zis_context *z, struct zis_stream_obj *input
+    struct zis_context *z, struct zis_stream_obj *input,
+    struct zis_module_obj *module
 );
 
 #endif // ZIS_FEATURE_ASM

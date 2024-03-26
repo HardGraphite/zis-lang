@@ -6,6 +6,7 @@
 
 struct zis_context;
 struct zis_func_obj;
+struct zis_module_obj;
 struct zis_stream_obj;
 
 #if ZIS_FEATURE_SRC
@@ -13,7 +14,8 @@ struct zis_stream_obj;
 /// Compile source code from `input` stream to a function.
 /// On failure, formats an exception (REG-0) and returns NULL.
 struct zis_func_obj *zis_compile_source(
-    struct zis_context *z, struct zis_stream_obj *input
+    struct zis_context *z, struct zis_stream_obj *input,
+    struct zis_module_obj *module /* = NULL */
 );
 
 #endif // ZIS_FEATURE_SRC

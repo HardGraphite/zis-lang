@@ -329,13 +329,12 @@ static bool module_loader_load_from_file(
     case MOD_FILE_SRC: {
         const int ff = ZIS_STREAM_OBJ_MODE_IN | ZIS_STREAM_OBJ_TEXT | ZIS_STREAM_OBJ_UTF8;
         struct zis_stream_obj *f = zis_stream_obj_new_file(z, file, ff);
-        var.init_func = zis_compile_source(z, f);
+        var.init_func = zis_compile_source(z, f, var.module);
         zis_stream_obj_close(f);
         if (!var.init_func) {
             status = ZIS_THR;
             break;
         }
-        zis_func_obj_set_module(z, var.init_func, var.module);
         break;
     }
 #endif // ZIS_FEATURE_SRC
@@ -371,13 +370,12 @@ static bool module_loader_load_from_file(
     case MOD_FILE_ASM: {
         const int ff = ZIS_STREAM_OBJ_MODE_IN | ZIS_STREAM_OBJ_TEXT | ZIS_STREAM_OBJ_UTF8;
         struct zis_stream_obj *f = zis_stream_obj_new_file(z, file, ff);
-        var.init_func = zis_assemble_func_from_text(z, f);
+        var.init_func = zis_assemble_func_from_text(z, f, var.module);
         zis_stream_obj_close(f);
         if (!var.init_func) {
             status = ZIS_THR;
             break;
         }
-        zis_func_obj_set_module(z, var.init_func, var.module);
         break;
     }
 #endif // ZIS_FEATURE_ASM
@@ -408,14 +406,12 @@ static bool module_loader_load_from_source(
     );
     zis_locals_zero(var);
     var.module = _module;
-    var.init_func = zis_compile_source(z, input);
+    var.init_func = zis_compile_source(z, input, var.module);
     int status = ZIS_OK;
-    if (!var.init_func) {
+    if (!var.init_func)
         status = ZIS_THR;
-    } else {
-        zis_func_obj_set_module(z, var.init_func, var.module);
+    else
         status = zis_module_obj_do_init(z, var.init_func);
-    }
     zis_locals_drop(z, var);
     assert(status == ZIS_OK || status == ZIS_THR);
     return status == ZIS_OK;

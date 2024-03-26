@@ -308,7 +308,7 @@ zis_nodiscard static bool frame_scope_set_argc(
 /// Generate function object. Fails (NULL) if too many registers are used.
 zis_nodiscard static struct zis_func_obj *frame_scope_gen_func(
     struct frame_scope *fs,
-    struct zis_context *z
+    struct zis_context *z, struct zis_module_obj *module
 ) {
     const unsigned int reg_max = fs->reg_touched_max;
     if (zis_unlikely(reg_max >= USHRT_MAX))
@@ -317,7 +317,7 @@ zis_nodiscard static struct zis_func_obj *frame_scope_gen_func(
     struct zis_func_obj_meta func_meta = *zis_assembler_func_meta(as, NULL);
     func_meta.nr = (unsigned short)(reg_max + 1);
     zis_assembler_func_meta(as, &func_meta);
-    return zis_assembler_finish(as, z);
+    return zis_assembler_finish(as, z, module);
 }
 
 /// Variable scope.
@@ -613,6 +613,7 @@ struct zis_codegen {
     struct zis_locals_root locals_root;
     struct scope_stack scope_stack;
     struct zis_context *z;
+    struct zis_module_obj *module;
     jmp_buf error_jb;
 };
 
@@ -620,6 +621,7 @@ static void codegen_gc_visit(void *_cg, enum zis_objmem_obj_visit_op op) {
     struct zis_codegen *const cg = _cg;
     _zis_locals_root_gc_visit(&cg->locals_root, (int)op);
     scope_stack_gc_visitor(&cg->scope_stack, op);
+    zis_objmem_visit_object_vec((struct zis_object **)&cg->module, (struct zis_object **)&cg->module + 1, op);
 }
 
 static struct zis_context *codegen_z(struct zis_codegen *restrict cg) {
@@ -1750,7 +1752,7 @@ static int emit_Func(struct zis_codegen *cg, struct zis_ast_node_obj *_node, uns
     }
     emit_block(cg, var.node, var.body);
     assert(scope_stack_current_scope(&cg->scope_stack).any->type == SCOPE_FRAME);
-    struct zis_func_obj *const result = frame_scope_gen_func(fs, codegen_z(cg));
+    struct zis_func_obj *const result = frame_scope_gen_func(fs, codegen_z(cg), cg->module);
     if (!result)
         error_too_many_regs(cg, var.node);
     scope_stack_pop_frame_scope(&cg->scope_stack);
@@ -1786,7 +1788,7 @@ static struct zis_func_obj *gen_module(struct zis_codegen *cg, struct zis_ast_no
     node = emit_block(cg, node, zis_ast_node_get_field(node, Module, body));
     assert(scope_stack_current_scope(&cg->scope_stack).any->type == SCOPE_FRAME);
     struct zis_func_obj *const result =
-        frame_scope_gen_func(scope_stack_current_scope(&cg->scope_stack).frame, codegen_z(cg));
+        frame_scope_gen_func(scope_stack_current_scope(&cg->scope_stack).frame, codegen_z(cg), cg->module);
     if (!result)
         error_too_many_regs(cg, node);
     scope_stack_pop_frame_scope(&cg->scope_stack);
@@ -1800,6 +1802,7 @@ struct zis_codegen *zis_codegen_create(struct zis_context *z) {
     zis_locals_root_init(&cg->locals_root, NULL);
     scope_stack_init(&cg->scope_stack);
     cg->z = z;
+    cg->module = z->globals->val_mod_unnamed;
     zis_objmem_add_gc_root(z, cg, codegen_gc_visit);
     return cg;
 }
@@ -1814,10 +1817,13 @@ void zis_codegen_destroy(struct zis_codegen *cg, struct zis_context *z) {
 
 struct zis_func_obj *zis_codegen_generate(
     struct zis_codegen *cg,
-    struct zis_ast_node_obj *ast
+    struct zis_ast_node_obj *ast,
+    struct zis_module_obj *_module
 ) {
-    assert(!cg->locals_root._list);
+    if (_module)
+        cg->module = _module;
 
+    assert(!cg->locals_root._list);
     struct zis_func_obj *result;
     if (!codegen_error_setjmp(cg)) {
         if (zis_ast_node_obj_type(ast) != ZIS_AST_NODE_Module)
@@ -1827,8 +1833,9 @@ struct zis_func_obj *zis_codegen_generate(
         zis_locals_root_reset(&cg->locals_root);
         result = NULL;
     }
-
     assert(!cg->locals_root._list);
+
+    cg->module = cg->z->globals->val_mod_unnamed;
 
     return result;
 }

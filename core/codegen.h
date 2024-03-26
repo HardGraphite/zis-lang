@@ -8,6 +8,7 @@ struct zis_assembler;
 struct zis_ast_node_obj;
 struct zis_context;
 struct zis_func_obj;
+struct zis_module_obj;
 
 #if ZIS_FEATURE_SRC
 
@@ -24,7 +25,8 @@ void zis_codegen_destroy(struct zis_codegen *cg, struct zis_context *z);
 /// On failure, formats an exception (REG-0) and returns NULL.
 struct zis_func_obj *zis_codegen_generate(
     struct zis_codegen *cg,
-    struct zis_ast_node_obj *ast
+    struct zis_ast_node_obj *ast,
+    struct zis_module_obj *module /* = NULL */
 );
 
 #endif // ZIS_FEATURE_SRC
