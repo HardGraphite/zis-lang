@@ -19,6 +19,16 @@
 
 /* ----- terminal info ------------------------------------------------------ */
 
+bool cli_stdin_isatty(void) {
+#if CLI_POSIX
+    return isatty(STDIN_FILENO);
+#elif CLI_WINDOWS
+    return _isatty(_fileno(stdin));
+#else
+    return true;
+#endif
+}
+
 bool cli_stdout_isatty(void) {
 #if CLI_POSIX
     return isatty(STDOUT_FILENO);

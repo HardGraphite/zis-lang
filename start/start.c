@@ -9,11 +9,31 @@
 #include "cliutil.h"
 #include "zis_config.h"
 
-static const struct clopts_program program;
+static void oh_help(struct clopts_context *, const char *, void *);
+static void oh_version(struct clopts_context *, const char *, void *);
+static void oh_interactive(struct clopts_context *, const char *, void *);
+static void rest_args_handler(struct clopts_context *, const char *[], int, void *);
 
-struct command_line_args {
-    const char **rest_args;
-    size_t rest_args_num;
+static const struct clopts_option program_options[] = {
+    {'h', NULL, oh_help, "Print help message and exit."},
+    {'v', NULL, oh_version, "Print version and build information, and exit."},
+    {'i', NULL, oh_interactive, "Enter the interactive mode."},
+    {0, 0, 0, 0},
+};
+
+static const struct clopts_program program = {
+    .usage_args = "[OPTION...] [[--] -|FILE|@MODULE|=CODE [ARGUMENT...]]",
+    .options = program_options,
+    .rest_args = rest_args_handler,
+};
+
+static const char *const program_prog_specifier_helps[] = {
+    "-\0"         "Read source code from stdin.",
+    "<FILE>\0"    "Run program in the file. <FILE> is the path to the file.",
+    "@<MODULE>\0" "Run module as a program. <MODULE> is the name of the module.",
+    "=<CODE>\0"   "Execute sourc code string <CODE>.",
+    "(empty)\0"   "Enter interactive mode if stdin is a terminal; otherwise read source code from stdin.",
+    NULL
 };
 
 static const char *const program_environ_helps[] = {
@@ -36,11 +56,18 @@ static const char *const program_environ_helps[] = {
     NULL
 };
 
+struct command_line_args {
+    const char **rest_args;
+    size_t rest_args_num;
+    bool force_interactive;
+};
+
 static void oh_help(struct clopts_context *ctx, const char *arg, void *_data) {
     assert(!arg), (void)arg, (void)_data;
     FILE *stream = stdout;
 
     clopts_help(&program, stream, ctx);
+    clopts_help_print_list(stream, "Program specifiers", program_prog_specifier_helps);
     clopts_help_print_list(stream, "Environment variables", program_environ_helps);
 
     clopts_handler_break(ctx);
@@ -67,6 +94,12 @@ static void oh_version(struct clopts_context *ctx, const char *arg, void *_data)
     clopts_handler_break(ctx);
 }
 
+static void oh_interactive(struct clopts_context *ctx, const char *arg, void *_data) {
+    assert(!arg), (void)ctx, (void)arg;
+    struct command_line_args *args = _data;
+    args->force_interactive = true;
+}
+
 static void rest_args_handler(
     struct clopts_context *ctx, const char *argv[], int argc, void *_data
 ) {
@@ -76,18 +109,6 @@ static void rest_args_handler(
     args->rest_args = argv;
     args->rest_args_num = (size_t)argc;
 }
-
-static const struct clopts_option program_options[] = {
-    {'h', NULL, oh_help, "Print help message and exit."},
-    {'v', NULL, oh_version, "Print version and build information, and exit."},
-    {0, 0, 0, 0},
-};
-
-static const struct clopts_program program = {
-    .usage_args = "[OPTION...] [[--] -|FILE|@MODULE [ARGUMENT...]]",
-    .options = program_options,
-    .rest_args = rest_args_handler,
-};
 
 static void parse_command_line_args(
     int argc, char *argv[], struct command_line_args *args
@@ -102,28 +123,49 @@ static void parse_command_line_args(
 static int start(zis_t z, void *_args) {
     struct command_line_args *const args = _args;
     int exit_status = EXIT_SUCCESS;
+    const char *imp_what;
+    int imp_flags;
 
-    if (args->rest_args_num) {
+    if (args->force_interactive) {
+        imp_what = "repl";
+        imp_flags = ZIS_IMP_NAME;
+    } else if (args->rest_args_num) {
         const char *module = args->rest_args[0];
-        int imp_flags = ZIS_IMP_MAIN;
         if (module[0] == '-' && !module[1]) {
             zis_make_stream(z, 0, ZIS_IOS_STDX, 0); // stdin
-            module = NULL;
-            imp_flags |= ZIS_IMP_CODE;
+            imp_what = NULL;
+            imp_flags = ZIS_IMP_CODE;
+        } else if (module[0] == '=') {
+            imp_what = module + 1;
+            imp_flags = ZIS_IMP_CODE;
         } else if (module[0] == '@') {
-            module++;
-            imp_flags |= ZIS_IMP_NAME;
+            imp_what = module + 1;
+            imp_flags = ZIS_IMP_NAME;
         } else {
-            imp_flags |= ZIS_IMP_PATH;
+            imp_what = module;
+            imp_flags = ZIS_IMP_PATH;
         }
+        imp_flags |= ZIS_IMP_MAIN;
+    } else {
+        if (cli_stdin_isatty()) {
+            imp_what = "repl";
+            imp_flags = ZIS_IMP_NAME;
+        } else {
+            zis_make_stream(z, 0, ZIS_IOS_STDX, 0); // stdin
+            imp_what = NULL;
+            imp_flags = ZIS_IMP_CODE;
+        }
+    }
+
+    if (imp_flags & ZIS_IMP_MAIN) {
         zis_make_int(z, 1, (int64_t)args->rest_args_num);
         zis_make_int(z, 2, (intptr_t)args->rest_args);
-        if (zis_import(z, 0, module, imp_flags) == ZIS_THR) {
-            zis_move_local(z, 1, 0);
-            zis_make_stream(z, 2, ZIS_IOS_STDX, 2); // stderr
-            zis_read_exception(z, 1, ZIS_RDE_DUMP, 2);
-            exit_status = EXIT_FAILURE;
-        }
+    }
+    if (zis_import(z, 0, imp_what, imp_flags) == ZIS_THR) {
+        zis_move_local(z, 1, 0);
+        zis_make_stream(z, 2, ZIS_IOS_STDX, 2); // stderr
+        zis_read_exception(z, 1, ZIS_RDE_DUMP, 2);
+        exit_status = EXIT_FAILURE;
     }
 
     return exit_status;

@@ -7,6 +7,9 @@
 
 /* ----- terminal info ------------------------------------------------------ */
 
+/// Test whether stdin is a terminal.
+bool cli_stdin_isatty(void);
+
 /// Test whether stdout is a terminal.
 bool cli_stdout_isatty(void);
 
