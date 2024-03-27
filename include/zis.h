@@ -698,7 +698,7 @@ ZIS_API int zis_move_local(zis_t z, unsigned int dst, unsigned int src) ZIS_NOEX
  * @param reg register index
  * @param name name of the global variable; or `NULL` to get name from `REG-0`
  * @param name_len string length of parameter `name`; or `-1` to calculate length with `strlen()`
- * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (name does not exist or REG-0 is not a `Symbol`).
+ * @return `ZIS_OK`; `ZIS_THR`, `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (REG-0 is not a `Symbol`).
  *
  * @warning Do not try to access global variable outside a function,
  * in which case there is no *current module*.
@@ -729,7 +729,7 @@ ZIS_API int zis_store_global(zis_t z, unsigned int reg, const char *name, size_t
  * @param name field name string; or `NULL` to get name from `REG-0`.
  * @param name_len string length of parameter `name`; or `-1` to calculate length with `strlen()`
  * @param reg_val register to load the field to
- * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (name does not exist or REG-0 is not a `Symbol`).
+ * @return `ZIS_OK`; `ZIS_THR`, `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (REG-0 is not a `Symbol`).
  */
 ZIS_API int zis_load_field(
     zis_t z, unsigned int reg_obj,
@@ -746,7 +746,7 @@ ZIS_API int zis_load_field(
  * @param name field name string; or `NULL` to get name from `REG-0`.
  * @param name_len string length of parameter `name`; or `-1` to calculate length with `strlen()`
  * @param reg_val register where the new field value is
- * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (name does not exist or REG-0 is not a `Symbol`).
+ * @return `ZIS_OK`; `ZIS_THR`, `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (REG-0 is not a `Symbol`).
  */
 ZIS_API int zis_store_field(
     zis_t z, unsigned int reg_obj,
@@ -762,8 +762,7 @@ ZIS_API int zis_store_field(
  * @param reg_obj register where the object is
  * @param reg_key register where the key is
  * @param reg_val register to load the element to
- * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index); `ZIS_E_ARG` (key does not exist);
- * `ZIS_E_TYPE` (`reg_obj` does not allow elements).
+ * @return `ZIS_OK`; `ZIS_THR`, `ZIS_E_IDX` (invalid reg index); `ZIS_E_ARG` (key does not exist).
  */
 ZIS_API int zis_load_element(zis_t z, unsigned int reg_obj, unsigned int reg_key, unsigned int reg_val) ZIS_NOEXCEPT;
 
@@ -776,8 +775,7 @@ ZIS_API int zis_load_element(zis_t z, unsigned int reg_obj, unsigned int reg_key
  * @param reg_obj register where the object is
  * @param reg_key register where the key is
  * @param reg_val register where the new value of the element is
- * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index); `ZIS_E_ARG` (key does not exist);
- * `ZIS_E_TYPE` (`reg_obj` does not allow elements).
+ * @return `ZIS_OK`; `ZIS_THR`, `ZIS_E_IDX` (invalid reg index); `ZIS_E_ARG` (key does not exist).
  */
 ZIS_API int zis_store_element(zis_t z, unsigned int reg_obj, unsigned int reg_key, unsigned int reg_val) ZIS_NOEXCEPT;
 
@@ -790,8 +788,7 @@ ZIS_API int zis_store_element(zis_t z, unsigned int reg_obj, unsigned int reg_ke
  * @param reg_obj register where the object is
  * @param reg_key register where the key is
  * @param reg_val register where the value is
- * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index); `ZIS_E_ARG` (key not valid);
- * `ZIS_E_TYPE` (`reg_obj` does not allow elements).
+ * @return `ZIS_OK`; `ZIS_THR`, `ZIS_E_IDX` (invalid reg index).
  */
 ZIS_API int zis_insert_element(zis_t z, unsigned int reg_obj, unsigned int reg_key, unsigned int reg_val) ZIS_NOEXCEPT;
 
@@ -803,8 +800,7 @@ ZIS_API int zis_insert_element(zis_t z, unsigned int reg_obj, unsigned int reg_k
  * @param z zis instance
  * @param reg_obj register where the object is
  * @param reg_key register where the key is
- * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index); `ZIS_E_ARG` (key not valid);
- * `ZIS_E_TYPE` (`reg_obj` does not allow elements).
+ * @return `ZIS_OK`; `ZIS_THR`, `ZIS_E_IDX` (invalid reg index).
  */
 ZIS_API int zis_remove_element(zis_t z, unsigned int reg_obj, unsigned int reg_key) ZIS_NOEXCEPT;
 
