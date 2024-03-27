@@ -67,9 +67,21 @@ extern "C" {
 /** @} */
 
 /**
- * Version number: { major, minor, patch }.
+ * Build information structure. @see `zis_build_info`.
  */
-ZIS_API extern const uint_least16_t zis_version[3];
+struct zis_build_info {
+    const char *system;     ///< Operating system name.
+    const char *machine;    ///< Hardware (architecture) name.
+    const char *compiler;   ///< Compiler name and version.
+    const char *extra;      ///< Extra information. Optional.
+    uint32_t    timestamp;  ///< UNIX timestamp (UTC), divided by 60.
+    uint8_t     version[3]; ///< Version number (major, minor, patch).
+};
+
+/**
+ * Build information.
+ */
+ZIS_API extern const struct zis_build_info zis_build_info;
 
 /** @} */
 
@@ -101,6 +113,7 @@ ZIS_API void zis_destroy(zis_t z) ZIS_NOEXCEPT;
 /** @{ */
 #define ZIS_PANIC_OOM   1  ///< Panic cause: out of memory (object memory)
 #define ZIS_PANIC_SOV   2  ///< Panic cause: stack overflow (runtime callstack)
+#define ZIS_PANIC_ILL   3  ///< Panic cause: illegal bytecode
 /** @} */
 
 /**
@@ -273,6 +286,31 @@ ZIS_API int zis_make_int(zis_t z, unsigned int reg, int64_t val) ZIS_NOEXCEPT;
  * `ZIS_E_BUF` (`int64_t` is not big enough to hold the value).
  */
 ZIS_API int zis_read_int(zis_t z, unsigned int reg, int64_t *val) ZIS_NOEXCEPT;
+
+/**
+ * Create an `Int` object from string.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param str pointer to the integer string (prefix '-' is allowed; underscores '_' are ignored)
+ * @param str_sz size in bytes of the string `str`, or `-1` to take `str` as a NUL-terminated string
+ * @param base integer string base; the absolute value of which must be in the range `[2,36]`
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_ARG` (illegal `str`).
+ */
+ZIS_API int zis_make_int_s(zis_t z, unsigned int reg, const char *str, size_t str_sz, int base) ZIS_NOEXCEPT;
+
+/**
+ * Represent an `Int` object as string.
+ *
+ * @param z zis instance
+ * @param reg register index
+ * @param buf pointer to a buffer to store UTF-8 string, or `NULL` to get expected buffer size
+ * @param buf_sz pointer to a `size_t` value that tells the buffer size and receives written size
+ * @param base integer string base, the absolute value of which must be in the range `[2,36]`; negative for uppercase letters
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`), `ZIS_E_TYPE` (wrong type of `reg`),
+ * `ZIS_E_BUF` (`buf` is not big enough).
+ */
+ZIS_API int zis_read_int_s(zis_t z, unsigned int reg, char *buf, size_t *buf_sz, int base) ZIS_NOEXCEPT;
 
 /**
  * Create an `Float` object.
@@ -450,26 +488,38 @@ ZIS_API int zis_make_exception(
     const char *type, unsigned int reg_data, const char *msg_fmt, ...
     ) ZIS_NOEXCEPT;
 
+#define ZIS_RDE_TEST     0x00 ///< `zis_read_exception()`: do nothing.
+#define ZIS_RDE_TYPE     0x01 ///< `zis_read_exception()`: get the `type` field.
+#define ZIS_RDE_DATA     0x02 ///< `zis_read_exception()`: get the `data` field.
+#define ZIS_RDE_WHAT     0x03 ///< `zis_read_exception()`: get the `what` field.
+#define ZIS_RDE_DUMP     0x04 ///< `zis_read_exception()`: print this exception.
+
 /**
  * Read contents of an `Exception` object.
  *
  * @param z zis instance
  * @param reg register index where the exception is
- * @param reg_type register to store the exception type
- * @param reg_data register to store the exception data
- * @param reg_what register to store the exception message
- * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index), `ZIS_E_TYPE` (wrong type of `reg`).
+ * @param flag `ZIS_RDE_*`
+ * @param reg_out register to store the result
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (invalid `flag`),
+ * `ZIS_E_TYPE` (wrong type of `reg`).
  */
-ZIS_API int zis_read_exception(
-    zis_t z, unsigned int reg,
-    unsigned int reg_type, unsigned int reg_data, unsigned int reg_what
-);
+ZIS_API int zis_read_exception(zis_t z, unsigned int reg, int flag, unsigned int reg_out) ZIS_NOEXCEPT;
 
-#define ZIS_STREAM_FILE    0x01 ///< `zis_make_stream()` type: file stream
+/** @name zis_make_stream() flags */
+/** @{ */
 
-#define ZIS_STREAM_RDONLY  0x10 ///< `zis_make_stream()` mode: read-only
-#define ZIS_STREAM_WRONLY  0x20 ///< `zis_make_stream()` mode: write-only
-#define ZIS_STREAM_WINEOL  0x40 ///< `zis_make_stream()` mode: use Windows style of end-of-line (CRLF)
+#define ZIS_IOS_FILE    0x01 ///< `zis_make_stream()` type: file stream.
+#define ZIS_IOS_STDX    0x02 ///< `zis_make_stream()` type: standard I/O stream (0=stdin, 1=stdout, 2=stderr).
+#define ZIS_IOS_TEXT    0x03 ///< `zis_make_stream()` type: read-only string stream.
+
+#define ZIS_IOS_RDONLY  0x10 ///< `zis_make_stream()` `ZIS_IOS_FILE` mode: read-only.
+#define ZIS_IOS_WRONLY  0x20 ///< `zis_make_stream()` `ZIS_IOS_FILE` mode: write-only.
+#define ZIS_IOS_WINEOL  0x40 ///< `zis_make_stream()` `ZIS_IOS_FILE` mode: use Windows style of end-of-line (CRLF).
+
+#define ZIS_IOS_STATIC  0x80 ///< `zis_make_stream()` `ZIS_IOS_TEXT` mode: string is static (infinite lifetime).
+
+/** @} */
 
 /**
  * Create a stream object.
@@ -486,7 +536,23 @@ ZIS_API int zis_read_exception(
  * const char *file_path = ...; // path to the file
  * const char *encoding  = ...; // text encoding (empty for UTF-8), or NULL to open as a binary file
  * const int other_flags = ...;
- * int status = zis_make_stream(z, reg, ZIS_STREAM_FILE | other_flags, file_path, encoding);
+ * int status = zis_make_stream(z, reg, ZIS_IOS_FILE | other_flags, file_path, encoding);
+ * ```
+ * To get the standard input stream:
+ * ```c
+ * const int stdio_id = 0; // 0 for stdin
+ * int status = zis_make_stream(z, reg, ZIS_IOS_STDX, stdio_id);
+ * ```
+ * To open a string stream:
+ * ```c
+ * const char *string = "..."; // the string
+ * const size_t string_size = strlen(string); // string size, or -1
+ * int status = zis_make_stream(z, reg, ZIS_IOS_TEXT | ZIS_IOS_STATIC, string, string_size);
+ * ```
+ * To open a string stream from a `String` object:
+ * ```c
+ * const unsigned int reg_str_obj = ...; // the register where the string object is
+ * int status = zis_make_stream(z, reg, ZIS_IOS_TEXT, NULL, reg_str_obj);
  * ```
  */
 ZIS_API int zis_make_stream(zis_t z, unsigned int reg, int flags, ...);
@@ -567,11 +633,17 @@ ZIS_API int zis_make_module(zis_t z, unsigned int reg, const struct zis_native_m
  */
 ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) ZIS_NOEXCEPT;
 
+/** @name zis_import() flags */
+/** @{ */
+
 #define ZIS_IMP_NAME     0x01 ///< `zis_import()` type: import by name.
 #define ZIS_IMP_PATH     0x02 ///< `zis_import()` type: import by file path.
+#define ZIS_IMP_CODE     0x03 ///< `zis_import()` type: compile source code.
 #define ZIS_IMP_ADDP     0x0f ///< `zis_import()` type: add to search path.
 
 #define ZIS_IMP_MAIN     0xf0 ///< `zis_import()` extra: call the `main` function (REG-1 = `(int)argc`, REG-2 = `(char**)argv`).
+
+/** @} */
 
 /**
  * Import a module.
@@ -588,6 +660,10 @@ ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) ZIS_NOEX
  * zis_import(z, reg, "module_name", ZIS_IMP_NAME);
  * // ##  To import a module by file path
  * zis_import(z, reg, "path/to/the/module/file.ext", ZIS_IMP_PATH);
+ * // ##  To compile a string to a module
+ * zis_import(z, reg, "the source code ...", ZIS_IMP_CODE);
+ * // ##  To compile the `Stream` object in `REG-0` to a module
+ * zis_import(z, reg, NULL, ZIS_IMP_CODE);
  * // ##  To add a module search path
  * zis_import(z, 0, "path/to/the/module/dir", ZIS_IMP_ADDP);
  * // ##  To load a module by path as the entry

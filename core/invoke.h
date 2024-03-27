@@ -15,7 +15,7 @@ struct zis_object;
 /// `REG-0` must not be used for argument passing.
 struct zis_func_obj *zis_invoke_prepare_va(
     struct zis_context *z, struct zis_object *callable,
-    struct zis_object **argv, size_t argc
+    struct zis_object **ret_to /* = NULL */, struct zis_object **argv, size_t argc
 );
 
 /// Prepare the environment for an invocation and return the function to call.
@@ -24,7 +24,7 @@ struct zis_func_obj *zis_invoke_prepare_va(
 /// `REG-0` must not be used for argument passing.
 struct zis_func_obj *zis_invoke_prepare_pa(
     struct zis_context *z, struct zis_object *callable,
-    struct zis_object *packed_args, size_t argc
+    struct zis_object **ret_to /* = NULL */, struct zis_object *packed_args, size_t argc
 );
 
 /// Prepare the environment for an invocation and return the function to call.
@@ -34,14 +34,12 @@ struct zis_func_obj *zis_invoke_prepare_pa(
 /// `REG-0` must not be used for argument passing.
 struct zis_func_obj *zis_invoke_prepare_da(
     struct zis_context *z, struct zis_object *callable,
-    const unsigned int arg_regs[], size_t argc
+    struct zis_object **ret_to /* = NULL */, const unsigned int arg_regs[], size_t argc
 );
 
-/// Clean up a frame created with `zis_invoke_prepare()` and get the return value.
-struct zis_object *zis_invoke_cleanup(struct zis_context *z);
-
-/// Call a function object.
+/// Call a function object and pop the frame.
 /// `zis_invoke_prepare_*() should be called before calling this function;
-/// `zis_invoke_cleanup()` should be called after calling this function.
-/// The function `func` shall have been stored in the REG-0 in caller's frame.
+/// otherwise, the new frame (and the arguments) shall have been prepared
+/// and the function `func` shall have been stored in the REG-0 in the caller's frame.
+/// If an exception is thrown, the stack trace will be updated.
 int zis_invoke_func(struct zis_context *z, struct zis_func_obj *func);

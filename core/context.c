@@ -10,16 +10,34 @@
 #include "globals.h"
 #include "loader.h"
 #include "memory.h"
+#include "ndefutil.h"
 #include "objmem.h"
 #include "stack.h"
 #include "symbolobj.h"
 #include "zis.h" // ZIS_PANIC_*
 
+#include "moduleobj.h"
 #include "pathobj.h"
 
 #include "zis_config.h"
 
-static void context_read_environ_path(struct zis_context *z) {
+/* ----- init: load essential builtin modules ------------------------------- */
+
+extern const struct zis_native_module_def ZIS_NATIVE_MODULE_VARNAME(prelude);
+
+zis_cold_fn static void context_load_builtin_modules(struct zis_context *z) {
+    const int flags = ZIS_MOD_LDR_UPDATE_LOADED;
+    struct zis_module_obj *x;
+    x = zis_module_loader_import(
+        z, z->globals->val_mod_prelude,
+        zis_symbol_registry_get(z, "prelude", (size_t)-1), NULL, flags
+    );
+    assert(x == z->globals->val_mod_prelude), zis_unused_var(x);
+}
+
+/* ----- init: read environment variables ----------------------------------- */
+
+zis_cold_fn static void context_read_environ_path(struct zis_context *z) {
 #ifdef ZIS_ENVIRON_NAME_PATH
 
 #if ZIS_SYSTEM_WINDOWS
@@ -56,7 +74,7 @@ static void context_read_environ_path(struct zis_context *z) {
 #endif // ZIS_ENVIRON_NAME_PATH
 }
 
-static void context_read_environ_mems(
+zis_cold_fn static void context_read_environ_mems(
     size_t *restrict stack_size,
     struct zis_objmem_options *restrict objmem_opts
 ) {
@@ -92,6 +110,8 @@ static void context_read_environ_mems(
 #endif // ZIS_ENVIRON_NAME_MEMS
 }
 
+/* ----- public functions --------------------------------------------------- */
+
 zis_nodiscard struct zis_context *zis_context_create(void) {
     zis_debug_try_init();
 
@@ -104,18 +124,13 @@ zis_nodiscard struct zis_context *zis_context_create(void) {
     z->objmem_context = zis_objmem_context_create(&objmem_options);
     z->callstack = zis_callstack_create(z, stack_size);
     z->symbol_registry = zis_symbol_registry_create(z);
-
-    // Allow use of `zis_callstack_frame_alloc_temp()` and `zis_callstack_frame_free_temp()`.
-    // See `zis_native_block()`.
-    zis_callstack_enter(z->callstack, 1, NULL);
+    zis_locals_root_init(&z->locals_root, z);
 
     z->globals = zis_context_globals_create(z);
     z->module_loader = zis_module_loader_create(z);
 
+    context_load_builtin_modules(z);
     context_read_environ_path(z);
-
-    zis_callstack_leave(z->callstack);
-    assert(zis_callstack_empty(z->callstack));
 
     assert(!z->panic_handler);
 
@@ -125,6 +140,7 @@ zis_nodiscard struct zis_context *zis_context_create(void) {
 
 void zis_context_destroy(struct zis_context *z) {
     zis_debug_log(INFO, "Context", "deleting context @%p", (void *)z);
+    zis_locals_root_fini(&z->locals_root, z);
     zis_module_loader_destroy(z->module_loader, z);
     zis_context_globals_destroy(z->globals, z);
     zis_symbol_registry_destroy(z->symbol_registry, z);
@@ -133,9 +149,18 @@ void zis_context_destroy(struct zis_context *z) {
     zis_mem_free(z);
 }
 
+void zis_context_set_reg0(struct zis_context *z, struct zis_object *v) {
+    z->callstack->frame[0] = v;
+}
+
+struct zis_object *zis_context_get_reg0(struct zis_context *z) {
+    return z->callstack->frame[0];
+}
+
 zis_noreturn void zis_context_panic(struct zis_context *z, enum zis_context_panic_reason r) {
     static_assert(ZIS_PANIC_OOM == (int)ZIS_CONTEXT_PANIC_OOM, "");
     static_assert(ZIS_PANIC_SOV == (int)ZIS_CONTEXT_PANIC_SOV, "");
+    static_assert(ZIS_PANIC_ILL == (int)ZIS_CONTEXT_PANIC_ILL, "");
 
     zis_debug_log(WARN, "Context", "context@%p: panic(%i)", (void *)z, (int)r);
 

@@ -499,6 +499,37 @@ zis_nodiscard zis_file_handle_t zis_file_open(const zis_path_char_t *path, int m
 #endif
 }
 
+zis_file_handle_t zis_file_stdio(int file_std_xxx) {
+    if (
+        file_std_xxx != ZIS_FILE_STDIN &&
+        file_std_xxx != ZIS_FILE_STDOUT &&
+        file_std_xxx != ZIS_FILE_STDERR
+    ) {
+        return NULL;
+    }
+
+#if ZIS_FS_POSIX
+
+    static_assert(ZIS_FILE_STDIN  ==  STDIN_FILENO, "");
+    static_assert(ZIS_FILE_STDOUT == STDOUT_FILENO, "");
+    static_assert(ZIS_FILE_STDERR == STDERR_FILENO, "");
+
+    return (void *)(intptr_t)file_std_xxx;
+
+#elif ZIS_FS_WINDOWS
+
+    static_assert((DWORD)(-ZIS_FILE_STDIN  - 10) ==  STD_INPUT_HANDLE, "");
+    static_assert((DWORD)(-ZIS_FILE_STDOUT - 10) == STD_OUTPUT_HANDLE, "");
+    static_assert((DWORD)(-ZIS_FILE_STDERR - 10) ==  STD_ERROR_HANDLE, "");
+
+    HANDLE h = GetStdHandle((DWORD)(-file_std_xxx - 10));
+    if (h = INVALID_HANDLE_VALUE)
+        return NULL;
+    return (void *)h;
+
+#endif
+}
+
 void zis_file_close(zis_file_handle_t f) {
 #if ZIS_FS_POSIX
 

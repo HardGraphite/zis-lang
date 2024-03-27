@@ -33,16 +33,18 @@ bool zis_func_obj_meta_conv(
 static struct zis_func_obj *func_obj_alloc(
     struct zis_context *z, size_t bytecode_len
 ) {
+    const enum zis_objmem_alloc_type alloc_type =
+        bytecode_len ? ZIS_OBJMEM_ALLOC_NOMV : ZIS_OBJMEM_ALLOC_SURV;
     struct zis_func_obj *const self = zis_object_cast(
         zis_objmem_alloc_ex(
-            z, ZIS_OBJMEM_ALLOC_SURV, z->globals->type_Function,
+            z, alloc_type, z->globals->type_Function,
             0U, FUN_OBJ_BYTES_FIXED_SIZE + sizeof(zis_func_obj_bytecode_word_t) * bytecode_len
         ),
         struct zis_func_obj
     );
-    self->_symbols = z->globals->val_empty_array_slots;
-    self->_constants = z->globals->val_empty_array_slots;
-    self->_module = z->globals->val_common_top_module;
+    struct zis_context_globals *g = z->globals;
+    zis_func_obj_set_resources(self, g->val_empty_array_slots, g->val_empty_array_slots);
+    self->_module = g->val_mod_unnamed;
     return self;
 }
 
@@ -61,7 +63,7 @@ struct zis_func_obj *zis_func_obj_new_bytecode(
     struct zis_func_obj_meta meta,
     const zis_func_obj_bytecode_word_t *code, size_t code_len
 ) {
-    struct zis_func_obj *const self = func_obj_alloc(z, 0);
+    struct zis_func_obj *const self = func_obj_alloc(z, code_len);
     self->meta = meta;
     self->native = NULL;
     const size_t code_sz = code_len * sizeof code[0];
@@ -70,14 +72,33 @@ struct zis_func_obj *zis_func_obj_new_bytecode(
     return self;
 }
 
+void zis_func_obj_set_resources(
+    struct zis_func_obj *self,
+    struct zis_array_slots_obj *symbols /*=NULL*/, struct zis_array_slots_obj *constants /*=NULL*/
+) {
+    if (symbols) {
+        self->_symbols = symbols;
+        zis_object_write_barrier(self, symbols);
+    }
+    if (constants) {
+        self->_constants = constants;
+        zis_object_write_barrier(self, constants);
+    }
+}
+
 void zis_func_obj_set_module(
     struct zis_context *z,
     struct zis_func_obj *self, struct zis_module_obj *mod
 ) {
     zis_unused_var(z);
-    assert(self->_module == z->globals->val_common_top_module);
+    assert(self->_module == z->globals->val_mod_unnamed);
     self->_module = mod;
     zis_object_assert_no_write_barrier_2(self, zis_object_from(mod));
+}
+
+size_t zis_func_obj_bytecode_length(const struct zis_func_obj *self) {
+    assert(self->_bytes_size >= FUN_OBJ_BYTES_FIXED_SIZE);
+    return (self->_bytes_size - FUN_OBJ_BYTES_FIXED_SIZE) / sizeof(zis_func_obj_bytecode_word_t);
 }
 
 ZIS_NATIVE_TYPE_DEF_XB(

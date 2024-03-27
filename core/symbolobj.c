@@ -234,6 +234,30 @@ struct zis_symbol_obj *zis_symbol_registry_get(
     return sym;
 }
 
+struct zis_symbol_obj *zis_symbol_registry_get2(
+    struct zis_context *z,
+    const char *s1, size_t n1 /* = -1 */, const char *s2, size_t n2 /* = -1 */
+) {
+    if (zis_unlikely(n1 == (size_t)-1))
+        n1 = strlen(s1);
+    if (zis_unlikely(n2 == (size_t)-1))
+        n2 = strlen(s2);
+    const size_t n = n1 + n2;
+    if (n <= 64) {
+        char buffer[64];
+        assert(n <= sizeof buffer);
+        memcpy(buffer, s1, n1);
+        memcpy(buffer + n1, s2, n2);
+        return zis_symbol_registry_get(z, buffer, n);
+    }
+    char *s = zis_mem_alloc(n);
+    memcpy(s, s1, n1);
+    memcpy(s + n1, s2, n2);
+    struct zis_symbol_obj *sym = zis_symbol_registry_get(z, s, n);
+    zis_mem_free(s);
+    return sym;
+}
+
 struct zis_symbol_obj *zis_symbol_registry_find(
     struct zis_context *z, const char *s, size_t n /* = -1 */
 ) {

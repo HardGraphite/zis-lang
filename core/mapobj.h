@@ -3,7 +3,6 @@
 #pragma once
 
 #include "attributes.h"
-#include "compat.h"
 #include "object.h"
 #include "objmem.h" // zis_object_write_barrier()
 
@@ -30,13 +29,6 @@ struct zis_hashmap_bucket_node_obj {
 
 #define zis_hashmap_bucket_node_obj_is_null(node_obj) \
     ((node_obj) == zis_hashmap_bucket_node_obj_null())
-
-/// Create a hashmap bucket node.
-/// R = { [0] = key, [1] = value }.
-struct zis_hashmap_bucket_node_obj *zis_hashmap_bucket_node_obj_new_r(
-    struct zis_context *z,
-    struct zis_object *regs[ZIS_PARAMARRAY_STATIC 2], size_t key_hash
-);
 
 /* ----- hashmap bucket operations ------------------------------------------ */
 
@@ -85,10 +77,8 @@ struct zis_map_obj {
 };
 
 /// Create an empty `Map`. Assign `load_factor = 0.0f` to use default load factor.
-/// R = { [0] = out_map }.
-struct zis_map_obj *zis_map_obj_new_r(
+struct zis_map_obj *zis_map_obj_new(
     struct zis_context *z,
-    struct zis_object *regs[ZIS_PARAMARRAY_STATIC 1],
     float load_factor, size_t reserve
 );
 
@@ -98,44 +88,40 @@ zis_static_force_inline size_t zis_map_obj_length(const struct zis_map_obj *self
 }
 
 /// Rehash.
-/// R = { [0] = map, [1] = tmp, [2] = tmp2, [3] = tmp3 }.
-void zis_map_obj_rehash_r(
+void zis_map_obj_rehash(
     struct zis_context *z,
-    struct zis_object *regs[ZIS_PARAMARRAY_STATIC 4], size_t n_buckets
+    struct zis_map_obj *self, size_t n_buckets
 );
 
 /// Reserve buckets for more elements.
-/// R = { [0] = map, [1] = tmp, [2] = tmp2, [3] = tmp3 }.
-void zis_map_obj_reserve_r(
+void zis_map_obj_reserve(
     struct zis_context *z,
-    struct zis_object *regs[ZIS_PARAMARRAY_STATIC 4], size_t n
+    struct zis_map_obj *self, size_t n
 );
 
 /// Delete all elements.
 void zis_map_obj_clear(struct zis_map_obj *self);
 
-/// Get value in the map by key.
-/// R = { [0] = map / out_value, [1] = key }.
+/// Get value in the map by key. `out_value` is optional.
 /// Returns `ZIS_OK`, `ZIS_THR` (throw REG-0), or `ZIS_E_ARG` (not found).
-int zis_map_obj_get_r(
+int zis_map_obj_get(
     struct zis_context *z,
-    struct zis_object *regs[ZIS_PARAMARRAY_STATIC 2]
+    struct zis_map_obj *self, struct zis_object *key,
+    struct zis_object ** out_value /* = NULL */
 );
 
 /// Add or update value in the map by key.
-/// R = { [0] = map, [1] = key, [2] = value, [3] = tmp }.
 /// Returns `ZIS_OK` or `ZIS_THR` (throw REG-0).
-int zis_map_obj_set_r(
+int zis_map_obj_set(
     struct zis_context *z,
-    struct zis_object *regs[ZIS_PARAMARRAY_STATIC 4]
+    struct zis_map_obj *self, struct zis_object *key, struct zis_object *value
 );
 
 /// Delete an element in the map.
-/// R = { [0] = map, [1] = key, [2] = tmp }.
 /// Returns `ZIS_OK`, `ZIS_THR` (throw REG-0), or `ZIS_E_ARG` (not found).
-int zis_map_obj_unset_r(
+int zis_map_obj_unset(
     struct zis_context *z,
-    struct zis_object *regs[ZIS_PARAMARRAY_STATIC 3]
+    struct zis_map_obj *self, struct zis_object *key
 );
 
 /// Get value by a symbol key. Return NULL if not found.
@@ -148,4 +134,10 @@ struct zis_object *zis_map_obj_sym_get(
 void zis_map_obj_sym_set(
     struct zis_context *z, struct zis_map_obj *self,
     struct zis_symbol_obj *key, struct zis_object *value
+);
+
+/// Visit each key-value pair.
+int zis_map_obj_foreach(
+    struct zis_context *z, struct zis_map_obj *self,
+    int (*fn)(struct zis_object *key, struct zis_object *val, void *arg), void *fn_arg
 );

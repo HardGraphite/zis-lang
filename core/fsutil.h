@@ -183,6 +183,13 @@ typedef void *zis_file_handle_t;
 /// Open a file.
 zis_nodiscard zis_file_handle_t zis_file_open(const zis_path_char_t *path, int mode);
 
+#define ZIS_FILE_STDIN   0
+#define ZIS_FILE_STDOUT  1
+#define ZIS_FILE_STDERR  2
+
+/// Get stdin/stdout/stderr. See `ZIS_FILE_STD*`
+zis_file_handle_t zis_file_stdio(int file_std_xxx);
+
 /// Close a file.
 void zis_file_close(zis_file_handle_t f);
 

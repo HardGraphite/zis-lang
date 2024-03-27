@@ -2,6 +2,10 @@
 ##### Options and configurations #####
 ######################################
 
+option(ZIS_FEATURE_ASM       "Enable the assembly code support."             ON)
+option(ZIS_FEATURE_DIS       "Enable the disassembling support."             ON)
+option(ZIS_FEATURE_SRC       "Enable the source code support."               ON)
+
 set(ZIS_MALLOC_INCLUDE "" CACHE FILEPATH
     "Path to a file to include, which defines malloc(), realloc(), and free().")
 set(ZIS_MALLOC_LINK "" CACHE FILEPATH
@@ -10,7 +14,7 @@ set(ZIS_MALLOC_LINK "" CACHE FILEPATH
 set(ZIS_FILENAME_EXTENSION_SRC ".zis" CACHE STRING "File name extension for source code.")
 set(ZIS_FILENAME_EXTENSION_NDL ".zso" CACHE STRING "File name extension for native dynamic libraries.")
 set(ZIS_FILENAME_EXTENSION_BYT ".zsc" CACHE STRING "File name extension for bytecode dumps.")
-set(ZIS_FILENAME_EXTENSION_ASM ".zsa" CACHE STRING "File name extension for assembly code.")
+set(ZIS_FILENAME_EXTENSION_ASM ".zss" CACHE STRING "File name extension for assembly code.")
 
 string(TOUPPER ${ZIS_OUTPUT_NAME} zis_name_upper)
 set(ZIS_ENVIRON_NAME_PATH "${zis_name_upper}_PATH" CACHE STRING
@@ -21,6 +25,8 @@ set(ZIS_ENVIRON_NAME_DEBUG_LOG "${zis_name_upper}_DEBUG_LOG" CACHE STRING
     "Environment variable name for debug logging configuration. Optional.")
 unset(zis_name_upper)
 
+set(ZIS_BUILD_EXTRA_INFO "" CACHE STRING "Extra build information. See `zis_build_info`.")
+
 ##########################
 ##### Generate files #####
 ##########################
@@ -28,11 +34,31 @@ unset(zis_name_upper)
 set(zis_core_conf_header_dir "${CMAKE_CURRENT_BINARY_DIR}")
 set(zis_core_conf_header_dir ${zis_core_conf_header_dir} PARENT_SCOPE)
 
+# Compiler info.
+if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
+    set(ZIS_BUILD_COMPILER_INFO "GCC")
+else()
+    set(ZIS_BUILD_COMPILER_INFO ${CMAKE_C_COMPILER_ID})
+endif()
+set(ZIS_BUILD_COMPILER_INFO "${ZIS_BUILD_COMPILER_INFO} ${CMAKE_C_COMPILER_VERSION}")
+# Build timestamp.
+string(TIMESTAMP ZIS_BUILD_TIMESTAMP "%s" UTC)
+# Extra info.
+if(ZIS_BUILD_EXTRA_INFO)
+    set(ZIS_BUILD_EXTRA_INFO_STR "${ZIS_BUILD_EXTRA_INFO}")
+    string(REPLACE "\\" "\\\\" ZIS_BUILD_EXTRA_INFO_STR "${ZIS_BUILD_EXTRA_INFO_STR}")
+    string(REPLACE "\"" "\\\"" ZIS_BUILD_EXTRA_INFO_STR "${ZIS_BUILD_EXTRA_INFO_STR}")
+    set(ZIS_BUILD_EXTRA_INFO_STR "\"${ZIS_BUILD_EXTRA_INFO_STR}\"")
+endif()
+
 file(CONFIGURE OUTPUT "${zis_core_conf_header_dir}/zis_config.h" @ONLY CONTENT [==[
 #pragma once
 #define         ZIS_VERSION_MAJOR   @ZIS_VERSION_MAJOR@
 #define         ZIS_VERSION_MINOR   @ZIS_VERSION_MINOR@
 #define         ZIS_VERSION_PATCH   @ZIS_VERSION_PATCH@
+#define         ZIS_BUILD_COMPILER_INFO    "@ZIS_BUILD_COMPILER_INFO@"
+#define         ZIS_BUILD_TIMESTAMP        (@ZIS_BUILD_TIMESTAMP@ / 60)
+#cmakedefine    ZIS_BUILD_EXTRA_INFO       @ZIS_BUILD_EXTRA_INFO_STR@
 #define         ZIS_FILENAME_EXTENSION_SRC "@ZIS_FILENAME_EXTENSION_SRC@"
 #define         ZIS_FILENAME_EXTENSION_NDL "@ZIS_FILENAME_EXTENSION_NDL@"
 #define         ZIS_FILENAME_EXTENSION_BYT "@ZIS_FILENAME_EXTENSION_BYT@"
@@ -42,9 +68,32 @@ file(CONFIGURE OUTPUT "${zis_core_conf_header_dir}/zis_config.h" @ONLY CONTENT [
 #cmakedefine    ZIS_ENVIRON_NAME_DEBUG_LOG "@ZIS_ENVIRON_NAME_DEBUG_LOG@"
 #cmakedefine    ZIS_DISPLAY_NAME    "@ZIS_DISPLAY_NAME@"
 #cmakedefine    ZIS_MALLOC_INCLUDE  "@ZIS_MALLOC_INCLUDE@"
+#cmakedefine01  ZIS_USE_COMPUTED_GOTO
 #cmakedefine01  ZIS_DEBUG
 #cmakedefine01  ZIS_DEBUG_LOGGING
+#cmakedefine01  ZIS_DEBUG_DUMPBT
+#cmakedefine01  ZIS_FEATURE_ASM
+#cmakedefine01  ZIS_FEATURE_DIS
+#cmakedefine01  ZIS_FEATURE_SRC
 ]==])
+
+add_custom_command(
+    OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/astdef.h"
+    COMMAND ${CMAKE_COMMAND} -P "astdef.cmake"
+    MAIN_DEPENDENCY "astdef.txt"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Updating astdef.h"
+    VERBATIM
+)
+
+add_custom_command(
+    OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/oplist.h"
+    COMMAND ${CMAKE_COMMAND} -P "oplist.cmake"
+    MAIN_DEPENDENCY "oplist.txt"
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    COMMENT "Updating oplist.h"
+    VERBATIM
+)
 
 ################################
 ##### Collect source files #####
@@ -80,6 +129,8 @@ else()
     set(zis_core_tgt zis_core_static)
 endif()
 set(zis_core_tgt ${zis_core_tgt} PARENT_SCOPE)
+# Extra dependencies.
+target_sources(${zis_core_tgt} PRIVATE "astdef.h" "oplist.h")
 # Output name and prefix.
 set_target_properties(${zis_core_tgt} PROPERTIES OUTPUT_NAME "${ZIS_OUTPUT_NAME}")
 get_target_property(prefix ${zis_core_tgt} PREFIX)

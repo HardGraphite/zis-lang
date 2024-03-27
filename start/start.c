@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "cliutil.h"
 #include "zis_config.h"
@@ -47,10 +48,22 @@ static void oh_help(struct clopts_context *ctx, const char *arg, void *_data) {
 
 static void oh_version(struct clopts_context *ctx, const char *arg, void *_data) {
     assert(!arg), (void)arg, (void)_data;
+    FILE *const stream = stdout;
+
+    char time_str[32];
+    const time_t timestamp = (time_t)zis_build_info.timestamp * 60;
+    strftime(time_str, sizeof time_str, "%F %R %z", localtime(&timestamp));
+
     fprintf(
-        stdout, ZIS_DISPLAY_NAME " %u.%u.%u\n",
-        zis_version[0], zis_version[1], zis_version[2]
+        stream, ZIS_DISPLAY_NAME " %u.%u.%u\n" "[%s %s; %s; %s]\n",
+        zis_build_info.version[0], zis_build_info.version[1], zis_build_info.version[2],
+        zis_build_info.system, zis_build_info.machine, zis_build_info.compiler, time_str
     );
+    if (zis_build_info.extra) {
+        fputc('\n', stream);
+        fputs(zis_build_info.extra, stream);
+        fputc('\n', stream);
+    }
     clopts_handler_break(ctx);
 }
 
@@ -66,12 +79,12 @@ static void rest_args_handler(
 
 static const struct clopts_option program_options[] = {
     {'h', NULL, oh_help, "Print help message and exit."},
-    {'v', NULL, oh_version, "Print version and exit."},
+    {'v', NULL, oh_version, "Print version and build information, and exit."},
     {0, 0, 0, 0},
 };
 
 static const struct clopts_program program = {
-    .usage_args = "[OPTION...] [FILE|@MODULE [ARGUMENT...]]",
+    .usage_args = "[OPTION...] [[--] -|FILE|@MODULE [ARGUMENT...]]",
     .options = program_options,
     .rest_args = rest_args_handler,
 };
@@ -93,7 +106,11 @@ static int start(zis_t z, void *_args) {
     if (args->rest_args_num) {
         const char *module = args->rest_args[0];
         int imp_flags = ZIS_IMP_MAIN;
-        if (module[0] == '@') {
+        if (module[0] == '-' && !module[1]) {
+            zis_make_stream(z, 0, ZIS_IOS_STDX, 0); // stdin
+            module = NULL;
+            imp_flags |= ZIS_IMP_CODE;
+        } else if (module[0] == '@') {
             module++;
             imp_flags |= ZIS_IMP_NAME;
         } else {
@@ -102,11 +119,9 @@ static int start(zis_t z, void *_args) {
         zis_make_int(z, 1, (int64_t)args->rest_args_num);
         zis_make_int(z, 2, (intptr_t)args->rest_args);
         if (zis_import(z, 0, module, imp_flags) == ZIS_THR) {
-            char msg[64];
-            size_t msg_sz = sizeof msg;
-            zis_read_exception(z, 0, 0, 0, 0);
-            if (zis_read_string(z, 0, msg, &msg_sz) == ZIS_OK)
-                fprintf(stderr, ZIS_DISPLAY_NAME ": error: %.*s\n", (int)msg_sz, msg);
+            zis_move_local(z, 1, 0);
+            zis_make_stream(z, 2, ZIS_IOS_STDX, 2); // stderr
+            zis_read_exception(z, 1, ZIS_RDE_DUMP, 2);
             exit_status = EXIT_FAILURE;
         }
     }

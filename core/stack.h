@@ -15,7 +15,8 @@ struct zis_object;
 struct zis_callstack_frame_info {
     struct zis_object **frame_top; // excluding temp registers
     struct zis_object **prev_frame;
-    void               *return_ip;
+    void               *caller_ip;
+    struct zis_object **ret_val_reg;
     struct zis_callstack_frame_info *_next_node;
 };
 
@@ -76,7 +77,7 @@ zis_nodiscard struct zis_callstack *zis_callstack_create(struct zis_context *z, 
 void zis_callstack_destroy(struct zis_callstack *cs, struct zis_context *z);
 
 /// Push a new frame.
-void zis_callstack_enter(struct zis_callstack *cs, size_t frame_size, void *return_ip);
+void zis_callstack_enter(struct zis_callstack *cs, size_t frame_size, void *caller_ip, struct zis_object **ret_val_reg);
 
 /// Pop the current frame.
 void zis_callstack_leave(struct zis_callstack *cs);

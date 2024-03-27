@@ -116,15 +116,68 @@ static void do_test_int64(zis_t z, int64_t v) {
     zis_test_assert_eq(value, v);
 }
 
+static void do_test_int_str(zis_t z, int64_t v) {
+    int status;
+    int64_t value;
+    char buf_v[80], buf_out[80];
+    size_t buf_out_sz;
+    zis_test_log(ZIS_TEST_LOG_TRACE, "v=%" PRIi64, v);
+    snprintf(buf_v, sizeof buf_v, "%" PRIi64, v);
+    status = zis_make_int_s(z, 0, buf_v, (size_t)-1, 10);
+    zis_test_assert_eq(status, ZIS_OK);
+    buf_out_sz = sizeof buf_out;
+    status = zis_read_int_s(z, 0, buf_out, &buf_out_sz, 10);
+    zis_test_assert_eq(status, ZIS_OK);
+    buf_out[buf_out_sz] = 0;
+    zis_test_assert_eq(sscanf(buf_out, "%" SCNi64, &value), 1);
+    zis_test_assert_eq(value, v);
+    zis_test_assert_eq(strcmp(buf_out, buf_v), 0);
+}
+
+static void do_test_int_str_2(zis_t z, const char *s, int base) {
+    int status;
+    char buf_out[128];
+    size_t buf_out_sz;
+    zis_test_log(ZIS_TEST_LOG_TRACE, "v=%s,base=%i", s, base);
+    status = zis_make_int_s(z, 0, s, (size_t)-1, base);
+    zis_test_assert_eq(status, ZIS_OK);
+    buf_out_sz = sizeof buf_out;
+    status = zis_read_int_s(z, 0, buf_out, &buf_out_sz, base);
+    zis_test_assert_eq(status, ZIS_OK);
+    buf_out[buf_out_sz] = 0;
+    zis_test_assert_eq(strcmp(buf_out, s), 0);
+}
+
+static void do_test_int_str_3(zis_t z, const char *s, int base, int64_t val) {
+    int status;
+    int64_t val_out;
+    zis_test_log(ZIS_TEST_LOG_TRACE, "v=%s/%" PRIi64 ",base=%i", s, val, base);
+    status = zis_make_int_s(z, 0, s, (size_t)-1, base);
+    zis_test_assert_eq(status, ZIS_OK);
+    status = zis_read_int(z, 0, &val_out);
+    zis_test_assert_eq(status, ZIS_OK);
+    zis_test_assert_eq(val, val_out);
+}
+
 zis_test_define(test_int, z) {
-    for (int64_t i = INT8_MIN; i <= INT8_MAX; i++)
+    for (int64_t i = INT8_MIN; i <= INT8_MAX; i++) {
         do_test_int64(z, i);
-    for (int64_t i = ZIS_SMALLINT_MIN - 5; i <= ZIS_SMALLINT_MIN + 5; i++)
+        do_test_int_str(z, i);
+    }
+    for (int64_t i = ZIS_SMALLINT_MIN - 5; i <= ZIS_SMALLINT_MIN + 5; i++) {
         do_test_int64(z, i);
-    for (int64_t i = ZIS_SMALLINT_MAX - 5; i <= ZIS_SMALLINT_MAX + 5; i++)
+        do_test_int_str(z, i);
+    }
+    for (int64_t i = ZIS_SMALLINT_MAX - 5; i <= ZIS_SMALLINT_MAX + 5; i++) {
         do_test_int64(z, i);
-    do_test_int64(z, INT64_MIN);
+        do_test_int_str(z, i);
+    }
+    do_test_int64(z, INT64_MIN + 1);
     do_test_int64(z, INT64_MAX);
+    do_test_int_str_2(z, "10000000000000000000000000000000000000000000000", 10);
+    do_test_int_str_2(z, "1234567890qwertyuiopasdfghjklzxcbnm", 36);
+    do_test_int_str_3(z, "-1_2_3", 10, -123);
+    do_test_int_str_3(z, "ff_ff", 16, 0xffff);
 }
 
 static void do_test_float(zis_t z, double v) {
@@ -259,9 +312,8 @@ zis_test_define(test_exception, z) {
     status = zis_make_exception(z, 0, type, 0, "%s", what);
     zis_test_assert_eq(status, ZIS_OK);
 
-    status = zis_read_exception(z, 0, 1, 2, 3);
+    status = zis_read_exception(z, 0, ZIS_RDE_TYPE, 1);
     zis_test_assert_eq(status, ZIS_OK);
-
     size = sizeof buffer;
     status = zis_read_symbol(z, 1, buffer, &size);
     zis_test_assert_eq(status, ZIS_OK);
@@ -269,11 +321,15 @@ zis_test_define(test_exception, z) {
     zis_test_assert_eq(size, type_strlen);
     zis_test_assert_eq(memcmp(buffer, type, type_strlen), 0);
 
+    status = zis_read_exception(z, 0, ZIS_RDE_DATA, 2);
+    zis_test_assert_eq(status, ZIS_OK);
     v_bool = false;
     status = zis_read_bool(z, 2, &v_bool);
     zis_test_assert_eq(status, ZIS_OK);
     zis_test_assert_eq(v_bool, true);
 
+    status = zis_read_exception(z, 0, ZIS_RDE_WHAT, 3);
+    zis_test_assert_eq(status, ZIS_OK);
     size = sizeof buffer;
     status = zis_read_string(z, 3, buffer, &size);
     zis_test_assert_eq(status, ZIS_OK);
@@ -294,7 +350,7 @@ zis_test_define(test_file_stream, z) {
         return;
     }
 
-    status = zis_make_stream(z, 1, ZIS_STREAM_FILE | ZIS_STREAM_RDONLY, this_file, "UTF-8");
+    status = zis_make_stream(z, 1, ZIS_IOS_FILE | ZIS_IOS_RDONLY, this_file, "UTF-8");
     zis_test_assert_eq(status, ZIS_OK);
 
     fclose(fp);
@@ -546,9 +602,8 @@ static void do_test_function__check_exception(zis_t z, unsigned reg, const char 
     char buffer[128];
     size_t size;
 
-    status = zis_read_exception(z, reg, REG_MAX - 3, REG_MAX - 2, REG_MAX - 1);
+    status = zis_read_exception(z, reg, ZIS_RDE_TYPE, REG_MAX - 3);
     zis_test_assert_eq(status, ZIS_OK);
-
     size = sizeof buffer;
     status = zis_read_symbol(z, REG_MAX - 3, buffer, &size);
     zis_test_assert_eq(status, ZIS_OK);
@@ -556,6 +611,8 @@ static void do_test_function__check_exception(zis_t z, unsigned reg, const char 
     zis_test_assert_eq(size, type_strlen);
     zis_test_assert_eq(memcmp(buffer, type, type_strlen), 0);
 
+    status = zis_read_exception(z, reg, ZIS_RDE_WHAT, REG_MAX - 1);
+    zis_test_assert_eq(status, ZIS_OK);
     size = sizeof buffer;
     status = zis_read_string(z, REG_MAX - 1, buffer, &size);
     zis_test_assert_eq(status, ZIS_OK);

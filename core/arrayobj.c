@@ -2,9 +2,9 @@
 
 #include "context.h"
 #include "globals.h"
+#include "locals.h"
 #include "ndefutil.h"
 #include "objmem.h"
-#include "stack.h"
 
 /* ----- array slots -------------------------------------------------------- */
 
@@ -31,7 +31,7 @@ struct zis_array_slots_obj *zis_array_slots_obj_new(
 
     if (v) {
         zis_object_vec_copy(self->_data, v, n);
-        zis_object_assert_no_write_barrier(self);
+        zis_object_write_barrier_n(self, v, n);
     } else {
         zis_object_vec_zero(self->_data, n);
     }
@@ -41,26 +41,26 @@ struct zis_array_slots_obj *zis_array_slots_obj_new(
 
 struct zis_array_slots_obj *zis_array_slots_obj_new2(
     struct zis_context *z, size_t len,
-    struct zis_array_slots_obj *other_slots
+    struct zis_array_slots_obj *_other_slots
 ) {
     if (zis_unlikely(!len))
         return z->globals->val_empty_array_slots;
 
-    struct zis_object **tmp_reg = zis_callstack_frame_alloc_temp(z, 1);
-    tmp_reg[0] = zis_object_from(other_slots); // !!
+    zis_locals_decl_1(z, var, struct zis_array_slots_obj *other_slots);
+    var.other_slots = _other_slots;
+
     struct zis_array_slots_obj *const self = array_slots_obj_alloc(z, len);
     assert(zis_array_slots_obj_length(self) == len);
-    other_slots = zis_object_cast(tmp_reg[0], struct zis_array_slots_obj); // !!
-    zis_callstack_frame_free_temp(z, 1);
 
-    struct zis_object **const v = other_slots->_data;
-    size_t n = zis_array_slots_obj_length(other_slots);
+    struct zis_object **const v = var.other_slots->_data;
+    size_t n = zis_array_slots_obj_length(var.other_slots);
     if (n > len)
         n = len;
     zis_object_vec_copy(self->_data, v, n);
-    zis_object_assert_no_write_barrier(self);
+    zis_object_write_barrier_n(self, v, n);
     zis_object_vec_zero(self->_data + n, len - n);
 
+    zis_locals_drop(z, var);
     return self;
 }
 
@@ -88,11 +88,11 @@ struct zis_array_obj *zis_array_obj_new(
     zis_object_assert_no_write_barrier(self);
     self->length = n;
     if (n) {
-        struct zis_object **tmp_reg = zis_callstack_frame_alloc_temp(z, 1);
-        tmp_reg[0] = zis_object_from(self); // !!
+        zis_locals_decl_1(z, var, struct zis_array_obj *self);
+        var.self = self;
         struct zis_array_slots_obj *const data = zis_array_slots_obj_new(z, v, n);
-        self = zis_object_cast(tmp_reg[0], struct zis_array_obj); // !!
-        zis_callstack_frame_free_temp(z, 1);
+        self = var.self;
+        zis_locals_drop(z, var);
         self->_data = data;
         zis_object_assert_no_write_barrier(self);
     }
@@ -113,8 +113,8 @@ struct zis_array_obj *zis_array_obj_new2(
     if (reserve < n)
         reserve = n;
     if (reserve) {
-        struct zis_object **tmp_reg = zis_callstack_frame_alloc_temp(z, 1);
-        tmp_reg[0] = zis_object_from(self); // !!
+        zis_locals_decl_1(z, var, struct zis_array_obj *self);
+        var.self = self;
         struct zis_array_slots_obj *data;
         if (v) {
             data = array_slots_obj_alloc(z, reserve);
@@ -123,12 +123,17 @@ struct zis_array_obj *zis_array_obj_new2(
         } else {
             data = zis_array_slots_obj_new(z, NULL, n);
         }
-        self = zis_object_cast(tmp_reg[0], struct zis_array_obj); // !!
-        zis_callstack_frame_free_temp(z, 1);
+        self = var.self;
+        zis_locals_drop(z, var);
         self->_data = data;
         zis_object_assert_no_write_barrier(self);
     }
     return self;
+}
+
+void zis_array_obj_clear(struct zis_array_obj *self) {
+    zis_object_vec_zero(self->_data->_data, self->length);
+    self->length = 0;
 }
 
 void zis_array_obj_append(
@@ -142,12 +147,11 @@ void zis_array_obj_append(
     if (zis_unlikely(old_len == old_cap)) {
         const size_t new_cap = old_cap >= 2 ? old_cap * 2 : 4;
 
-        struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 2);
-        tmp_regs[0] = zis_object_from(self), tmp_regs[1] = v; // !!
+        zis_locals_decl(z, var, struct zis_array_obj *self; struct zis_object *v;);
+        var.self = self, var.v = v;
         self_data = zis_array_slots_obj_new2(z, new_cap, self_data);
-        self = zis_object_cast(tmp_regs[0], struct zis_array_obj),
-        v = tmp_regs[1]; // !!
-        zis_callstack_frame_free_temp(z, 2);
+        self = var.self, v = var.v;
+        zis_locals_drop(z, var);
 
         self->_data = self_data;
         zis_object_write_barrier(self, self_data);
@@ -157,29 +161,13 @@ void zis_array_obj_append(
     self->length = old_len + 1;
 }
 
-struct zis_object *zis_array_obj_pop(
-    struct zis_context *z,
-    struct zis_array_obj *self
-) {
+struct zis_object *zis_array_obj_pop(struct zis_array_obj *self) {
     struct zis_array_slots_obj *self_data = self->_data;
-    const size_t old_cap = zis_array_slots_obj_length(self_data);
     const size_t old_len = self->length;
+    assert(old_len <= zis_array_slots_obj_length(self_data));
 
     if (zis_unlikely(!old_len))
         return NULL; // empty
-
-    if (zis_unlikely(old_len <= old_cap / 2 && old_len >= 16)) {
-        const size_t new_cap = old_len;
-
-        struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 1);
-        tmp_regs[0] = zis_object_from(self); // !!
-        self_data = zis_array_slots_obj_new2(z, new_cap, self_data);
-        self = zis_object_cast(tmp_regs[0], struct zis_array_obj); // !!
-        zis_callstack_frame_free_temp(z, 1);
-
-        self->_data = self_data;
-        zis_object_write_barrier(self, self_data);
-    }
 
     const size_t new_len = old_len - 1;
     self->length = new_len;
@@ -210,18 +198,17 @@ bool zis_array_obj_insert(
     if (zis_unlikely(old_len == old_cap)) {
         const size_t new_cap = old_cap >= 2 ? old_cap * 2 : 4;
 
-        struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 2);
-        tmp_regs[0] = zis_object_from(self), tmp_regs[1] = v; // !!
+        zis_locals_decl(z, var, struct zis_array_obj *self; struct zis_object *v;);
+        var.self = self, var.v = v;
         self_data = array_slots_obj_alloc(z, new_cap);
-        self = zis_object_cast(tmp_regs[0], struct zis_array_obj),
-        v = tmp_regs[1]; // !!
-        zis_callstack_frame_free_temp(z, 2);
+        self = var.self, v = var.v;
+        zis_locals_drop(z, var);
         old_data = self->_data->_data;
 
         self->_data = self_data;
         zis_object_write_barrier(self, self_data);
         zis_object_vec_copy(self_data->_data, old_data, pos);
-        zis_object_assert_no_write_barrier(self_data);
+        zis_object_write_barrier_n(self_data, old_data, pos);
     }
     zis_object_vec_move(self_data->_data + pos + 1, old_data + pos, old_len - pos);
     zis_array_slots_obj_set(self_data, pos, v);
@@ -237,7 +224,7 @@ bool zis_array_obj_remove(
     if (zis_unlikely(!old_len || pos >= old_len))
         return false;
     if (zis_unlikely(pos == old_len - 1)) {
-        zis_array_obj_pop(z, self);
+        zis_array_obj_pop(self);
         return true;
     }
 
@@ -248,17 +235,17 @@ bool zis_array_obj_remove(
     if (zis_unlikely(old_len <= old_cap / 2 && old_len >= 16)) {
         const size_t new_cap = old_len;
 
-        struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, 1);
-        tmp_regs[0] = zis_object_from(self); // !!
+        zis_locals_decl_1(z, var, struct zis_array_obj *self);
+        var.self = self;
         self_data = array_slots_obj_alloc(z, new_cap);
-        self = zis_object_cast(tmp_regs[0], struct zis_array_obj); // !!
-        zis_callstack_frame_free_temp(z, 1);
+        self = var.self;
+        zis_locals_drop(z, var);
         old_data = self->_data->_data;
 
         self->_data = self_data;
         zis_object_write_barrier(self, self_data);
         zis_object_vec_copy(self_data->_data, old_data, pos);
-        zis_object_assert_no_write_barrier(self_data);
+        zis_object_write_barrier_n(self_data, old_data, pos);
     }
     const size_t new_len = old_len - 1;
     zis_object_vec_move(self_data->_data + pos, old_data + pos + 1, new_len - pos);
@@ -367,7 +354,7 @@ bool zis_array_obj_Mx_remove_element(
             if (zis_unlikely(idx == 0))
                 return false;
             if (idx == -1)
-                return zis_array_obj_pop(z, self) ? true : false;
+                return zis_array_obj_pop(self) ? true : false;
             idx = len_smi + idx;
             if (zis_unlikely((size_t)idx >= len))
                 return false;

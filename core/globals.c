@@ -15,14 +15,16 @@
 #include "bytesobj.h"
 #include "moduleobj.h"
 #include "nilobj.h"
+#include "streamobj.h"
 #include "stringobj.h"
 #include "symbolobj.h"
 #include "tupleobj.h"
 #include "typeobj.h"
 
 #define E(NAME)  extern const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR(NAME);
-_ZIS_BUILTIN_TYPE_LIST
-E(Type)
+_ZIS_BUILTIN_TYPE_LIST0
+_ZIS_BUILTIN_TYPE_LIST1
+_ZIS_BUILTIN_TYPE_LIST2
 #undef E
 
 /// Alloc types. See `_zis_type_obj_bootstrap_alloc()`.
@@ -44,21 +46,22 @@ zis_cold_fn static void _init_types_0(
 #define E(NAME) \
     g->type_##NAME = _zis_type_obj_bootstrap_alloc(z, &ZIS_NATIVE_TYPE_VAR(NAME));
 
-    _ZIS_BUILTIN_TYPE_LIST
+    _ZIS_BUILTIN_TYPE_LIST1
+    _ZIS_BUILTIN_TYPE_LIST2
 
 #undef E
 }
 
-/// Initialize type objects. See `_zis_type_obj_bootstrap_init_r()`.
+/// Initialize type objects. See `_zis_type_obj_bootstrap_init()`.
 zis_cold_fn static void _init_types_1(
-    struct zis_context_globals *g, struct zis_context *z,
-    struct zis_object *tmp_regs[ZIS_PARAMARRAY_STATIC 2]
+    struct zis_context_globals *g, struct zis_context *z
 ) {
 #define E(NAME) \
-    _zis_type_obj_bootstrap_init_r(z, g->type_##NAME, tmp_regs);
+    _zis_type_obj_bootstrap_init(z, g->type_##NAME);
 
-    E(Type)
-    _ZIS_BUILTIN_TYPE_LIST
+    _ZIS_BUILTIN_TYPE_LIST0
+    _ZIS_BUILTIN_TYPE_LIST1
+    _ZIS_BUILTIN_TYPE_LIST2
 
 #undef E
 }
@@ -70,8 +73,9 @@ zis_cold_fn static void _init_types_2(
 #define E(NAME) \
     zis_type_obj_load_native_def(z, g->type_##NAME, &ZIS_NATIVE_TYPE_VAR(NAME));
 
-    E(Type)
-    _ZIS_BUILTIN_TYPE_LIST
+    _ZIS_BUILTIN_TYPE_LIST0
+    _ZIS_BUILTIN_TYPE_LIST1
+    _ZIS_BUILTIN_TYPE_LIST2
 
 #undef E
 }
@@ -91,10 +95,26 @@ zis_cold_fn static void _init_values_0(
 
 /// Initialize the rest values.
 zis_cold_fn static void _init_values_1(
-    struct zis_context_globals *g, struct zis_context *z,
-    struct zis_object *tmp_regs[ZIS_PARAMARRAY_STATIC 3]
+    struct zis_context_globals *g, struct zis_context *z
 ) {
-    g->val_common_top_module = zis_module_obj_new_r(z, tmp_regs);
+    g->val_mod_prelude = zis_module_obj_new(z, false);
+    g->val_mod_unnamed = zis_module_obj_new(z, true);
+
+    const int stdio_common_flags = ZIS_STREAM_OBJ_TEXT | ZIS_STREAM_OBJ_UTF8;
+    g->val_stream_stdin = zis_stream_obj_new_file_native(
+        z, zis_file_stdio(ZIS_FILE_STDIN), stdio_common_flags | ZIS_STREAM_OBJ_MODE_IN
+    );
+    g->val_stream_stdout = zis_stream_obj_new_file_native(
+        z, zis_file_stdio(ZIS_FILE_STDOUT), stdio_common_flags | ZIS_STREAM_OBJ_MODE_OUT
+    );
+    g->val_stream_stderr = zis_stream_obj_new_file_native(
+        z, zis_file_stdio(ZIS_FILE_STDERR), stdio_common_flags | ZIS_STREAM_OBJ_MODE_OUT
+    );
+
+#if ZIS_FEATURE_SRC
+    // NOTE: Leave it uninitialized. Shall be initialized by a lexer lazily.
+    assert(zis_object_is_smallint(zis_object_from(g->val_lexer_keywords)));
+#endif // ZIS_FEATURE_SRC
 }
 
 /// Initialize symbols.
@@ -112,8 +132,6 @@ zis_cold_fn static void _init_symbols(
 
 /// Do initialization.
 zis_cold_fn static void globals_init(struct zis_context_globals *g, struct zis_context *z) {
-    const size_t tmp_regs_num = 3;
-    struct zis_object **tmp_regs = zis_callstack_frame_alloc_temp(z, tmp_regs_num);
     assert(!z->globals);
     z->globals = g;
 
@@ -126,11 +144,11 @@ zis_cold_fn static void globals_init(struct zis_context_globals *g, struct zis_c
     _init_values_0(g, z);
 
     // ## 3. Initialize type objects. They are complete now.
-    _init_types_1(g, z, tmp_regs);
+    _init_types_1(g, z);
 
     // ## 4. Create the rest global values. Some of them will be used when
     // loading type definitions of the type objects.
-    _init_values_1(g, z, tmp_regs);
+    _init_values_1(g, z);
 
     // ## 5. Load type definitions of the type objects.
     _init_types_2(g, z);
@@ -139,7 +157,6 @@ zis_cold_fn static void globals_init(struct zis_context_globals *g, struct zis_c
     _init_symbols(g, z);
 
     z->globals = NULL;
-    zis_callstack_frame_free_temp(z, tmp_regs_num);
 }
 
 /// GC visitor. See `zis_objmem_object_visitor_t`.

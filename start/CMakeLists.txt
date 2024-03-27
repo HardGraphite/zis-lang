@@ -50,11 +50,8 @@ endif()
 include(ZisInstallDirs)
 
 ### RPATH.
-if(DEFINED zis_start_shared AND ZIS_PACK_RELA_RPATH AND UNIX)
-    set_target_properties(
-        zis_start_shared PROPERTIES INSTALL_RPATH
-        "$<IF:$<PLATFORM_ID:Darwin>,@executable_path,$ORIGIN>/../${zis_install_lib_dir}"
-    )
+if(ZIS_PACK_RELA_RPATH AND TARGET zis_start_shared)
+    zis_install_set_rela_rpath(zis_start_shared ${zis_install_exe_dir} ${zis_install_lib_dir})
 endif()
 
 ### Install rules.

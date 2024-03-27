@@ -22,7 +22,7 @@ indent_size = 4
 
 [*.md]
 indent_style = space
-indent_size = 2
+indent_size = 4
 
 [*.svg]
 indent_style = space

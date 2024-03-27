@@ -3,13 +3,42 @@
 #include "context.h"
 #include "fsutil.h"
 #include "globals.h"
+#include "memory.h"
 #include "ndefutil.h"
 #include "objmem.h"
-#include "stack.h"
 #include "strutil.h"
 
 #include "exceptobj.h"
 #include "pathobj.h"
+#include "stringobj.h"
+
+/* ----- stream backend: none ----------------------------------------------- */
+
+static intptr_t sop_none_seek(void *_data, intptr_t offset, int whence) {
+    zis_unused_var(_data), zis_unused_var(offset), zis_unused_var(whence);
+    return 0;
+}
+
+static size_t sop_none_read(void *_data, char *restrict buffer, size_t size) {
+    zis_unused_var(_data), zis_unused_var(buffer), zis_unused_var(size);
+    return 0;
+}
+
+static int sop_none_write(void *_data, const char *restrict data, size_t size) {
+    zis_unused_var(_data), zis_unused_var(data), zis_unused_var(size);
+    return 0;
+}
+
+static void sop_none_close(void *data) {
+    zis_unused_var(data);
+}
+
+static const struct zis_stream_obj_operations sop_none = {
+    .seek  = sop_none_seek,
+    .read  = sop_none_read,
+    .write = sop_none_write,
+    .close = sop_none_close,
+};
 
 /* ----- stream backend: file ----------------------------------------------- */
 
@@ -22,6 +51,79 @@ static const struct zis_stream_obj_operations sop_file = {
     .read  = zis_file_read,
     .write = zis_file_write,
     .close = zis_file_close,
+};
+
+/* ----- stream backend: immutable string ----------------------------------- */
+
+struct sop_str_state {
+    const char *current;
+    const char *data_ptr;
+    const char *data_end;
+    char        _data[];
+};
+
+static void *sop_str_alloc_state(size_t data_size) {
+    struct sop_str_state *state =
+        zis_mem_alloc(sizeof(struct sop_str_state) + data_size);
+    state->data_ptr = state->_data;
+    state->current  = state->data_ptr;
+    state->data_end = state->_data + data_size;
+    return state;
+}
+
+static void sop_str_use_state_for_static_str(
+    struct sop_str_state *restrict state, const char *restrict str, size_t sz
+) {
+    state->data_ptr = str;
+    state->current  = str;
+    state->data_end = str + sz;
+}
+
+static intptr_t sop_str_seek(void *_data, intptr_t offset, int whence) {
+    struct sop_str_state *const restrict state = _data;
+    const char *new_cur;
+    switch (whence) {
+    case SEEK_SET:
+        new_cur = state->data_ptr;
+        break;
+    case SEEK_CUR:
+        new_cur = state->current;
+        break;
+    case SEEK_END:
+        new_cur = state->data_end;
+        break;
+    default:
+        return 0;
+    }
+    new_cur += offset;
+    if (new_cur < state->data_ptr)
+        new_cur = state->data_ptr;
+    else if (new_cur > state->data_end)
+        new_cur = state->data_end;
+    state->current = new_cur;
+    return new_cur - state->data_ptr;
+}
+
+static size_t sop_str_read(void *_data, char *restrict buffer, size_t size) {
+    struct sop_str_state *const state = _data;
+    const size_t rest_size = (size_t)(state->data_end - state->current);
+    if (rest_size < size)
+        size = rest_size;
+    memcpy(buffer, state->current, size);
+    state->current += size;
+    return size;
+}
+
+static void sop_str_close(void *_data) {
+    struct sop_str_state *const state = _data;
+    zis_mem_free(state);
+}
+
+static const struct zis_stream_obj_operations sop_str = {
+    .seek  = sop_str_seek,
+    .read  = sop_str_read,
+    .write = NULL,
+    .close = sop_str_close,
 };
 
 /* ----- stream object ------------------------------------------------------ */
@@ -38,7 +140,7 @@ static void stream_obj_zero(struct zis_stream_obj *self) {
 
 struct zis_stream_obj *zis_stream_obj_new(struct zis_context *z) {
     struct zis_stream_obj *self = zis_object_cast(
-        zis_objmem_alloc_ex(z, ZIS_OBJMEM_ALLOC_HUGE, z->globals->type_Stream, 0, 0),
+        zis_objmem_alloc_ex(z, ZIS_OBJMEM_ALLOC_NOMV, z->globals->type_Stream, 0, 0),
         struct zis_stream_obj
     );
     stream_obj_zero(self);
@@ -84,10 +186,60 @@ struct zis_stream_obj *zis_stream_obj_new_file(
             z, "sys", zis_object_from(path_obj),
             "cannot open this file"
         );
-        z->callstack->frame[0] = zis_object_from(exc);
+        zis_context_set_reg0(z, zis_object_from(exc));
         return NULL;
     }
     zis_stream_obj_bind(self, &sop_file, data, flags);
+    return self;
+}
+
+struct zis_stream_obj *zis_stream_obj_new_file_native(
+    struct zis_context *z,
+    zis_file_handle_t file, int flags
+) {
+    struct zis_stream_obj *self = zis_stream_obj_new(z);
+    zis_stream_obj_bind(self, &sop_file, file, flags);
+    return self;
+}
+
+struct zis_stream_obj *zis_stream_obj_new_str(
+    struct zis_context *z,
+    const char *restrict string, size_t string_size, bool static_string
+) {
+    if (string_size == (size_t)-1)
+        string_size = strlen(string);
+    struct zis_stream_obj *self = zis_stream_obj_new(z);
+    const int flags = ZIS_STREAM_OBJ_MODE_IN | ZIS_STREAM_OBJ_TEXT | ZIS_STREAM_OBJ_UTF8;
+    if (string_size <= ZIS_STREAM_OBJ_BUF_SZ) {
+        struct sop_str_state dummy_state;
+        sop_str_use_state_for_static_str(&dummy_state, string, string_size);
+        zis_stream_obj_bind(self, &sop_str, &dummy_state, flags);
+        zis_stream_obj_peek_char(self);
+        self->_ops = &sop_none, self->_ops_data = NULL;
+    } else {
+        struct sop_str_state *state;
+        if (static_string) {
+            state = sop_str_alloc_state(0);
+            sop_str_use_state_for_static_str(state, string, string_size);
+        } else {
+            state = sop_str_alloc_state(string_size);
+            memcpy(state->_data, string, string_size);
+        }
+        zis_stream_obj_bind(self, &sop_str, state, flags);
+    }
+    return self;
+}
+
+struct zis_stream_obj *zis_stream_obj_new_strob(
+    struct zis_context *z, struct zis_string_obj *str_obj
+) {
+    const size_t data_size = zis_string_obj_value(str_obj, NULL, 0);
+    struct sop_str_state *state = sop_str_alloc_state(data_size);
+    const size_t n = zis_string_obj_value(str_obj, state->_data, data_size);
+    assert(n == data_size), zis_unused_var(n);
+    struct zis_stream_obj *self = zis_stream_obj_new(z);
+    const int flags = ZIS_STREAM_OBJ_MODE_IN | ZIS_STREAM_OBJ_TEXT | ZIS_STREAM_OBJ_UTF8;
+    zis_stream_obj_bind(self, &sop_str, state, flags);
     return self;
 }
 
@@ -196,10 +348,13 @@ static int32_t _stream_obj_peek_char_slow_impl(
                 self->_ops_data, self->_b_buf + rest_size,
                 ZIS_STREAM_OBJ_BUF_SZ - rest_size
             );
-            if (n == (size_t)-1)
+            if (n == (size_t)-1) {
+                if (char_len)
+                    *char_len = 0;
                 return -1;
-            self->_b_cur = self->_b_buf;
+            }
             self->_b_end = self->_b_buf + rest_size + n;
+            self->_b_cur = self->_b_end;
             self->_c_cur = self->_b_buf;
             self->_c_end = self->_b_end;
         } else {
@@ -215,10 +370,10 @@ static int32_t _stream_obj_peek_char_slow_impl(
         self->_c_cur++;
     }
     const size_t n = zis_u8char_to_code(&c, (const zis_char8_t *)self->_c_cur, (const zis_char8_t *)self->_c_end);
-    if (n == 0)
-        return -1; // TODO: use a different status code from IO error.
     if (char_len)
         *char_len = n;
+    if (n == 0)
+        return -1; // TODO: use a different status code from IO error.
     return (int32_t)c;
 }
 
@@ -255,6 +410,81 @@ bool _zis_stream_obj_write_char_slow(struct zis_stream_obj *restrict self, int32
         return false;
     self->_c_cur += n;
     return true;
+}
+
+size_t zis_stream_obj_read_line(
+    struct zis_stream_obj *restrict self, char *restrict buffer, size_t size
+) {
+    // TODO: read the buffer directly instead of reading characters one by one.
+
+    assert(size >= 4);
+    size_t i = 0;
+    while (i < size - 3) {
+        const int32_t c = zis_stream_obj_read_char(self);
+        if (!(c & 0x80)) {
+            buffer[i] = (char)c;
+            i++;
+            if (zis_unlikely(c == '\n'))
+                break;
+        } else {
+            if (zis_unlikely(c == -1))
+                break;
+            zis_char8_t b[4];
+            const size_t n = zis_u8char_from_code(c, b);
+            assert(n);
+            memcpy(buffer, b, n);
+            i += n;
+        }
+    }
+    return i;
+}
+
+bool zis_stream_obj_write_chars(
+    struct zis_stream_obj *restrict self, const char *restrict _str, size_t size
+) {
+    // TODO: write to the buffer directly instead of one by one.
+
+    for (
+        const zis_char8_t *str = (const zis_char8_t *)_str, *const str_end = str + size;
+        str < str_end;
+    ) {
+        zis_wchar_t c;
+        const size_t n = zis_u8char_to_code(&c, str, str_end);
+        if (zis_unlikely(!n))
+            return false;
+        str += n;
+        if (zis_unlikely(!zis_stream_obj_write_char(self, c)))
+            return false;
+    }
+    return true;
+}
+
+char *zis_stream_obj_char_buf_ptr(
+    struct zis_stream_obj *restrict self,
+    size_t move_offset, size_t *restrict rest_size_p
+) {
+    assert_stream_valid(self);
+    assert(zis_stream_obj_flag_text(self));
+    if (self->_c_end == self->_c_cur) {
+        if (zis_stream_obj_flag_readable(self)) {
+            if (zis_stream_obj_peek_char(self) == -1)
+                return NULL;
+        } else {
+            assert(zis_stream_obj_flag_writeable(self));
+            zis_stream_obj_flush_chars(self);
+        }
+    }
+    size_t rest_size = (size_t)(self->_c_end - self->_c_cur);
+    assert(rest_size);
+    if (move_offset) {
+        if (move_offset > rest_size)
+            zis_context_panic(NULL, ZIS_CONTEXT_PANIC_ABORT);
+        self->_c_cur += move_offset;
+        rest_size -= move_offset;
+    }
+    if (rest_size_p)
+        *rest_size_p = rest_size;
+    return self->_c_cur;
 }
 
 ZIS_NATIVE_TYPE_DEF(

@@ -1,0 +1,63 @@
+##
+## Definition of AST nodes.
+##
+
+# Syntax:
+#   <NodeName>  ( <Type1> <field1> , <Type2> <field2> , ... )
+#   # Comment.
+#
+# where <Type#> is:
+#   - Node     ->  struct zis_ast_node_obj *
+#   - Node<?>  ->  struct zis_ast_node_obj *, whose node name is "?"
+#   - Object   ->  struct zis_object *
+#   - Xxx      ->  struct zis_xxx_obj *
+
+Nil            (Object _)
+Bool           (Bool value)
+Constant       (Object value)
+Name           (Symbol value)
+
+Pos            (Node value)
+Neg            (Node value)
+BitNot         (Node value)
+Not            (Node value)
+
+Add            (Node lhs, Node rhs)
+Sub            (Node lhs, Node rhs)
+Mul            (Node lhs, Node rhs)
+Div            (Node lhs, Node rhs)
+Rem            (Node lhs, Node rhs)
+Shl            (Node lhs, Node rhs)
+Shr            (Node lhs, Node rhs)
+BitAnd         (Node lhs, Node rhs)
+BitOr          (Node lhs, Node rhs)
+BitXor         (Node lhs, Node rhs)
+Assign         (Node lhs, Node rhs)
+Eq             (Node lhs, Node rhs)
+Ne             (Node lhs, Node rhs)
+Lt             (Node lhs, Node rhs)
+Le             (Node lhs, Node rhs)
+Gt             (Node lhs, Node rhs)
+Ge             (Node lhs, Node rhs)
+And            (Node lhs, Node rhs)
+Or             (Node lhs, Node rhs)
+Subscript      (Node value, Node key)
+Field          (Node value, Symbol name)
+Call           (Node value, Array args)
+Send           (Node target, Symbol method, Array args)
+
+Tuple          (Array args)
+Array          (Array args)
+Map            (Array args) # args: key1, val1, key2, val2, ...
+
+Import         (Node value)
+Return         (Object value) # value: nil or expr-node
+Throw          (Object value) # value: nil or expr-node
+Break          (Object _)
+Continue       (Object _)
+
+Cond           (Array args) # args: cond1, body1, cond2, body2, ...
+While          (Node cond, Array body)
+Func           (Symbol name, Array args, Array body)
+
+Module         (Object file, Array body)

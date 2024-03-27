@@ -5,44 +5,53 @@ Source code for the runtime core.
 ## Files
 
 + runtime-independent utilities (`*util.*`)
-  - [`algorithm.h`](algorithm.h)
-  - [`attributes.h`](attributes.h)
-  - [`bits.h`](bits.h)
-  - [`compat.h`](compat.h)
-  - [`fsutil.h`](fsutil.h), [`fsutil.c`](fsutil.c)
-  - [`memory.h`](memory.h), [`memory.c`](memory.c)
-  - [`platform.h`](platform.h)
-  - [`strutil.h`](strutil.h), [`strutil.c`](strutil.c)
+    - [`algorithm.h`](algorithm.h)
+    - [`attributes.h`](attributes.h)
+    - [`bits.h`](bits.h)
+    - [`compat.h`](compat.h)
+    - [`fsutil.h`](fsutil.h), [`fsutil.c`](fsutil.c)
+    - [`memory.h`](memory.h), [`memory.c`](memory.c)
+    - [`platform.h`](platform.h)
+    - [`strutil.h`](strutil.h), [`strutil.c`](strutil.c)
 + runtime context
-  - [`api.c`](api.c)
-  - [`context.h`](context.h), [`context.c`](context.c)
-  - [`debug.h`](debug.h), [`debug.c`](debug.c)
-  - [`globals.h`](globals.h), [`globals.c`](globals.c)
-  - [`invoke.h`](invoke.h), [`invoke.c`](invoke.c)
-  - [`loader.h`](loader.h), [`loader.c`](loader.c)
-  - [`stack.h`](stack.h), [`stack.c`](stack.c)
+    - [`api.c`](api.c)
+    - [`context.h`](context.h), [`context.c`](context.c)
+    - [`debug.h`](debug.h), [`debug.c`](debug.c)
+    - [`globals.h`](globals.h), [`globals.c`](globals.c)
+    - [`invoke.h`](invoke.h), [`invoke.c`](invoke.c)
+    - [`loader.h`](loader.h), [`loader.c`](loader.c)
+    - [`stack.h`](stack.h), [`stack.c`](stack.c)
++ bytecode compiler:
+    - [`assembly.h`](assembly.h), [`assembly.c`](assembly.c)
+    - [`ast.h`](ast.h), [`ast.c`](ast.c)
+    - [`codegen.h`](codegen.h), [`codegen.c`](codegen.c)
+    - [`compile.h`](compile.h), [`compile.c`](compile.c)
+    - [`lexer.h`](lexer.h), [`lexer.c`](lexer.c)
+    - [`parser.h`](parser.c), [`parser.c`](parser.c)
+    - [`token.h`](token.h), [`token.c`](token.c)
 + object system support (`obj*.*`)
-  - [`ndefutil.h`](ndefutil.h)
-  - [`object.h`](object.h), [`object.c`](object.c)
-  - [`objmem.h`](objmem.h), [`objmem.c`](objmem.c)
-  - [`smallint.h`](smallint.h)
+    - [`locals.h`](locals.h), [`locals.c`](locals.c)
+    - [`ndefutil.h`](ndefutil.h)
+    - [`object.h`](object.h), [`object.c`](object.c)
+    - [`objmem.h`](objmem.h), [`objmem.c`](objmem.c)
+    - [`smallint.h`](smallint.h)
 + built-in types (`*obj.*`)
-  - [`arrayobj.h`](arrayobj.h), [`arrayobj.c`](arrayobj.c)
-  - [`boolobj.h`](boolobj.h), [`boolobj.c`](boolobj.c)
-  - [`bytesobj.h`](bytesobj.h), [`bytesobj.c`](bytesobj.c)
-  - [`exceptobj.h`](exceptobj.h), [`exceptobj.c`](exceptobj.c)
-  - [`floatobj.h`](floatobj.h), [`floatobj.c`](floatobj.c)
-  - [`funcobj.h`](funcobj.h), [`funcobj.c`](funcobj.c)
-  - [`intobj.h`](intobj.h), [`intobj.c`](intobj.c)
-  - [`mapobj.h`](mapobj.h), [`mapobj.c`](mapobj.c)
-  - [`moduleobj.h`](moduleobj.h), [`moduleobj.c`](moduleobj.c)
-  - [`nilobj.h`](nilobj.h), [`nilobj.c`](nilobj.c)
-  - [`pathobj.h`](pathobj.h), [`pathobj.c`](pathobj.c)
-  - [`streamobj.h`](streamobj.h), [`streamobj.c`](streamobj.c)
-  - [`stringobj.h`](stringobj.h), [`stringobj.c`](stringobj.c)
-  - [`symbolobj.h`](symbolobj.h), [`symbolobj.c`](symbolobj.c)
-  - [`tupleobj.h`](tupleobj.h), [`tupleobj.c`](tupleobj.c)
-  - [`typeobj.h`](typeobj.h), [`typeobj.c`](typeobj.c)
+    - [`arrayobj.h`](arrayobj.h), [`arrayobj.c`](arrayobj.c)
+    - [`boolobj.h`](boolobj.h), [`boolobj.c`](boolobj.c)
+    - [`bytesobj.h`](bytesobj.h), [`bytesobj.c`](bytesobj.c)
+    - [`exceptobj.h`](exceptobj.h), [`exceptobj.c`](exceptobj.c)
+    - [`floatobj.h`](floatobj.h), [`floatobj.c`](floatobj.c)
+    - [`funcobj.h`](funcobj.h), [`funcobj.c`](funcobj.c)
+    - [`intobj.h`](intobj.h), [`intobj.c`](intobj.c)
+    - [`mapobj.h`](mapobj.h), [`mapobj.c`](mapobj.c)
+    - [`moduleobj.h`](moduleobj.h), [`moduleobj.c`](moduleobj.c)
+    - [`nilobj.h`](nilobj.h), [`nilobj.c`](nilobj.c)
+    - [`pathobj.h`](pathobj.h), [`pathobj.c`](pathobj.c)
+    - [`streamobj.h`](streamobj.h), [`streamobj.c`](streamobj.c)
+    - [`stringobj.h`](stringobj.h), [`stringobj.c`](stringobj.c)
+    - [`symbolobj.h`](symbolobj.h), [`symbolobj.c`](symbolobj.c)
+    - [`tupleobj.h`](tupleobj.h), [`tupleobj.c`](tupleobj.c)
+    - [`typeobj.h`](typeobj.h), [`typeobj.c`](typeobj.c)
 
 ## Conventions and precautions
 
@@ -74,6 +83,31 @@ and the pointers then became dangling ones.
 An easy solution is to put the pointers to objects onto the runtime callstack before creating objects
 and update the local variables from the callstack after that.
 
+#### Native function local references
+
+The **locals** mechanism is available
+to *protect* the references stored in local variables.
+
+Here is an example:
+
+```c
+struct xyz_obj *xyz_obj_add(zis_context *z, struct xyz_obj *_a, struct xyz_obj *_b) {
+    zis_locals_decl(
+        z, var,
+        struct xyz_obj *a, *b;
+    ); // Declare local references.
+    // zis_locals_zero(var); // This line is not needed here.
+    var.a = _a. var.b = _b; // Initialize the variables.
+    struct xyz_adder_obj *adder = xyz_adder_obj_new(z); // Create object.
+    struct xyz_obj *y = xyz_adder_obj_add(adder, var.a, var.b);
+    zis_locals_drop(z, var); // Drop the references.
+    return y;
+}
+```
+
+Considering that this method can slightly impact performance,
+do not use it in unnecessary situations or paths.
+
 #### Temporary callstack registers
 
 If the function cannot access the callstack directly,
@@ -93,10 +127,13 @@ struct xyz_obj *xyz_obj_add(zis_context *z, struct xyz_obj *a, struct xyz_obj *b
 }
 ```
 
-Considering that this method can slightly impact performance,
-do not use it in unnecessary situations or paths.
+Compared with the **locals** mechanism,
+this method is slightly slower and less convenient for reference keeping.
+However, this is the only way to allocate slots of arbitrary size from the stack.
 
 #### Callstack registers as arguments
+
+**This approach has been deprecated. DO NOT use it if no necessary.**
 
 A function may accept a vector of callstack registers
 instead of allocated temporary ones.
@@ -113,6 +150,7 @@ void xyz_obj_add_r(zis_context *z, struct zis_object *regs[static 3]) {
     regs[2] = xyz_adder_obj_add(adder, a, b);
 }
 ```
+
 Do not forget the function name suffix "`_r`" and the "`R = {...}`" comment!
 Since some compilers do not support the `static` keyword in a parameter array declaration,
 you may need the macro `ZIS_PARAMARRAY_STATIC` in file "`compat.h`".

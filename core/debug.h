@@ -18,6 +18,8 @@ void zis_debug_time(struct timespec *tp);
 
 #if ZIS_DEBUG_LOGGING
 
+#include <stdio.h>
+
 #include "attributes.h"
 
 /// Logging levels.
@@ -27,31 +29,49 @@ enum zis_debug_log_level {
     ZIS_DEBUG_LOG_WARN,
     ZIS_DEBUG_LOG_INFO,
     ZIS_DEBUG_LOG_TRACE,
+    ZIS_DEBUG_LOG_DUMP,
 };
-
-typedef void (*zis_debug_log_with_func_t)(void *arg, void *file);
 
 /// Print a logging message.
 #define zis_debug_log(level, group, ...) \
     (_zis_debug_log(ZIS_DEBUG_LOG_##level, group, __VA_ARGS__))
 
-/// Print logging messages with a function.
-/// The function `func` takes `func_arg` and a FILE pointer as the arguments.
-#define zis_debug_log_with(level, group, prompt, func, func_arg) \
-    (_zis_debug_log_with(ZIS_DEBUG_LOG_##level, group, prompt " ===", func, func_arg))
+/// Print logging messages with a block of code.
+#define zis_debug_log_1(level, group, prompt, stream_var, stmt) \
+do {                                                            \
+    FILE *const __fp =                                          \
+        zis_debug_log_stream(ZIS_DEBUG_LOG_##level, group);     \
+    if (!__fp)                                                  \
+        break;                                                  \
+    zis_debug_log(level, group, "%s vvv", prompt);              \
+    { FILE * stream_var = __fp; stmt }                          \
+    zis_debug_log(level, group, "%s ^^^", prompt);              \
+} while (0)
+
+/// Get the logging stream. Returns NULL if not available.
+FILE *zis_debug_log_stream(enum zis_debug_log_level level, const char *group);
 
 void _zis_debug_log(
     enum zis_debug_log_level, const char *,
     zis_printf_fn_arg_fmtstr const char *, ...
 ) zis_printf_fn_attrs(3, 4);
-void _zis_debug_log_with(
-    enum zis_debug_log_level, const char *,
-    const char *, zis_debug_log_with_func_t, void *
-);
 
 #else // !ZIS_DEBUG_LOGGING
 
 #define zis_debug_log(level, group, ...) ((void)0)
-#define zis_debug_log_with(level, group, prompt, func, func_arg) ((void)0)
+#define zis_debug_log_1(level, group, prompt, var, stmt) ((void)0)
+#define zis_debug_log_stream(level, group) ((void *)0)
 
 #endif // ZIS_DEBUG_LOGGING
+
+#if ZIS_DEBUG_DUMPBT
+
+#include <stdio.h>
+
+void zis_debug_dump_backtrace(FILE *stream);
+
+#else // !ZIS_DEBUG_DUMPBT
+
+#define zis_debug_dump_backtrace(stream) ((void)0)
+
+#endif // ZIS_DEBUG_DUMPBT

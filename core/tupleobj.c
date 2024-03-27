@@ -24,7 +24,7 @@ struct zis_tuple_obj *zis_tuple_obj_new(
     struct zis_tuple_obj *const self = tuple_obj_alloc(z, n);
     if (zis_likely(v)) {
         zis_object_vec_copy(self->_data, v, n);
-        zis_object_assert_no_write_barrier(self);
+        zis_object_write_barrier_n(self, v, n);
     } else {
         zis_object_vec_zero(self->_data, n);
     }

@@ -10,6 +10,7 @@
 #include "object.h"
 
 struct zis_context;
+struct zis_string_obj;
 
 /* ----- stream object ------------------------------------------------------ */
 
@@ -65,6 +66,23 @@ struct zis_stream_obj *zis_stream_obj_new_file(
     const zis_path_char_t *restrict file, int flags
 );
 
+/// Open a stream associated with a file.
+struct zis_stream_obj *zis_stream_obj_new_file_native(
+    struct zis_context *z,
+    zis_file_handle_t file, int flags
+);
+
+/// Open a read-only stream for string reading. `string_size` can be -1.
+struct zis_stream_obj *zis_stream_obj_new_str(
+    struct zis_context *z,
+    const char *restrict string, size_t string_size, bool static_string
+);
+
+/// Open a read-only stream for string object reading.
+struct zis_stream_obj *zis_stream_obj_new_strob(
+    struct zis_context *z, struct zis_string_obj *str_obj
+);
+
 /// Close a stream.
 void zis_stream_obj_close(struct zis_stream_obj *self);
 
@@ -102,6 +120,7 @@ bool zis_stream_obj_write_bytes(
     const void *restrict data, size_t size
 );
 
+/// Write data from output buffer to the associated backend.
 bool zis_stream_obj_flush_chars(struct zis_stream_obj *restrict self);
 
 int32_t _zis_stream_obj_peek_char_slow(struct zis_stream_obj *restrict self);
@@ -148,7 +167,7 @@ bool _zis_stream_obj_write_char_slow(struct zis_stream_obj *restrict self, int32
 
 /// Write a character (Unicode point) to the stream. No mode check.
 /// Returns whether successful.
-zis_static_force_inline bool zis_stream_obj_write_chars(
+zis_static_force_inline bool zis_stream_obj_write_char(
     struct zis_stream_obj *restrict self, int32_t c
 ) {
     assert(self->_ops && zis_stream_obj_flag_writeable(self) && zis_stream_obj_flag_text(self));
@@ -164,3 +183,12 @@ zis_static_force_inline bool zis_stream_obj_write_chars(
 
     return _zis_stream_obj_write_char_slow(self, c);
 }
+
+/// Read characters to the buffer until an end-of-line char (including) or end of buffer.
+size_t zis_stream_obj_read_line(struct zis_stream_obj *restrict self, char *restrict buffer, size_t size);
+
+/// Write characters.
+bool zis_stream_obj_write_chars(struct zis_stream_obj *restrict self, const char *restrict str, size_t size);
+
+/// Get or move the c-buffer pointer (_c_cur). Returns NULL if reaches the end of stream in the input mode.
+char *zis_stream_obj_char_buf_ptr(struct zis_stream_obj *restrict self, size_t move_offset, size_t *restrict rest_size_p);

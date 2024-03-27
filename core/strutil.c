@@ -32,6 +32,11 @@ int zis_str_icmp(const char *s1, const char *s2) {
 #endif
 }
 
+void zis_str_toupper(char *restrict s, size_t n) {
+    for (size_t i = 0; i < n; i++)
+        s[i] = (char)toupper(s[i]);
+}
+
 size_t zis_u8char_from_code(
     zis_wchar_t code, zis_char8_t utf8_char_buf[ZIS_PARAMARRAY_STATIC 4]
 ) {
@@ -208,6 +213,19 @@ zis_char8_t *zis_u8str_find_pos(const zis_char8_t *u8_str, size_t n_chars) {
     return (zis_char8_t *)u8_str;
 }
 
+zis_char8_t *zis_u8str_find_end(const zis_char8_t *u8_str, size_t max_bytes) {
+    const zis_char8_t *const u8_str_end = u8_str + max_bytes;
+    for (const zis_char8_t *p = u8_str_end; p >= u8_str; p--) {
+        const zis_char8_t c = *p;
+        if ((c & 0xc0) != 0x80) {
+            const size_t n = zis_u8char_len_1(c);
+            if (n && p + n <= u8_str_end)
+                return (zis_char8_t *)(p + n);
+        }
+    }
+    return NULL;
+}
+
 static const zis_wchar_t char_width_table[] = {
     0x01100, 0x01160,
     0x02329, 0x0232B,
@@ -241,4 +259,16 @@ size_t zis_char_width(zis_wchar_t code_point) {
     }
 
     return 0;
+}
+
+unsigned int zis_char_digit(zis_wchar_t c) {
+    return c < 0x80 ? zis_char_digit_1((char)c) : (unsigned int)-1;
+}
+
+unsigned int zis_char_digit_1(char c) {
+    if (isdigit(c))
+        return c - '0';
+    if (isalpha(c))
+        return tolower(c) - 'a' + 10;
+    return (unsigned int)-1;
 }

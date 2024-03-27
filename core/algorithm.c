@@ -8,6 +8,12 @@
 
 #include "attributes.h"
 
+/* ----- numbers ------------------------------------------------------------ */
+
+double zis_math_log(double a, double x) {
+    return log(x) / log(a);
+}
+
 /* ----- hash functions ----------------------------------------------------- */
 
 size_t zis_hash_float(double num) {

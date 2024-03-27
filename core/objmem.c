@@ -158,6 +158,7 @@ static void mem_span_set_init(struct mem_span_set *set) {
 
 /// Finalize the set.
 static void mem_span_set_fini(struct mem_span_set *set) {
+    assert(!set->_nodes);
     mem_span_set_foreach_node(set, node, { zis_mem_free(node); });
     set->_nodes = NULL;
 }
@@ -1607,10 +1608,9 @@ zis_noreturn zis_noinline static void objmem_error_oom(struct zis_context *z) {
     struct zis_objmem_context *const ctx = z->objmem_context;
     zis_unused_var(ctx);
     zis_debug_log(FATAL, "ObjMem", "objmem@%p: out of memory", (void *)ctx);
-    zis_debug_log_with(
-        INFO, "ObjMem", "zis_objmem_print_usage()",
-        (zis_debug_log_with_func_t)zis_objmem_print_usage, ctx
-    );
+    zis_debug_log_1(DUMP, "ObjMem", "zis_objmem_print_usage()", fp, {
+        zis_objmem_print_usage(ctx, fp);
+    });
     zis_context_panic(z, ZIS_CONTEXT_PANIC_OOM);
 }
 
@@ -1991,10 +1991,9 @@ int zis_objmem_gc(struct zis_context *z, enum zis_objmem_gc_type type) {
     zis_unused_var(dt_ms);
 
     zis_debug_log(INFO, "ObjMem", "GC ends, %.2lf ms", dt_ms);
-    zis_debug_log_with(
-        TRACE, "ObjMem", "zis_objmem_print_usage()",
-        (zis_debug_log_with_func_t)zis_objmem_print_usage, ctx
-    );
+    zis_debug_log_1(DUMP, "ObjMem", "zis_objmem_print_usage()", fp, {
+        zis_objmem_print_usage(ctx, fp);
+    });
 
     assert(!new_space_post_gc_check(&ctx->new_space));
     assert(!old_space_post_gc_check(&ctx->old_space));

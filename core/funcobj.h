@@ -11,6 +11,7 @@
 struct zis_context;
 struct zis_module_obj;
 struct zis_object;
+struct zis_symbol_obj;
 
 /// Bytecode word.
 typedef uint32_t zis_func_obj_bytecode_word_t;
@@ -29,6 +30,7 @@ zis_nodiscard bool zis_func_obj_meta_conv(
 );
 
 /// The `Function` object. The basic callable object.
+/// Functions with bytecode will not be moved by the GC system.
 struct zis_func_obj {
     ZIS_OBJECT_HEAD
     // --- SLOTS ---
@@ -55,7 +57,14 @@ struct zis_func_obj *zis_func_obj_new_bytecode(
     const zis_func_obj_bytecode_word_t *code, size_t code_len
 );
 
-/// Set parent module of a function. Shall only be used after function created.
+/// Set module's of a function. Both `symbols` and `constants` can be NULL
+/// Shall only be used immediately after function created.
+void zis_func_obj_set_resources(
+    struct zis_func_obj *self,
+    struct zis_array_slots_obj *symbols /*=NULL*/, struct zis_array_slots_obj *constants /*=NULL*/
+);
+
+/// Set parent module of a function. Shall only be used immediately after function created.
 void zis_func_obj_set_module(
     struct zis_context *z,
     struct zis_func_obj *self, struct zis_module_obj *mod
@@ -67,10 +76,23 @@ zis_func_obj_module(const struct zis_func_obj *self) {
     return self->_module;
 }
 
+/// Get the length of the symbol table.
+zis_static_force_inline size_t
+zis_func_obj_symbol_count(const struct zis_func_obj *self) {
+    return zis_array_slots_obj_length(self->_symbols);
+}
+
 /// Get a symbol from function symbol table.
-zis_static_force_inline struct zis_object *
+zis_static_force_inline struct zis_symbol_obj *
 zis_func_obj_symbol(const struct zis_func_obj *self, size_t id) {
-    return zis_array_slots_obj_get(self->_symbols, id);
+    struct zis_object *sym = zis_array_slots_obj_get(self->_symbols, id);
+    return zis_object_cast(sym, struct zis_symbol_obj);
+}
+
+/// Get the length of the constant table.
+zis_static_force_inline size_t
+zis_func_obj_constant_count(const struct zis_func_obj *self) {
+    return zis_array_slots_obj_length(self->_constants);
 }
 
 /// Get a constant from function constant table.
@@ -78,3 +100,6 @@ zis_static_force_inline struct zis_object *
 zis_func_obj_constant(const struct zis_func_obj *self, size_t id) {
     return zis_array_slots_obj_get(self->_constants, id);
 }
+
+/// Get the number of instructions in the bytecode sequence.
+size_t zis_func_obj_bytecode_length(const struct zis_func_obj *self);

@@ -6,7 +6,6 @@
 #include <stddef.h>
 
 #include "attributes.h"
-#include "compat.h"
 #include "object.h"
 
 #include "arrayobj.h"
@@ -30,14 +29,10 @@ struct zis_type_obj {
 };
 
 struct zis_type_obj *_zis_type_obj_bootstrap_alloc(struct zis_context *z, const struct zis_native_type_def *restrict def);
-void _zis_type_obj_bootstrap_init_r(struct zis_context *z, struct zis_type_obj *self, struct zis_object *regs[ZIS_PARAMARRAY_STATIC 2]);
+void _zis_type_obj_bootstrap_init(struct zis_context *z, struct zis_type_obj *self);
 
 /// Create an empty `Type`.
-/// R = { [0] = out_type_obj, [1] = tmp }.
-struct zis_type_obj *zis_type_obj_new_r(
-    struct zis_context *z,
-    struct zis_object *regs[ZIS_PARAMARRAY_STATIC 2]
-);
+struct zis_type_obj *zis_type_obj_new(struct zis_context *z);
 
 /// Load a native type def.
 void zis_type_obj_load_native_def(

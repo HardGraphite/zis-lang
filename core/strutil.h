@@ -20,6 +20,9 @@ typedef uint32_t zis_wchar_t;
 /// Compare two string, ignoring the letter cases.
 int zis_str_icmp(const char *s1, const char *s2);
 
+/// Convert characters to uppercase.
+void zis_str_toupper(char *restrict s, size_t n);
+
 /* ----- UTF-8 support ------------------------------------------------------ */
 
 /// Convert Unicode code point to UTF-8 character. Return character length.
@@ -60,7 +63,17 @@ int zis_u8str_len_s(const zis_char8_t *u8_str, size_t n_bytes);
 /// If out of range, return the pointer to the ending NUL char.
 zis_char8_t *zis_u8str_find_pos(const zis_char8_t *u8_str, size_t n_chars);
 
+/// Find the last valid UTF-8 character. Returns the pointer to 1 byte past the last character.
+/// Returns NULL if no valid character is found.
+zis_char8_t *zis_u8str_find_end(const zis_char8_t *u8_str, size_t max_bytes);
+
 /* ----- char and string info ----------------------------------------------- */
 
 /// Get number of columns needed to display the given character.
 size_t zis_char_width(zis_wchar_t c);
+
+/// Convert a character to a number. `c` must be one of [0-9a-zA-Z].
+/// Returns `-1` if the character `c` is not a valid digit.
+unsigned int zis_char_digit(zis_wchar_t c);
+
+unsigned int zis_char_digit_1(char c);
