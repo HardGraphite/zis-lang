@@ -146,7 +146,7 @@ zis_cold_fn static int F_init(zis_t z) {
 
 static const struct zis_native_func_def M_funcs[] = {
     { NULL    , {0, 0, 1}, F_init     },
-    { "print" , {1, 0, 0}, F_print    },
+    { "print" , {1, 0, 1}, F_print    },
     { NULL    , {0, 0, 0}, NULL       },
 };
 

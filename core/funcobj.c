@@ -15,12 +15,14 @@ bool zis_func_obj_meta_conv(
     struct zis_func_obj_meta *dst,
     struct zis_native_func_meta func_def_meta
 ) {
+    if (zis_unlikely(func_def_meta.na + (func_def_meta.no == (uint8_t)-1 ? 1 : func_def_meta.no) > func_def_meta.nl))
+        return false;
     const struct zis_func_obj_meta func_obj_meta = {
         .na = func_def_meta.na,
         .no = func_def_meta.no,
-        .nr = 1 + func_def_meta.na + (func_def_meta.no == (uint8_t)-1 ? 1 : func_def_meta.no) + func_def_meta.nl,
+        .nr = UINT16_C(1) + func_def_meta.nl,
     };
-    if (zis_unlikely(func_obj_meta.nr <= func_def_meta.nl))
+    if (zis_unlikely(func_obj_meta.nr == 0))
         return false;
     *dst = func_obj_meta;
     return true;

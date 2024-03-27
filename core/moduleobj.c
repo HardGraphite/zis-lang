@@ -109,7 +109,7 @@ zis_nodiscard struct zis_func_obj *zis_module_obj_load_native_def(
             if (zis_unlikely(!zis_func_obj_meta_conv(&func_obj_meta, func_def->meta))) {
                 zis_debug_log(
                     ERROR, "Loader",
-                    "(struct zis_native_func_meta){ .na=%u, .no=%u, .nl=%u }: `.nl' is too big",
+                    "(struct zis_native_func_meta){ .na=%u, .no=%u, .nl=%u }: illegal",
                     func_def->meta.na, func_def->meta.no, func_def->meta.nl
                 );
                 continue;

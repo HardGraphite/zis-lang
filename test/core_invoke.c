@@ -175,7 +175,7 @@ static int F_a3(zis_t z) { // func(a1, a2, a3) -> ((a1, a2, a3), nil, nil)
 }
 
 zis_test_define(test_F_a3, z) {
-    const struct zis_native_func_def fd = {NULL, {3, 0, 1}, F_a3};
+    const struct zis_native_func_def fd = {NULL, {3, 0, 4}, F_a3};
     make_func(z, &fd);
 
     call_and_check_int_seq(z, &fd, 3, true); // F(1, 2, 3)
@@ -193,7 +193,7 @@ static int F_a2o2(zis_t z) { // func(a1, a2, ?o1, ?o2) -> ((a1, a2), (o1, o2), n
 }
 
 zis_test_define(test_F_a2o2, z) {
-    const struct zis_native_func_def fd = {NULL, {2, 2, 2}, F_a2o2};
+    const struct zis_native_func_def fd = {NULL, {2, 2, 6}, F_a2o2};
     make_func(z, &fd);
 
     for (size_t i = 2; i <= 4; i++)
@@ -211,7 +211,7 @@ static int F_a2v(zis_t z) { // func(a1, a2, *v) -> ((a1, a2), nil, v)
 }
 
 zis_test_define(test_F_a2v, z) {
-    const struct zis_native_func_def fd = {NULL, {2, (unsigned char)-1, 1}, F_a2v};
+    const struct zis_native_func_def fd = {NULL, {2, (unsigned char)-1, 4}, F_a2v};
     make_func(z, &fd);
 
     for (size_t i = 2; i <= 5; i++)

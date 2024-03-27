@@ -55,8 +55,8 @@ static int F_init(zis_t z) {
 
 static const struct zis_native_func_def funcs[] = {
     { NULL   , {0, 0, 1}, F_init  },
-    { "main" , {1, 0, 2}, F_main  },
-    { "hello", {1, 0, 0}, F_hello },
+    { "main" , {1, 0, 3}, F_main  },
+    { "hello", {1, 0, 1}, F_hello },
     { NULL   , {0, 0, 0}, NULL    },
 };
 

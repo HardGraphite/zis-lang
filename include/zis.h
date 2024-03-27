@@ -147,9 +147,14 @@ typedef int (*zis_native_func_t)(zis_t) ZIS_NOEXCEPT;
  * Metadata of a native function.
  */
 struct zis_native_func_meta {
-    uint8_t  na; ///< Number of arguments (excluding optional ones).
-    uint8_t  no; ///< Number of optional arguments. Or `-1` to accept a `Tuple` holding the rest arguments (variadic).
-    uint16_t nl; ///< Number of local variables (excluding REG-0 and arguments).
+    /// Number of arguments (excluding optional ones).
+    uint8_t  na;
+    /// Number of optional arguments. Or `-1` to accept a `Tuple` holding
+    /// the rest arguments (variadic).
+    uint8_t  no;
+    /// Number of local variables (excluding REG-0 but including arguments,
+    /// that is, the maximum of the indices of used registers).
+    uint16_t nl;
 };
 
 /**
