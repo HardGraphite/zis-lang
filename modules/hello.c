@@ -1,5 +1,6 @@
 //%% [module]
 //%% name = hello
+//%% description = Say hello.
 
 #include <stdio.h>
 #include <stdlib.h>

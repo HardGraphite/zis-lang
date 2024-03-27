@@ -1,5 +1,6 @@
 //%% [module]
 //%% name = prelude
+//%% description = The prelude module.
 //%% required = YES
 //%% force-embedded = YES
 
