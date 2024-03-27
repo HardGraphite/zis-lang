@@ -4,7 +4,8 @@ include("ModuleConf.cmake")
 ##### Define module targets #####
 #################################
 
-set(zis_embedded_modules)
+set(zis_embedded_modules) # List of names
+set(zis_module_targets)   # List of targets
 
 function(zis_add_module_target mod_name conf_strings sources)
     message(VERBOSE "Found ZiS module `${mod_name}'")
@@ -74,6 +75,11 @@ function(zis_add_module_target mod_name conf_strings sources)
             endif()
         else() # shared
             set(mod_tgt "zis_mod_${mod_name}")
+            if(zis_module_targets)
+                set(zis_module_targets "${zis_module_targets};${mod_tgt}" PARENT_SCOPE)
+            else()
+                set(zis_module_targets ${mod_tgt} PARENT_SCOPE)
+            endif()
             message(VERBOSE "Add target ${mod_tgt} for module `${mod_name}'")
             add_library(${mod_tgt} MODULE ${sources})
             target_include_directories(${mod_tgt} PRIVATE "${CMAKE_SOURCE_DIR}/include")
@@ -144,3 +150,18 @@ unset(ZIS_EMBEDDED_MODULE_LIST_SORTED)
 unset(ZIS_EMBEDDED_MODULE_LIST_EMPTY)
 
 target_include_directories(${zis_core_tgt} PRIVATE ${zis_modules_header_dir})
+
+#######################################
+##### Installation configurations #####
+#######################################
+
+include(ZisInstallDirs)
+
+foreach(tgt IN LISTS zis_module_targets)
+    ### RPATH.
+    if(ZIS_PACK_RELA_RPATH)
+        zis_install_set_rela_rpath(${tgt} ${zis_install_mod_dir} ${zis_install_lib_dir})
+    endif()
+    ### Install rules.
+    install(TARGETS ${tgt} DESTINATION ${zis_install_mod_dir})
+endforeach()
