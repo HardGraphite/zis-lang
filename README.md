@@ -33,11 +33,11 @@ to specify the build configuration (build type) when building:
 cmake --build . --config Release
 ```
 
-To build with debug code, enable the options `ZIS_DEBUG` and `ZIS_DEBUG_LOGGING`.
-To build documentations, enable the `ZIS_DOC*` options.
-To run tests, enable the option `ZIS_TEST` and use command `ctest`.
-To install the binaries, use command `cmake` with command-line argument `--install`.
-To generate a package, enable the option `ZIS_PACK` and use command `cpack`.
+To **build with debug code**, enable the options `ZIS_DEBUG*` options.
+To **build documentations**, enable the `ZIS_DOC*` options.
+To **run tests**, enable the option `ZIS_TEST` and use command `ctest`.
+To **install the binaries**, use command `cmake` with command-line argument `--install`.
+To **generate a package**, enable the option `ZIS_PACK` and use command `cpack`.
 
 Use commands `ccmake` or `cmake-gui` to view and customize the options.
 
