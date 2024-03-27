@@ -107,7 +107,7 @@ void zis_exception_obj_stack_trace(
     if (ip < (void *)func_p || ip >= (void *)func_p_end)
         ip_offset = 0;
     else
-        ip_offset = (zis_func_obj_bytecode_word_t *)ip - func_p;
+        ip_offset = (unsigned int)((zis_func_obj_bytecode_word_t *)ip - func_p);
 
     zis_locals_decl(
         z, var,
@@ -157,7 +157,7 @@ int zis_exception_obj_walk_stack_trace(
     var.stack_trace = zis_object_cast(self->_stack_trace, struct zis_array_obj);
 
     int fn_ret = 0;
-    for (size_t i = 0; i < n; i++) {
+    for (unsigned int i = 0; i < n; i++) {
         struct zis_object *const *const v = zis_array_obj_data(var.stack_trace);
         assert(zis_object_type(v[i * 2]) == z->globals->type_Function);
         assert(zis_object_is_smallint(v[i * 2 + 1]));

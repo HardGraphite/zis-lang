@@ -897,7 +897,7 @@ static struct zis_ast_node_obj *emit_elements(
         struct zis_array_obj *elements;
     );
     var.node = _node, var.elements = _elements;
-    for (size_t i = 0; ; i++) {
+    for (unsigned int i = 0; ; i++) {
         struct zis_object *sub_node = zis_array_obj_get(var.elements, i);
         if (!sub_node)
             break;

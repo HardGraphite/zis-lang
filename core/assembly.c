@@ -272,9 +272,9 @@ static unsigned int jumpinstr_table_add(
 }
 
 static struct jumpinstr_table_entry *jumpinstr_table_get(
-    struct jumpinstr_table *jt, unsigned int index
+    struct jumpinstr_table *jt, size_t index
 ) {
-    assert((size_t)index < jt->length);
+    assert(index < jt->length);
     return &jt->data[index];
 }
 

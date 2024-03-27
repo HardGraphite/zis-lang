@@ -679,7 +679,7 @@ struct zis_module_obj *zis_module_loader_import(
         var.sub_module_name = _sub_module_name;
     var.module = _module ? _module : zis_module_obj_new(z, true);
 
-    bool ok;
+    bool ok = found_in_loaded;
 
     // Load and save the module.
     if (!found_in_loaded) {

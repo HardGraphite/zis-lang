@@ -166,7 +166,7 @@ struct zis_object *zis_int_obj_or_smallint_s(
             num = -num;
         return zis_smallint_to_ptr(num);
     } else {
-        const size_t cell_count =
+        const unsigned int cell_count =
             zis_round_up_to_n_pow2(BIGINT_CELL_WIDTH, num_width) / BIGINT_CELL_WIDTH;
         struct zis_int_obj *self = int_obj_alloc(z, cell_count);
         self->negative = negative;

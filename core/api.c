@@ -1020,7 +1020,7 @@ static int _api_make_stream_open_str(struct _api_make_stream_context *restrict x
         const bool str_static = x->api_flags & ZIS_IOS_STATIC;
         stream_obj = zis_stream_obj_new_str(x->z, str, str_sz, str_static);
     } else {
-        const unsigned int reg = va_arg(x->api_args, size_t);
+        const unsigned int reg = va_arg(x->api_args, unsigned int);
         struct zis_object *obj = api_get_local(x->z, reg);
         if (zis_unlikely(!obj))
             return ZIS_E_IDX;
