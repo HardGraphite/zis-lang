@@ -89,6 +89,10 @@ function(zis_add_module_target mod_name conf_strings sources)
                 else()
                     target_link_libraries(${mod_tgt} PRIVATE ${zis_start_tgt})
                 endif()
+            elseif(ANDROID)
+                if(ZIS_BUILD_SHARED)
+                    target_link_libraries(${mod_tgt} PRIVATE ${zis_core_tgt})
+                endif()
             endif()
             target_link_libraries(${mod_tgt} PRIVATE ${mod_link_libs})
             set_target_properties(
@@ -159,7 +163,7 @@ include(ZisInstallDirs)
 
 foreach(tgt IN LISTS zis_module_targets)
     ### RPATH.
-    if(ZIS_PACK_RELA_RPATH)
+    if(ZIS_PACK_RELA_RPATH AND ANDROID)
         zis_install_set_rela_rpath(${tgt} ${zis_install_mod_dir} ${zis_install_lib_dir})
     endif()
     ### Install rules.
