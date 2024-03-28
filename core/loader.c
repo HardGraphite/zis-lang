@@ -327,10 +327,13 @@ static bool module_loader_load_from_file(
 
 #if ZIS_FEATURE_SRC
     case MOD_FILE_SRC: {
+        struct zis_compilation_bundle comp_bundle;
+        zis_compilation_bundle_init(&comp_bundle, z);
         const int ff = ZIS_STREAM_OBJ_MODE_IN | ZIS_STREAM_OBJ_TEXT | ZIS_STREAM_OBJ_UTF8;
         struct zis_stream_obj *f = zis_stream_obj_new_file(z, file, ff);
-        var.init_func = zis_compile_source(z, f, var.module);
+        var.init_func = zis_compile_source(&comp_bundle, f, var.module);
         zis_stream_obj_close(f);
+        zis_compilation_bundle_fini(&comp_bundle);
         if (!var.init_func) {
             status = ZIS_THR;
             break;
@@ -399,6 +402,7 @@ static bool module_loader_load_from_source(
 ) {
 #if ZIS_FEATURE_SRC
 
+    struct zis_compilation_bundle comp_bundle;
     zis_locals_decl(
         z, var,
         struct zis_module_obj *module;
@@ -406,7 +410,9 @@ static bool module_loader_load_from_source(
     );
     zis_locals_zero(var);
     var.module = _module;
-    var.init_func = zis_compile_source(z, input, var.module);
+    zis_compilation_bundle_init(&comp_bundle, z);
+    var.init_func = zis_compile_source(&comp_bundle, input, var.module);
+    zis_compilation_bundle_fini(&comp_bundle);
     int status = ZIS_OK;
     if (!var.init_func)
         status = ZIS_THR;
