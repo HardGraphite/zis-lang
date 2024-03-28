@@ -103,7 +103,7 @@ static struct zis_hashmap_bucket_node_obj *zis_hashmap_buckets_get_node(
     struct zis_context *z,
     struct hashmap_buckets_get_node_locals *locals, size_t key_hash
 ) {
-    assert(zis_object_type(zis_object_from(locals->buckets)) == z->globals->type_Array_Slots);
+    assert(zis_object_type_is(zis_object_from(locals->buckets), z->globals->type_Array_Slots));
     struct zis_hashmap_bucket_node_obj *node =
         zis_hashmap_buckets_get_bucket(locals->buckets, key_hash);
 

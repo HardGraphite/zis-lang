@@ -156,7 +156,7 @@ static int _module_loader_search_fn(const zis_path_char_t *mod_name, void *_arg)
         struct zis_object *entry = zis_array_obj_get(d->search_path, i);
         if (!entry)
             break;
-        if (zis_object_type(entry) != z->globals->type_Path)
+        if (!zis_object_type_is(entry, z->globals->type_Path))
             continue;
         struct zis_path_obj *const path_obj = zis_object_cast(entry, struct zis_path_obj);
         const zis_path_char_t *const dir = zis_path_obj_data(path_obj);
@@ -482,7 +482,7 @@ void zis_module_loader_add_path(struct zis_context *z, struct zis_path_obj *path
         struct zis_object *e = zis_array_obj_get(d->search_path, i);
         if (!e)
             break;
-        if (zis_object_type(e) != z->globals->type_Path)
+        if (!zis_object_type_is(e, z->globals->type_Path))
             continue;
         struct zis_path_obj *const e_path = zis_object_cast(e, struct zis_path_obj);
         if (zis_path_obj_same(path, e_path))
@@ -524,7 +524,7 @@ void zis_module_loader_add_loaded(
     struct zis_context_globals *const g = z->globals;
 
     struct zis_object *entry = zis_map_obj_sym_get(d->loaded_modules, module_name);
-    struct zis_type_obj *entry_type = entry ? zis_object_type(entry) : NULL;
+    struct zis_type_obj *entry_type = entry ? zis_object_type_1(entry) : NULL;
 
     if (sub_module_name) {
         if (entry_type == g->type_Map) {
@@ -584,7 +584,7 @@ struct zis_module_obj *zis_module_loader_get_loaded(
     struct zis_object *entry = zis_map_obj_sym_get(d->loaded_modules, module_name);
     if (!entry)
         return NULL;
-    struct zis_type_obj *entry_type = zis_object_type(entry);
+    struct zis_type_obj *entry_type = zis_object_type_1(entry);
     if (entry_type == g->type_Module)
         return zis_object_cast(entry, struct zis_module_obj);
     if (entry_type != g->type_Map)
@@ -592,7 +592,7 @@ struct zis_module_obj *zis_module_loader_get_loaded(
     entry = zis_map_obj_sym_get(zis_object_cast(entry, struct zis_map_obj), g->sym_init);
     if (!entry)
         return NULL;
-    entry_type = zis_object_type(entry);
+    entry_type = zis_object_type_1(entry);
     if (entry_type == g->type_Module)
         return zis_object_cast(entry, struct zis_module_obj);
     return NULL;

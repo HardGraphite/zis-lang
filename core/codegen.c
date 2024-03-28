@@ -693,7 +693,7 @@ static void check_obj_is_node(
     struct zis_codegen *restrict cg,
     struct zis_ast_node_obj *parent_node, struct zis_object *obj
 ) {
-    if (zis_unlikely(zis_object_is_smallint(obj) || zis_object_type(obj) != cg->z->globals->type_AstNode))
+    if (zis_unlikely(!zis_object_type_is(obj, cg->z->globals->type_AstNode)))
         error(cg, parent_node, "sub-node is not a node object");
 }
 
@@ -1575,7 +1575,7 @@ static int emit_Return(struct zis_codegen *cg, struct zis_ast_node_obj *node, un
     if (value == zis_object_from(codegen_z(cg)->globals->val_nil)) {
         zis_assembler_append_Aw(as, ZIS_OPC_RETNIL, 0);
     } else {
-        assert(zis_object_type(value) == codegen_z(cg)->globals->type_AstNode);
+        assert(zis_object_type_is(value, codegen_z(cg)->globals->type_AstNode));
         struct zis_ast_node_obj *value_node = zis_object_cast(value, struct zis_ast_node_obj);
         unsigned int value_reg;
         if (node_is_constant(value_node)) {
@@ -1600,7 +1600,7 @@ static int emit_Throw(struct zis_codegen *cg, struct zis_ast_node_obj *node, uns
         error_not_implemented(cg, __func__, node);
         // TODO: Throw statement without argument.
     } else {
-        assert(zis_object_type(value) == codegen_z(cg)->globals->type_AstNode);
+        assert(zis_object_type_is(value, codegen_z(cg)->globals->type_AstNode));
         struct zis_ast_node_obj *value_node = zis_object_cast(value, struct zis_ast_node_obj);
         unsigned int value_reg;
         if (node_is_constant(value_node)) {
@@ -1669,7 +1669,7 @@ static int emit_Cond(struct zis_codegen *cg, struct zis_ast_node_obj *_node, uns
             }
             check_obj_is_node(cg, var.node, x0);
             var.branch_cond = zis_object_cast(x0, struct zis_ast_node_obj);
-            if (zis_unlikely(zis_object_type(x1) != codegen_z(cg)->globals->type_Array)) {
+            if (zis_unlikely(!zis_object_type_is(x1, codegen_z(cg)->globals->type_Array))) {
                 error(
                     cg, var.node, "illegal <%s> node args (%zu): %s",
                     zis_ast_node_type_represent(ZIS_AST_NODE_Cond), i + 2, "not an Array"
@@ -1743,7 +1743,7 @@ static int emit_Func(struct zis_codegen *cg, struct zis_ast_node_obj *_node, uns
         struct zis_object *arg_decl = zis_array_obj_get(var.args, i);
         if (!arg_decl)
             break;
-        if (zis_object_type(arg_decl) != type_sym) // TODO: support optional arguments.
+        if (!zis_object_type_is(arg_decl, type_sym)) // TODO: support optional arguments.
             error(cg, var.node, "formal argument is not symbol");
         struct zis_symbol_obj *arg_name = zis_object_cast(arg_decl, struct zis_symbol_obj);
         if (frame_scope_find_var(fs, arg_name)) {

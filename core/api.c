@@ -81,7 +81,7 @@ static struct zis_func_obj *api_get_current_func(zis_t z) {
     struct zis_callstack *const cs = z->callstack;
     assert(!zis_callstack_empty(cs));
     struct zis_object *x = zis_callstack_frame_info(cs)->prev_frame[0];
-    assert(zis_object_type(x) == z->globals->type_Function);
+    assert(zis_object_type_is(x, z->globals->type_Function));
     return zis_object_cast(x, struct zis_func_obj);
 }
 
@@ -90,7 +90,7 @@ static struct zis_object *api_get_current_func_or(zis_t z, struct zis_object *al
     if (zis_callstack_empty(cs))
         return alt;
     struct zis_object *func_obj = zis_callstack_frame_info(cs)->prev_frame[0];
-    if (zis_object_type(func_obj) != z->globals->type_Function)
+    if (!zis_object_type_is(func_obj, z->globals->type_Function))
         return alt;
     return func_obj;
 }
@@ -104,7 +104,7 @@ zis_noinline static int api_format_exception_with_name(
             name_len = strlen(name);
     } else {
         struct zis_object *name_obj = api_get_local(z, alt_name_reg);
-        if (name_obj && zis_object_type(name_obj) == z->globals->type_Symbol) {
+        if (name_obj && zis_object_type_is(name_obj, z->globals->type_Symbol)) {
             struct zis_symbol_obj *name_sym = zis_object_cast(name_obj, struct zis_symbol_obj);
             name = zis_symbol_obj_data(name_sym);
             name_len = zis_symbol_obj_data_size(name_sym);
@@ -205,7 +205,7 @@ ZIS_API int zis_read_nil(zis_t z, unsigned int reg) {
         return ZIS_E_IDX;
     if (obj == zis_object_from(z->globals->val_nil))
         return ZIS_OK;
-    assert(zis_object_type(obj) != z->globals->type_Nil);
+    assert(!zis_object_type_is(obj, z->globals->type_Nil));
     return ZIS_E_TYPE;
 }
 
@@ -222,7 +222,7 @@ ZIS_API int zis_read_bool(zis_t z, unsigned int reg, bool *val) {
     struct zis_object *obj = api_get_local(z, reg);
     if (zis_unlikely(!obj))
         return ZIS_E_IDX;
-    if (zis_unlikely(zis_object_is_smallint(obj) || zis_object_type(obj) != z->globals->type_Bool))
+    if (zis_unlikely(!zis_object_type_is(obj, z->globals->type_Bool)))
         return ZIS_E_TYPE;
     *val = zis_bool_obj_value(zis_object_cast(obj, struct zis_bool_obj));
     return ZIS_OK;
@@ -301,7 +301,7 @@ ZIS_API int zis_read_float(zis_t z, unsigned int reg, double *val) {
     struct zis_object *obj = api_get_local(z, reg);
     if (zis_unlikely(!obj))
         return ZIS_E_IDX;
-    if (zis_unlikely(zis_object_is_smallint(obj) || zis_object_type(obj) != z->globals->type_Float))
+    if (zis_unlikely(!zis_object_type_is(obj, z->globals->type_Float)))
         return ZIS_E_TYPE;
     *val = zis_float_obj_value(zis_object_cast(obj, struct zis_float_obj));
     return ZIS_OK;
@@ -322,7 +322,7 @@ ZIS_API int zis_read_string(zis_t z, unsigned int reg, char *buf, size_t *sz) {
     struct zis_object *obj = api_get_local(z, reg);
     if (zis_unlikely(!obj))
         return ZIS_E_IDX;
-    if (zis_unlikely(zis_object_is_smallint(obj) || zis_object_type(obj) != z->globals->type_String))
+    if (zis_unlikely(!zis_object_type_is(obj, z->globals->type_String)))
         return ZIS_E_TYPE;
     const size_t n = zis_string_obj_value(zis_object_cast(obj, struct zis_string_obj), buf, *sz);
     if (zis_unlikely(n == (size_t)-1))
@@ -345,7 +345,7 @@ ZIS_API int zis_read_symbol(zis_t z, unsigned int reg, char *buf, size_t *sz) {
     struct zis_object *obj = api_get_local(z, reg);
     if (zis_unlikely(!obj))
         return ZIS_E_IDX;
-    if (zis_unlikely(zis_object_is_smallint(obj) || zis_object_type(obj) != z->globals->type_Symbol))
+    if (zis_unlikely(!zis_object_type_is(obj, z->globals->type_Symbol)))
         return ZIS_E_TYPE;
     struct zis_symbol_obj *const sym_obj = zis_object_cast(obj, struct zis_symbol_obj);
     const size_t sym_sz = zis_symbol_obj_data_size(sym_obj);
@@ -370,7 +370,7 @@ ZIS_API int zis_read_bytes(zis_t z, unsigned int reg, void *buf, size_t *sz) {
     struct zis_object *obj = api_get_local(z, reg);
     if (zis_unlikely(!obj))
         return ZIS_E_IDX;
-    if (zis_unlikely(zis_object_is_smallint(obj) || zis_object_type(obj) != z->globals->type_Bytes))
+    if (zis_unlikely(!zis_object_type_is(obj, z->globals->type_Bytes)))
         return ZIS_E_TYPE;
     struct zis_bytes_obj *const bytes_obj = zis_object_cast(obj, struct zis_bytes_obj);
     const size_t bytes_sz = zis_bytes_obj_size(bytes_obj);
@@ -589,7 +589,7 @@ static int api_make_values_impl(
                     return rv;
                 }
                 for (size_t i = 0; i < elem_count_x2; i += 2) {
-                    assert(zis_object_type(*ret_p) == z->globals->type_Map);
+                    assert(zis_object_type_is(*ret_p, z->globals->type_Map));
                     status = zis_map_obj_set(
                         z, zis_object_cast(*ret_p, struct zis_map_obj),
                         tmp_regs[i], tmp_regs[i + 1]
@@ -601,7 +601,7 @@ static int api_make_values_impl(
                     }
                 }
                 zis_callstack_frame_free_temp(z, elem_count_x2);
-                assert(zis_object_type(*ret_p) == z->globals->type_Map);
+                assert(zis_object_type_is(*ret_p, z->globals->type_Map));
                 assert(zis_map_obj_length(zis_object_cast(*ret_p, struct zis_map_obj)) == elem_count);
             }
             assert(*fmt_p == '}');
@@ -695,11 +695,11 @@ static int api_read_values_impl(
 
 #define CHECK_TYPE(T) \
 do {                  \
-    if (zis_likely(!zis_object_is_smallint(in_obj) && zis_object_type(in_obj) == g->type_##T)) \
+    if (zis_likely(zis_object_type_is(in_obj, g->type_##T))) \
         break;        \
-    if (x->no_type_err_for_nil && in_obj == zis_object_from(g->val_nil))                       \
-        goto break_switch;                                                                     \
-    status = ZIS_E_TYPE;                                                                       \
+    if (x->no_type_err_for_nil && in_obj == zis_object_from(g->val_nil)) \
+        goto break_switch;                                   \
+    status = ZIS_E_TYPE;                                     \
     goto do_return;   \
 } while(0)            \
 // ^^^ CHECK_TYPE() ^^^
@@ -965,7 +965,7 @@ ZIS_API int zis_read_exception(zis_t z, unsigned int reg, int flag, unsigned int
     struct zis_object *obj = api_get_local(z, reg);
     if (zis_unlikely(!obj))
         return ZIS_E_IDX;
-    if (zis_unlikely(zis_object_is_smallint(obj) || zis_object_type(obj) != z->globals->type_Exception))
+    if (zis_unlikely(!zis_object_type_is(obj, z->globals->type_Exception)))
         return ZIS_E_TYPE;
     struct zis_exception_obj *const exc_obj = zis_object_cast(obj, struct zis_exception_obj);
     struct zis_object **out_obj_ref = api_ref_local(z, reg_out);
@@ -987,7 +987,7 @@ ZIS_API int zis_read_exception(zis_t z, unsigned int reg, int flag, unsigned int
     case ZIS_RDE_DUMP:
         zis_exception_obj_print(
             z, exc_obj,
-            (!zis_object_is_smallint(*out_obj_ref) && zis_object_type(*out_obj_ref) == z->globals->type_Stream) ?
+            zis_object_type_is(*out_obj_ref, z->globals->type_Stream) ?
                 zis_object_cast(*out_obj_ref, struct zis_stream_obj) : NULL
         );
         break;
@@ -1048,7 +1048,7 @@ static int _api_make_stream_open_str(struct _api_make_stream_context *restrict x
         struct zis_object *obj = api_get_local(x->z, reg);
         if (zis_unlikely(!obj))
             return ZIS_E_IDX;
-        if (zis_unlikely(zis_object_is_smallint(obj) || zis_object_type(obj) != x->z->globals->type_String))
+        if (zis_unlikely(!zis_object_type_is(obj, x->z->globals->type_String)))
             return ZIS_E_TYPE;
         stream_obj = zis_stream_obj_new_strob(x->z, zis_object_cast(obj, struct zis_string_obj));
     }
@@ -1120,7 +1120,7 @@ ZIS_API int zis_make_function(
     struct zis_func_obj *const func_obj = zis_func_obj_new_native(z, func_obj_meta, def->code);
     *obj_ref = zis_object_from(func_obj);
     struct zis_object *maybe_mod_obj = api_get_local(z, reg_module);
-    if (maybe_mod_obj && zis_object_type(maybe_mod_obj) == z->globals->type_Module)
+    if (maybe_mod_obj && zis_object_type_is(maybe_mod_obj, z->globals->type_Module))
         zis_func_obj_set_module(z, func_obj, zis_object_cast(maybe_mod_obj, struct zis_module_obj));
     return ZIS_OK;
 }
@@ -1159,27 +1159,21 @@ ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) {
         struct zis_object *packed_args_obj = api_get_local(z, regs[2]);
         if (zis_unlikely(!packed_args_obj))
             return ZIS_E_IDX;
-        if (zis_unlikely(zis_object_is_smallint(packed_args_obj))) {
-        packed_args_obj_wrong_type:
+        struct zis_type_obj *const packed_args_obj_type = zis_object_type_1(packed_args_obj);
+        if (packed_args_obj_type == z->globals->type_Tuple) {
+            struct zis_tuple_obj *const tuple_obj =
+                zis_object_cast(packed_args_obj, struct zis_tuple_obj);
+            argc = zis_tuple_obj_length(tuple_obj);
+        } else if (packed_args_obj_type == z->globals->type_Array) {
+            struct zis_array_obj *const array_obj =
+                zis_object_cast(packed_args_obj, struct zis_array_obj);
+            argc            = zis_array_obj_length(array_obj);
+            packed_args_obj = zis_object_from(array_obj->_data);
+        } else {
             zis_context_set_reg0(z, zis_object_from(zis_exception_obj_format(
                 z, "type", packed_args_obj, "wrong type of packed arguments"
             )));
             return ZIS_THR;
-        } else {
-            struct zis_type_obj *const packed_args_obj_type =
-                zis_object_type(packed_args_obj);
-            if (packed_args_obj_type == z->globals->type_Tuple) {
-                struct zis_tuple_obj *const tuple_obj =
-                    zis_object_cast(packed_args_obj, struct zis_tuple_obj);
-                argc = zis_tuple_obj_length(tuple_obj);
-            } else if (packed_args_obj_type == z->globals->type_Array) {
-                struct zis_array_obj *const array_obj =
-                    zis_object_cast(packed_args_obj, struct zis_array_obj);
-                argc            = zis_array_obj_length(array_obj);
-                packed_args_obj = zis_object_from(array_obj->_data);
-            } else {
-                goto packed_args_obj_wrong_type;
-            }
         }
         func_obj = zis_invoke_prepare_pa(z, callable_obj, ret_val_ref, packed_args_obj, argc);
         if (zis_unlikely(!func_obj))
@@ -1240,7 +1234,7 @@ static int api_import_compile_code(zis_t z, struct zis_object **res_ref, const c
         source_stream = zis_stream_obj_new_str(z, code, (size_t)-1, true);
     } else {
         struct zis_object *obj = zis_context_get_reg0(z);
-        if (zis_object_is_smallint(obj) || zis_object_type(obj) != z->globals->type_Stream)
+        if (!zis_object_type_is(obj, z->globals->type_Stream))
             return ZIS_E_TYPE;
         source_stream = zis_object_cast(obj, struct zis_stream_obj);
     }
@@ -1262,12 +1256,12 @@ static int api_import_add_path(zis_t z, const char *path) {
 }
 
 static int api_import_call_main(zis_t z, struct zis_object **res_ref) {
-    assert(zis_object_type(*res_ref) == z->globals->type_Module);
+    assert(zis_object_type_is(*res_ref, z->globals->type_Module));
     struct zis_object *main_fn = zis_module_obj_get(
         zis_object_cast(*res_ref, struct zis_module_obj),
         zis_symbol_registry_get(z, "main", (size_t)-1)
     );
-    if (!main_fn || zis_object_type(main_fn) != z->globals->type_Function) {
+    if (!main_fn || !zis_object_type_is(main_fn, z->globals->type_Function)) {
         zis_debug_log(WARN, "API", "the main function is not defined");
         return ZIS_OK;
     }
@@ -1367,7 +1361,7 @@ ZIS_API int zis_load_global(zis_t z, unsigned int reg, const char *name, size_t 
             return api_load_global_err_not_found(z, name, name_len);
     } else {
         struct zis_object *name_obj = z->callstack->frame[0];
-        if (zis_unlikely(zis_object_type(name_obj) != z->globals->type_Symbol))
+        if (zis_unlikely(!zis_object_type_is(name_obj, z->globals->type_Symbol)))
             return ZIS_E_ARG;
         name_sym = zis_object_cast(name_obj, struct zis_symbol_obj);
     }
@@ -1389,7 +1383,7 @@ ZIS_API int zis_store_global(zis_t z, unsigned int reg, const char *name, size_t
         assert(name_sym);
     } else {
         struct zis_object *name_obj = z->callstack->frame[0];
-        if (zis_unlikely(zis_object_type(name_obj) != z->globals->type_Symbol))
+        if (zis_unlikely(!zis_object_type_is(name_obj, z->globals->type_Symbol)))
             return ZIS_E_ARG;
         name_sym = zis_object_cast(name_obj, struct zis_symbol_obj);
     }
@@ -1420,7 +1414,7 @@ ZIS_API int zis_load_field(
             return api_load_field_err_not_found(z, api_get_local(z, reg_obj), name, name_len);
     } else {
         struct zis_object *name_obj = z->callstack->frame[0];
-        if (zis_unlikely(zis_object_type(name_obj) != z->globals->type_Symbol))
+        if (zis_unlikely(!zis_object_type_is(name_obj, z->globals->type_Symbol)))
             return ZIS_E_ARG;
         name_sym = zis_object_cast(name_obj, struct zis_symbol_obj);
     }
@@ -1430,9 +1424,7 @@ ZIS_API int zis_load_field(
     struct zis_object **const val_ref = api_ref_local(z, reg_val);
     if (zis_unlikely(!val_ref))
         return ZIS_E_IDX;
-    if (zis_unlikely(zis_object_is_smallint(obj)))
-        return api_load_field_err_not_found(z, obj, name, name_len);
-    struct zis_type_obj *const obj_type = zis_object_type(obj);
+    struct zis_type_obj *const obj_type = zis_object_type_1(obj);
     if (obj_type == z->globals->type_Module) {
         struct zis_module_obj *const mod = zis_object_cast(obj, struct zis_module_obj);
         struct zis_object *const val = zis_module_obj_get(mod, name_sym);
@@ -1468,7 +1460,7 @@ ZIS_API int zis_store_field(
         assert(name_sym);
     } else {
         struct zis_object *name_obj = z->callstack->frame[0];
-        if (zis_unlikely(zis_object_type(name_obj) != z->globals->type_Symbol))
+        if (zis_unlikely(!zis_object_type_is(name_obj, z->globals->type_Symbol)))
             return ZIS_E_ARG;
         name_sym = zis_object_cast(name_obj, struct zis_symbol_obj);
     }
@@ -1478,7 +1470,7 @@ ZIS_API int zis_store_field(
     struct zis_object *const val = api_get_local(z, reg_val);
     if (zis_unlikely(!val))
         return ZIS_E_IDX;
-    struct zis_type_obj *const obj_type = zis_object_type(obj);
+    struct zis_type_obj *const obj_type = zis_object_type_1(obj);
     if (obj_type == z->globals->type_Module) {
         struct zis_module_obj *const mod = zis_object_cast(obj, struct zis_module_obj);
         zis_module_obj_set(z, mod, name_sym, val);
@@ -1528,9 +1520,7 @@ ZIS_API int zis_load_element(
     struct zis_object **const val_ref = api_ref_local(z, reg_val);
     if (zis_unlikely(!val_ref))
         return ZIS_E_IDX;
-    if (zis_unlikely(zis_object_is_smallint(obj)))
-        return api_xxx_element_err_not_subscriptable(z, obj);
-    struct zis_type_obj *const obj_type = zis_object_type(obj);
+    struct zis_type_obj *const obj_type = zis_object_type_1(obj);
     const struct zis_context_globals *const g = z->globals;
     if (obj_type == g->type_Array) {
         struct zis_array_obj *const array = zis_object_cast(obj, struct zis_array_obj);
@@ -1572,9 +1562,7 @@ ZIS_API int zis_store_element(
     struct zis_object *const val = api_get_local(z, reg_val);
     if (zis_unlikely(!val))
         return ZIS_E_IDX;
-    if (zis_unlikely(zis_object_is_smallint(obj)))
-        return api_xxx_element_err_not_subscriptable(z, obj);
-    struct zis_type_obj *const obj_type = zis_object_type(obj);
+    struct zis_type_obj *const obj_type = zis_object_type_1(obj);
     const struct zis_context_globals *const g = z->globals;
     if (obj_type == g->type_Array) {
         struct zis_array_obj *const array = zis_object_cast(obj, struct zis_array_obj);
@@ -1602,9 +1590,7 @@ ZIS_API int zis_insert_element(
     struct zis_object *const val = api_get_local(z, reg_val);
     if (zis_unlikely(!val))
         return ZIS_E_IDX;
-    if (zis_unlikely(zis_object_is_smallint(obj)))
-        return api_xxx_element_err_not_subscriptable(z, obj);
-    struct zis_type_obj *const obj_type = zis_object_type(obj);
+    struct zis_type_obj *const obj_type = zis_object_type_1(obj);
     const struct zis_context_globals *const g = z->globals;
     if (obj_type == g->type_Array) {
         struct zis_array_obj *const array = zis_object_cast(obj, struct zis_array_obj);
@@ -1623,9 +1609,7 @@ ZIS_API int zis_remove_element(zis_t z, unsigned int reg_obj, unsigned int reg_k
     struct zis_object *const key = api_get_local(z, reg_key);
     if (zis_unlikely(!key))
         return ZIS_E_IDX;
-    if (zis_unlikely(zis_object_is_smallint(obj)))
-        return api_xxx_element_err_not_subscriptable(z, obj);
-    struct zis_type_obj *const obj_type = zis_object_type(obj);
+    struct zis_type_obj *const obj_type = zis_object_type_1(obj);
     const struct zis_context_globals *const g = z->globals;
     if (obj_type == g->type_Array) {
         struct zis_array_obj *const array = zis_object_cast(obj, struct zis_array_obj);

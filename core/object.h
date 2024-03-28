@@ -169,9 +169,25 @@ struct zis_object {
 #define zis_object_cast(obj_ptr, type) \
     ((type *)(obj_ptr))
 
-/// Get type of an object.
+/// Get type of an object. The `obj` must not be a small integer.
 #define zis_object_type(obj) \
     (assert(!zis_object_is_smallint(obj)), zis_object_meta_get_type_ptr((obj)->_meta))
+
+/// Get type of an object. The `obj` can be a small integer, in which case NULL is returned.
+/// @warning This function may return NULL!
+/// @note `zis_object_type()` should be used instead if `obj` is definitely not a small integer.
+zis_static_force_inline struct zis_type_obj *zis_object_type_1(struct zis_object *obj) {
+    if (zis_unlikely(zis_object_is_smallint(obj)))
+        return NULL;
+    return zis_object_type(obj);
+}
+
+/// Check the type of an object. The `obj` can be a small integer, in which case always returns false.
+zis_static_force_inline bool zis_object_type_is(struct zis_object *obj, struct zis_type_obj *type) {
+    if (zis_unlikely(zis_object_is_smallint(obj)))
+        return false;
+    return zis_object_type(obj) == type;
+}
 
 /// Get field in SLOTS by index. No bounds checking for the index.
 #define zis_object_get_slot(obj, index) \

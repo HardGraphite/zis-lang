@@ -119,7 +119,7 @@ void zis_exception_obj_stack_trace(
     var.stack_trace = zis_object_cast(self->_stack_trace, struct zis_array_obj);
     var.func_obj = func_obj;
 
-    if (zis_object_type(self->_stack_trace) != z->globals->type_Array) {
+    if (!zis_object_type_is(self->_stack_trace, z->globals->type_Array)) {
         struct zis_array_obj *x = zis_array_obj_new(z, NULL, 0);
         var.stack_trace = x;
         var.self->_stack_trace = zis_object_from(x);
@@ -135,7 +135,7 @@ void zis_exception_obj_stack_trace(
 size_t zis_exception_obj_stack_trace_length(
     struct zis_context *z, const struct zis_exception_obj *self
 ) {
-    if (zis_object_type(self->_stack_trace) != z->globals->type_Array)
+    if (!zis_object_type_is(self->_stack_trace, z->globals->type_Array))
         return 0;
     const size_t n =
         zis_array_obj_length(zis_object_cast(self->_stack_trace, struct zis_array_obj));
@@ -152,14 +152,14 @@ int zis_exception_obj_walk_stack_trace(
     if (!n)
         return 0;
 
-    assert(zis_object_type(self->_stack_trace) == z->globals->type_Array);
+    assert(zis_object_type_is(self->_stack_trace, z->globals->type_Array));
     zis_locals_decl_1(z, var, struct zis_array_obj *stack_trace);
     var.stack_trace = zis_object_cast(self->_stack_trace, struct zis_array_obj);
 
     int fn_ret = 0;
     for (unsigned int i = 0; i < n; i++) {
         struct zis_object *const *const v = zis_array_obj_data(var.stack_trace);
-        assert(zis_object_type(v[i * 2]) == z->globals->type_Function);
+        assert(zis_object_type_is(v[i * 2], z->globals->type_Function));
         assert(zis_object_is_smallint(v[i * 2 + 1]));
         fn_ret = fn(
             i,
@@ -201,7 +201,7 @@ int zis_exception_obj_print(
 ) {
     // TODO: print to the `out_stream`.
     fputs("Exception: ", stdout);
-    if (zis_object_type(self->what) == z->globals->type_String) {
+    if (zis_object_type_is(self->what, z->globals->type_String)) {
         char buffer[80];
         buffer[zis_string_obj_value(zis_object_cast(self->what, struct zis_string_obj), buffer, sizeof buffer)] = 0;
         fputs(buffer, stdout);

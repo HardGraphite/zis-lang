@@ -232,7 +232,7 @@ static struct zis_ast_node_obj *expr_builder_pop_operand(
     struct zis_object *node = zis_array_obj_pop(eb->operand_stack);
     if (zis_unlikely(!node))
         return NULL;
-    // assert(zis_object_type(node) == z->globals->type_AstNode);
+    // assert(zis_object_type_is(node, z->globals->type_AstNode));
     return zis_object_cast(node, struct zis_ast_node_obj);
 }
 
@@ -544,7 +544,7 @@ static struct zis_ast_node_obj *expr_builder_generate_expr(
             );
         } else {
             struct zis_object *node = zis_array_obj_pop(eb->operand_stack);
-            assert(zis_object_type(node) == parser_z(p)->globals->type_AstNode);
+            assert(zis_object_type_is(node, parser_z(p)->globals->type_AstNode));
             struct zis_ast_node_obj_location *loc =
                 zis_ast_node_obj_location(zis_object_cast(node, struct zis_ast_node_obj));
             error(p, loc->line0, loc->column0, "unexpected %s", "expression");
@@ -553,7 +553,7 @@ static struct zis_ast_node_obj *expr_builder_generate_expr(
 
     struct zis_object *node = zis_array_obj_pop(eb->operand_stack);
     assert(node);
-    assert(zis_object_type(node) == parser_z(p)->globals->type_AstNode);
+    assert(zis_object_type_is(node, parser_z(p)->globals->type_AstNode));
     return zis_object_cast(node, struct zis_ast_node_obj);
 }
 
@@ -1239,10 +1239,10 @@ static void _parser_dump_obj(
 ) {
     struct zis_context_globals *const g = z->globals;
     const unsigned int level_m1 = level - 1;
-    struct zis_type_obj *obj_type;
-    if (zis_object_is_smallint(obj)) {
+    struct zis_type_obj *obj_type = zis_object_type_1(obj);
+    if (!obj_type) {
         fprintf(fp, "%*c%lli\n", level_m1, ' ', (long long)zis_smallint_from_ptr(obj));
-    } else if ((obj_type = zis_object_type(obj)), obj_type == g->type_AstNode) {
+    } else if (obj_type == g->type_AstNode) {
         _parser_dump_ast(z, fp, zis_object_cast(obj, struct zis_ast_node_obj), level);
     } else if (obj_type == g->type_Array) {
         struct zis_array_obj *const arr_obj = zis_object_cast(obj, struct zis_array_obj);

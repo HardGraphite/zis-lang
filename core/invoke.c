@@ -74,7 +74,7 @@ zis_static_force_inline bool invocation_enter(
 
     /// Extract the function object.
     struct zis_object *const callable = caller_frame[0];
-    if (zis_likely(zis_object_type(callable) == z->globals->type_Function)) {
+    if (zis_likely(zis_object_type_is(callable, z->globals->type_Function))) {
         struct zis_func_obj *func_obj = zis_object_cast(callable, struct zis_func_obj);
         callee_frame_size = func_obj->meta.nr;
         info->func_meta = func_obj->meta;
@@ -116,7 +116,7 @@ zis_static_force_inline bool invocation_pass_args_vec(
     } else {
         if (zis_unlikely(argc < argc_min)) {
         argc_error:
-            assert(zis_object_type(info->caller_frame[0]) == z->globals->type_Function);
+            assert(zis_object_type_is(info->caller_frame[0], z->globals->type_Function));
             struct zis_func_obj *func_obj = zis_object_cast(info->caller_frame[0], struct zis_func_obj);
             format_error_argc(z, func_obj, argc);
             return false;
@@ -145,8 +145,8 @@ zis_static_force_inline bool invocation_pass_args_pac(
     struct invocation_info *info
 ) {
     assert(
-        zis_object_type(packed_args) == z->globals->type_Tuple ||
-        zis_object_type(packed_args) == z->globals->type_Array_Slots
+        zis_object_type_is(packed_args, z->globals->type_Tuple) ||
+        zis_object_type_is(packed_args, z->globals->type_Array_Slots)
     );
     static_assert(
         offsetof(struct zis_tuple_obj, _data) ==
@@ -214,7 +214,7 @@ zis_static_force_inline bool invocation_pass_args_dis(
     } else {
         if (zis_unlikely(argc < argc_min)) {
         argc_error:
-            assert(zis_object_type(info->caller_frame[0]) == z->globals->type_Function);
+            assert(zis_object_type_is(info->caller_frame[0], z->globals->type_Function));
             struct zis_func_obj *func_obj = zis_object_cast(info->caller_frame[0], struct zis_func_obj);
             format_error_argc(z, func_obj, argc);
             return false;
@@ -314,14 +314,14 @@ zis_hot_fn static int invoke_bytecode_func(
 #define FUNC_ENSURE \
     do {  /* func_obj shall not be moved */ \
         assert((void *)func_obj == (void *)zis_callstack_frame_info(stack)->prev_frame[0]); \
-        assert(zis_object_type((struct zis_object *)func_obj) == g->type_Function);         \
+        assert(zis_object_type_is((struct zis_object *)func_obj, g->type_Function));        \
         assert((size_t)func_sym_count == zis_func_obj_symbol_count(func_obj));     \
         assert((size_t)func_const_count == zis_func_obj_constant_count(func_obj)); \
     } while (0)
 #define FUNC_CHANGED \
     do {             \
         struct zis_object *p = zis_callstack_frame_info(stack)->prev_frame[0]; \
-        assert(zis_object_type(p) == g->type_Function);                        \
+        assert(zis_object_type_is(p, g->type_Function));                       \
         func_obj = zis_object_cast(p, struct zis_func_obj);                    \
         func_sym_count = (uint32_t)zis_func_obj_symbol_count(func_obj);        \
         func_const_count = (uint32_t)zis_func_obj_constant_count(func_obj);    \
@@ -330,7 +330,7 @@ zis_hot_fn static int invoke_bytecode_func(
     do {                          \
         func_obj = (NEW_FUNC);    \
         assert((void *)func_obj == (void *)zis_callstack_frame_info(stack)->prev_frame[0]); \
-        assert(zis_object_type((struct zis_object *)func_obj) == g->type_Function);         \
+        assert(zis_object_type_is((struct zis_object *)func_obj, g->type_Function));        \
         func_sym_count = (uint32_t)zis_func_obj_symbol_count(func_obj);        \
         func_const_count = (uint32_t)zis_func_obj_constant_count(func_obj);    \
     } while (0)
@@ -543,12 +543,11 @@ _interp_loop:
         zis_instr_extract_operands_Aw(this_instr, val);
         struct zis_object **val_p = bp + val;
         BOUND_CHECK_REG(val_p);
-        const bool val_is_exc =
-            !zis_object_is_smallint(*val_p) && zis_object_type(*val_p) == g->type_Exception;
+        const bool val_is_exc = zis_object_type_is(*val_p, g->type_Exception);
         FUNC_ENSURE;
         while (true) {
             if (val_is_exc) {
-                assert(zis_object_type(*val_p) == g->type_Exception);
+                assert(zis_object_type_is(*val_p, g->type_Exception));
                 struct zis_exception_obj *exc = zis_object_cast(*val_p, struct zis_exception_obj);
                 zis_exception_obj_stack_trace(z, exc, func_obj, ip);
             }
@@ -648,7 +647,7 @@ _interp_loop:
         BOUND_CHECK_REG(ret_p);
         BOUND_CHECK_REG(arg_p);
         struct zis_object *a = *arg_p;
-        struct zis_type_obj *t = zis_object_type(a);
+        struct zis_type_obj *t = zis_object_type_1(a);
         size_t argc;
         if (t == g->type_Tuple) {
             argc = zis_tuple_obj_length(zis_object_cast(a, struct zis_tuple_obj));
@@ -799,7 +798,7 @@ _interp_loop:
         BOUND_CHECK_SYM(name);
         struct zis_symbol_obj *name_sym = zis_func_obj_symbol(func_obj, name);
         struct zis_object *obj = *obj_p;
-        struct zis_type_obj *const obj_type = zis_object_type(obj);
+        struct zis_type_obj *const obj_type = zis_object_type_1(obj);
         if (obj_type == g->type_Module) {
             struct zis_module_obj *const mod = zis_object_cast(obj, struct zis_module_obj);
             struct zis_object *const val = zis_module_obj_get(mod, name_sym);
@@ -831,7 +830,7 @@ _interp_loop:
         BOUND_CHECK_SYM(name);
         struct zis_symbol_obj *name_sym = zis_func_obj_symbol(func_obj, name);
         struct zis_object *obj = *obj_p;
-        struct zis_type_obj *const obj_type = zis_object_type(obj);
+        struct zis_type_obj *const obj_type = zis_object_type_1(obj);
         if (obj_type == g->type_Module) {
             struct zis_module_obj *const mod = zis_object_cast(obj, struct zis_module_obj);
             zis_module_obj_set(z, mod, name_sym, *fld_p);
@@ -1186,8 +1185,8 @@ panic_ill:
 static void invoke_prepare_xx_pass_args_fail_cleanup(
     struct zis_context *z, const struct invocation_info *restrict ii
 ) {
-    assert(zis_object_type(z->callstack->frame[0]) == z->globals->type_Exception);
-    assert(zis_object_type(ii->caller_frame[0]) == z->globals->type_Function);
+    assert(zis_object_type_is(z->callstack->frame[0], z->globals->type_Exception));
+    assert(zis_object_type_is(ii->caller_frame[0], z->globals->type_Function));
     zis_exception_obj_stack_trace(
         z,
         zis_object_cast(z->callstack->frame[0], struct zis_exception_obj),
@@ -1212,7 +1211,7 @@ struct zis_func_obj *zis_invoke_prepare_va(
         invoke_prepare_xx_pass_args_fail_cleanup(z, &ii);
         return NULL;
     }
-    assert(zis_object_type(ii.caller_frame[0]) == z->globals->type_Function);
+    assert(zis_object_type_is(ii.caller_frame[0], z->globals->type_Function));
     return zis_object_cast(ii.caller_frame[0], struct zis_func_obj);
 }
 
@@ -1230,7 +1229,7 @@ struct zis_func_obj *zis_invoke_prepare_pa(
         invoke_prepare_xx_pass_args_fail_cleanup(z, &ii);
         return NULL;
     }
-    assert(zis_object_type(ii.caller_frame[0]) == z->globals->type_Function);
+    assert(zis_object_type_is(ii.caller_frame[0], z->globals->type_Function));
     return zis_object_cast(ii.caller_frame[0], struct zis_func_obj);
 }
 
@@ -1247,7 +1246,7 @@ struct zis_func_obj *zis_invoke_prepare_da(
         invoke_prepare_xx_pass_args_fail_cleanup(z, &ii);
         return NULL;
     }
-    assert(zis_object_type(ii.caller_frame[0]) == z->globals->type_Function);
+    assert(zis_object_type_is(ii.caller_frame[0], z->globals->type_Function));
     return zis_object_cast(ii.caller_frame[0], struct zis_func_obj);
 }
 
@@ -1258,12 +1257,11 @@ int zis_invoke_func(struct zis_context *z, struct zis_func_obj *func) {
         const int status = c_func(z);
         if (
             zis_unlikely(status == ZIS_THR) &&
-            !zis_object_is_smallint(z->callstack->frame[0]) &&
-            zis_object_type(z->callstack->frame[0]) == z->globals->type_Exception
+            zis_object_type_is(z->callstack->frame[0], z->globals->type_Exception)
         ) {
             struct zis_exception_obj *exc_obj =
                 zis_object_cast(z->callstack->frame[0], struct zis_exception_obj);
-            assert(zis_object_type(zis_callstack_frame_info(z->callstack)->prev_frame[0]) == z->globals->type_Function);
+            assert(zis_object_type_is(zis_callstack_frame_info(z->callstack)->prev_frame[0], z->globals->type_Function));
             struct zis_func_obj *func_obj =
                 zis_object_cast(zis_callstack_frame_info(z->callstack)->prev_frame[0], struct zis_func_obj);
             assert(func_obj->native == c_func);

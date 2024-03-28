@@ -27,7 +27,7 @@
 static void F_print__print_1(zis_t z, struct zis_object *value, struct zis_stream_obj *stream) {
     char buffer[80];
     struct zis_context_globals *g = z->globals;
-    struct zis_type_obj *type = zis_object_is_smallint(value) ? NULL : zis_object_type(value);
+    struct zis_type_obj *type = zis_object_type_1(value);
     if (!type) {
         snprintf(buffer, sizeof buffer, "%lli", (long long)zis_smallint_from_ptr(value));
     } else if (type == g->type_Nil) {
