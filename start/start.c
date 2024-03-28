@@ -145,7 +145,6 @@ static int start(zis_t z, void *_args) {
             imp_what = module;
             imp_flags = ZIS_IMP_PATH;
         }
-        imp_flags |= ZIS_IMP_MAIN;
     } else {
         if (cli_stdin_isatty()) {
             imp_what = "repl";
@@ -157,10 +156,9 @@ static int start(zis_t z, void *_args) {
         }
     }
 
-    if (imp_flags & ZIS_IMP_MAIN) {
-        zis_make_int(z, 1, (int64_t)args->rest_args_num);
-        zis_make_int(z, 2, (intptr_t)args->rest_args);
-    }
+    imp_flags |= ZIS_IMP_MAIN;
+    zis_make_int(z, 1, (int64_t)args->rest_args_num);
+    zis_make_int(z, 2, (intptr_t)args->rest_args);
     if (zis_import(z, 0, imp_what, imp_flags) == ZIS_THR) {
         zis_move_local(z, 1, 0);
         zis_make_stream(z, 2, ZIS_IOS_STDX, 2); // stderr
