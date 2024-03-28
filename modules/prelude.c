@@ -103,6 +103,48 @@ static int F_print(zis_t z) {
     return ZIS_OK;
 }
 
+// input(?prompt :: String) -> line :: String
+static int F_input(zis_t z) {
+    // TODO: re-write this function.
+
+    struct zis_object **reg1 = &z->callstack->frame[1];
+
+    if (zis_object_type_is(*reg1, z->globals->type_String)) {
+        struct zis_stream_obj *stream = z->globals->val_stream_stdout;
+        F_print__print_1(z, *reg1, stream);
+        zis_stream_obj_flush_chars(stream);
+    }
+
+    struct zis_stream_obj *stream = z->globals->val_stream_stdin;
+    for (bool first_read = true;;) {
+        char buffer[128];
+        size_t n = zis_stream_obj_read_line(stream, buffer, sizeof buffer);
+        if (!n) {
+            if (first_read) {
+                zis_make_exception(z, 0, NULL, 0, "read on a closed stream");
+                return ZIS_THR;
+            }
+            break;
+        }
+        const bool found_lf = buffer[n - 1] == '\n';
+        if (found_lf)
+            n--;
+        struct zis_string_obj *str = zis_string_obj_new(z, buffer, n);
+        if (first_read) {
+            first_read = false;
+        } else {
+            assert(zis_object_type_is(*reg1, z->globals->type_String));
+            str = zis_string_obj_concat(z, zis_object_cast(*reg1, struct zis_string_obj), str);
+        }
+        *reg1 = zis_object_from(str);
+        if (found_lf)
+            break;
+    }
+
+    z->callstack->frame[0] = *reg1;
+    return ZIS_OK;
+}
+
 /* ----- builtin types ------------------------------------------------------ */
 
 #pragma pack(push, 1)
@@ -147,6 +189,7 @@ zis_cold_fn static int F_init(zis_t z) {
 static const struct zis_native_func_def M_funcs[] = {
     { NULL    , {0, 0, 1}, F_init     },
     { "print" , {1, 0, 1}, F_print    },
+    { "input" , {0, 1, 1}, F_input    },
     { NULL    , {0, 0, 0}, NULL       },
 };
 
