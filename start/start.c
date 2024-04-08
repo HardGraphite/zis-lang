@@ -9,6 +9,9 @@
 #include "cliutil.h"
 #include "zis_config.h"
 
+#define EXIT_BADARGS (EXIT_FAILURE + 1) // Illegal command line arguments
+static_assert(EXIT_BADARGS != EXIT_SUCCESS, "");
+
 static void oh_help(struct clopts_context *, const char *, void *);
 static void oh_version(struct clopts_context *, const char *, void *);
 static void oh_interactive(struct clopts_context *, const char *, void *);
@@ -117,7 +120,7 @@ static void parse_command_line_args(
     const int ret = clopts_parse(&program, args, stderr, argc, argv);
     if (ret == 0)
         return;
-    exit(ret > 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+    exit(ret > 0 ? EXIT_SUCCESS : EXIT_BADARGS);
 }
 
 static int start(zis_t z, void *_args) {
