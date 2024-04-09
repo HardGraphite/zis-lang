@@ -253,10 +253,15 @@ static void expr_builder_gen_one_expr(
     if (zis_token_type_is_bin_op(op_type)) {
         if (zis_array_obj_length(eb->operand_stack) < 2)
             goto too_few_operands;
-    } else {
-        assert(zis_token_type_is_un_op(op_type));
+    } else if (zis_token_type_is_un_op(op_type)) {
         if (zis_array_obj_length(eb->operand_stack) < 1)
             goto too_few_operands;
+    } else {
+        assert(op_type == ZIS_TOK_L_PAREN);
+        error(
+            p, p->lexer.line, p->lexer.column, "expected %s before %s",
+            zis_token_type_represent(ZIS_TOK_R_PAREN), zis_token_type_represent(ZIS_TOK_EOS)
+        );
     }
 
     switch (op_type) {
