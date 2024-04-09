@@ -890,11 +890,11 @@ void zis_lexer_start(
     l->input = input_stream;
     l->temp_var = zis_smallint_to_ptr(0);
     l->error_handler = error_handler;
+    assert(l->keywords == l->z->globals->val_lexer_keywords);
 }
 
 void zis_lexer_finish(struct zis_lexer *restrict l) {
     l->input = zis_object_cast(zis_smallint_to_ptr(0), struct zis_stream_obj);
-    l->keywords = zis_object_cast(zis_smallint_to_ptr(0), struct zis_map_obj);
     l->temp_var = zis_smallint_to_ptr(0);
     l->error_handler = NULL;
 }
