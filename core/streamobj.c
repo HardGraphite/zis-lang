@@ -317,13 +317,11 @@ bool zis_stream_obj_flush_chars(struct zis_stream_obj *restrict self) {
     if (zis_stream_obj_flag_utf8(self)) {
         assert(self->_b_buf == self->_c_buf && self->_b_end == self->_c_end);
         assert(self->_b_cur == self->_b_buf && self->_b_end == self->_b_buf + ZIS_STREAM_OBJ_BUF_SZ);
-        const size_t size = (size_t)(self->_b_end - self->_c_cur);
-        const int r = self->_ops->write(self->_ops_data, self->_b_buf, size);
+        const size_t size = (size_t)(self->_c_cur - self->_c_buf);
+        const int r = self->_ops->write(self->_ops_data, self->_c_buf, size);
         if (r != 0)
             return false;
-        self->_b_cur = self->_b_buf;
-        self->_c_cur = self->_b_buf;
-        self->_c_end = self->_b_end;
+        self->_c_cur = self->_c_buf;
     } else {
         zis_context_panic(NULL, ZIS_CONTEXT_PANIC_ABORT); // Not implemented.
     }
