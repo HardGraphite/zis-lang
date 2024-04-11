@@ -6,7 +6,6 @@
 #include <string.h>
 
 #include "debug.h"
-#include "fsutil.h"
 #include "globals.h"
 #include "loader.h"
 #include "memory.h"
@@ -157,18 +156,28 @@ struct zis_object *zis_context_get_reg0(struct zis_context *z) {
     return z->callstack->frame[0];
 }
 
-zis_noreturn void zis_context_panic(struct zis_context *z, enum zis_context_panic_reason r) {
-    static_assert(ZIS_PANIC_OOM == (int)ZIS_CONTEXT_PANIC_OOM, "");
-    static_assert(ZIS_PANIC_SOV == (int)ZIS_CONTEXT_PANIC_SOV, "");
-    static_assert(ZIS_PANIC_ILL == (int)ZIS_CONTEXT_PANIC_ILL, "");
+zis_noreturn zis_cold_fn void
+zis_context_panic(struct zis_context *z, enum zis_context_panic_reason r) {
+    static_assert(ZIS_PANIC_OOM == ZIS_CONTEXT_PANIC_OOM, "");
+    static_assert(ZIS_PANIC_SOV == ZIS_CONTEXT_PANIC_SOV, "");
+    static_assert(ZIS_PANIC_ILL == ZIS_CONTEXT_PANIC_ILL, "");
 
-    zis_debug_log(WARN, "Context", "context@%p: panic(%i)", (void *)z, (int)r);
+    zis_debug_log(
+        WARN, "Context", "context@%p: panic(%i:%s)", (void *)z, (int)r,
+        r == ZIS_CONTEXT_PANIC_ABORT ? "abort" :
+        r == ZIS_CONTEXT_PANIC_OOM ? "out-of-memory" :
+        r == ZIS_CONTEXT_PANIC_SOV ? "stack-overflow" :
+        r == ZIS_CONTEXT_PANIC_ILL ? "illegal-bytecode" :
+        r == ZIS_CONTEXT_PANIC_IMPL ? "not-implemented" :
+        "??"
+    );
 
-    if (r != ZIS_CONTEXT_PANIC_ABORT) {
+    if (r != ZIS_CONTEXT_PANIC_ABORT && z) {
         zis_context_panic_handler_t handler = z->panic_handler;
         if (handler)
             handler(z, (int)r);
     }
 
+    fprintf(stderr, ZIS_DISPLAY_NAME ": panic(%i)\n", (int)r);
     abort();
 }

@@ -384,7 +384,7 @@ static bool module_loader_load_from_file(
 #endif // ZIS_FEATURE_ASM
 
     default:
-        zis_context_panic(z, ZIS_CONTEXT_PANIC_ABORT); // Not implemented.
+        zis_context_panic(z, ZIS_CONTEXT_PANIC_IMPL);
     }
 
     if (status == ZIS_OK)
@@ -655,7 +655,7 @@ static bool _module_loader_load_sub(
     int flags
 ) {
     zis_unused_var(z), zis_unused_var(top_module), zis_unused_var(module_name), zis_unused_var(sub_module_name), zis_unused_var(flags);
-    zis_context_panic(z, ZIS_CONTEXT_PANIC_ABORT); // Not implemented.
+    zis_context_panic(z, ZIS_CONTEXT_PANIC_IMPL);
 }
 
 struct zis_module_obj *zis_module_loader_import(
