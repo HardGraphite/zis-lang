@@ -1530,12 +1530,12 @@ static int emit_Tuple(struct zis_codegen *cg, struct zis_ast_node_obj *node, uns
 
 static int emit_Array(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
     assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Array);
-    return emit_list_like_node(cg, node, tgt_reg, ZIS_OPC_MKTUP);
+    return emit_list_like_node(cg, node, tgt_reg, ZIS_OPC_MKARR);
 }
 
 static int emit_Map(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
     assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Map);
-    return emit_list_like_node(cg, node, tgt_reg, ZIS_OPC_MKTUP);
+    return emit_list_like_node(cg, node, tgt_reg, ZIS_OPC_MKMAP);
 }
 
 static int emit_Import(struct zis_codegen *cg, struct zis_ast_node_obj *_node, unsigned int tgt_reg) {
