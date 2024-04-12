@@ -5,6 +5,7 @@
 
 #include "context.h"
 #include "globals.h"
+#include "locals.h"
 #include "ndefutil.h"
 #include "objmem.h"
 #include "strutil.h"
@@ -305,10 +306,32 @@ const char *zis_string_obj_data_utf8(const struct zis_string_obj *self) {
 
 struct zis_string_obj *zis_string_obj_concat(
     struct zis_context *z,
-    struct zis_string_obj *str1, struct zis_string_obj *str2
+    struct zis_string_obj *_str1, struct zis_string_obj *_str2
 ) {
-    zis_context_panic(z, ZIS_CONTEXT_PANIC_IMPL);
-    zis_unused_var(str1), zis_unused_var(str2);
+    zis_locals_decl(
+        z, var,
+        struct zis_string_obj *str1, *str2, *new_str;
+    );
+    var.str1 = _str1, var.str2 = _str2, var.new_str = _str2;
+
+    const enum string_obj_char_type
+    str1t = string_obj_char_type(var.str1), str2t = string_obj_char_type(var.str2);
+    const size_t str1n = string_obj_length(var.str1), str2n = string_obj_length(var.str2);
+
+    if (str1t == str2t) {
+        struct zis_string_obj *const new_str = string_obj_alloc(z, str1t, str1n + str2n);
+        void *const new_str_data = string_obj_data(new_str);
+        const size_t cn = string_obj_char_size(str1t);
+        const size_t str1_data_size = str1n * cn, str2_data_size = str2n * cn;
+        memcpy(new_str_data, string_obj_data(var.str1), str1_data_size);
+        memcpy((char *)new_str_data + str1_data_size, string_obj_data(var.str2), str2_data_size);
+        var.new_str = new_str;
+    } else {
+        zis_context_panic(z, ZIS_CONTEXT_PANIC_IMPL);
+    }
+
+    zis_locals_drop(z, var);
+    return var.new_str;
 }
 
 /* ----- type definition ---------------------------------------------------- */

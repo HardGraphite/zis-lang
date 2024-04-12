@@ -131,23 +131,28 @@ static void next_token(struct zis_parser *restrict p) {
 
 zis_noreturn zis_noinline zis_cold_fn static void
 error_unexpected_token(struct zis_parser *restrict p, enum zis_token_type expected_tt /*=NTOK*/) {
-    const struct zis_token *tok = this_token(p);
-    const char *tok_tt_s = zis_token_type_represent(tok->type);
+    const struct zis_token *const tok = this_token(p);
+    const char *const tok_type_s = zis_token_type_represent(
+        tok->type == ZIS_TOK_EOS && p->lexer.input_eof ? ZIS_TOK_EOF : tok->type
+    );
     if (expected_tt == NTOK)
-        error(p, tok->line0, tok->column0, "unexpected %s", tok_tt_s);
+        error(p, tok->line0, tok->column0, "unexpected `%s'", tok_type_s);
     error(
-        p, tok->line0, tok->column0, "expected %s before %s",
-        zis_token_type_represent(expected_tt), tok_tt_s
+        p, tok->line0, tok->column0, "expected `%s' before `%s'",
+        zis_token_type_represent(expected_tt), tok_type_s
     );
 }
 
+/// No-node.
+#define NNODE ((enum zis_ast_node_type)-1)
+
 zis_noreturn zis_noinline zis_cold_fn static void error_unexpected_node(
     struct zis_parser *restrict p,
-    struct zis_ast_node_obj *node, enum zis_ast_node_type expected_nt
+    struct zis_ast_node_obj *node, enum zis_ast_node_type expected_nt /*=NNODE*/
 ) {
     const struct zis_ast_node_obj_location *const loc = zis_ast_node_obj_location(node);
     const char *node_type_s = zis_ast_node_type_represent(zis_ast_node_obj_type(node));
-    if ((int)expected_nt == -1)
+    if (expected_nt == NNODE)
         error(p, loc->line0, loc->column0, "unexpected <%s>", node_type_s);
     error(
         p, loc->line0, loc->column0, "expected <%s> but got <%s>",
@@ -258,10 +263,7 @@ static void expr_builder_gen_one_expr(
             goto too_few_operands;
     } else {
         assert(op_type == ZIS_TOK_L_PAREN);
-        error(
-            p, p->lexer.line, p->lexer.column, "expected %s before %s",
-            zis_token_type_represent(ZIS_TOK_R_PAREN), zis_token_type_represent(ZIS_TOK_EOS)
-        );
+        error_unexpected_token(p, ZIS_TOK_R_PAREN);
     }
 
     switch (op_type) {
@@ -542,17 +544,11 @@ static struct zis_ast_node_obj *expr_builder_generate_expr(
     const size_t rest_operands_count = zis_array_obj_length(eb->operand_stack);
     if (zis_unlikely(rest_operands_count != 1)) {
         if (!rest_operands_count) {
-            const struct zis_token *tok = this_token(p);
-            error(
-                p, tok->line0, tok->column0, "expected %s before %s",
-                "an expression", zis_token_type_represent(tok->type)
-            );
+            error_unexpected_token(p, NTOK);
         } else {
             struct zis_object *node = zis_array_obj_pop(eb->operand_stack);
             assert(zis_object_type_is(node, parser_z(p)->globals->type_AstNode));
-            struct zis_ast_node_obj_location *loc =
-                zis_ast_node_obj_location(zis_object_cast(node, struct zis_ast_node_obj));
-            error(p, loc->line0, loc->column0, "unexpected %s", "expression");
+            error_unexpected_node(p, zis_object_cast(node, struct zis_ast_node_obj), NNODE);
         }
     }
 
