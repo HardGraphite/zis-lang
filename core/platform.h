@@ -5,17 +5,29 @@
 #if defined(_WIN32)
 #    define ZIS_SYSTEM_NAME "Windows"
 #    define ZIS_SYSTEM_WINDOWS 1
-#elif defined(__linux__)
-#    define ZIS_SYSTEM_NAME "Linux"
-#    define ZIS_SYSTEM_POSIX 1
 #elif defined(__APPLE__) && defined(__MACH__)
 #    define ZIS_SYSTEM_NAME "Apple"
+#    define ZIS_SYSTEM_APPLE 1
+#    define ZIS_SYSTEM_POSIX 1
+#elif defined(__ANDROID__)
+#    define ZIS_SYSTEM_NAME "Android"
+#    define ZIS_SYSTEM_ANDROID 1
+#    define ZIS_SYSTEM_LINUX 1
+#    define ZIS_SYSTEM_POSIX 1
+#elif defined(__linux__)
+#    define ZIS_SYSTEM_NAME "Linux"
+#    define ZIS_SYSTEM_LINUX 1
 #    define ZIS_SYSTEM_POSIX 1
 #elif defined(__FreeBSD__) || defined(__FreeBSD)
 #    define ZIS_SYSTEM_NAME "FreeBSD"
+#    define ZIS_SYSTEM_FREEBSD 1
+#    define ZIS_SYSTEM_POSIX 1
+#elif defined(__unix__) || defined(__unix)
+#    define ZIS_SYSTEM_NAME "UNIX"
+#    define ZIS_SYSTEM_UNIX 1
 #    define ZIS_SYSTEM_POSIX 1
 #else
-#    define ZIS_SYSTEM_NAME "?"
+#    define ZIS_SYSTEM_NAME ""
 #endif
 
 #if defined(_M_IA64)
@@ -25,14 +37,14 @@
 #    define ZIS_ARCH_NAME "x86_64"
 #elif defined(__x86) || defined(__x86__) || defined(_M_IX86)
 #    define ZIS_ARCH_NAME "x86"
-#elif defined(_M_ARM64)
+#elif defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64)
 #    define ZIS_ARCH_NAME "arm64"
-#elif defined(_M_ARM)
+#elif defined(__arm__) || defined(__arm) || defined(_M_ARM)
 #    define ZIS_ARCH_NAME "arm"
-#elif defined(_M_MIPS)
+#elif defined(__mips__) || defined(_M_MIPS)
 #    define ZIS_ARCH_NAME "mips"
 #else
-#    define ZIS_ARCH_NAME "?"
+#    define ZIS_ARCH_NAME ""
 #endif
 
 #if defined(__has_include) && __has_include(<bits/wordsize.h>)
