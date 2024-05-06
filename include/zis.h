@@ -823,6 +823,58 @@ ZIS_API int zis_remove_element(zis_t z, unsigned int reg_obj, unsigned int reg_k
 
 /** @} */
 
+/** @defgroup zis-api-misc API: miscellaneous */
+/** @{ */
+
+#if defined(__cplusplus) && __cplusplus >= 201803L
+#    define ZIS_API__IF_LIKELY(EXPR) if (EXPR) [[likely]]
+#    define ZIS_API__IF_UNLIKELY(EXPR) if (EXPR) [[unlikely]]
+#elif defined(__GNUC__) || defined(__clang__)
+#    define ZIS_API__IF_LIKELY(EXPR) if (__builtin_expect((bool)(EXPR), 1))
+#    define ZIS_API__IF_UNLIKELY(EXPR) if (__builtin_expect((bool)(EXPR), 0))
+#else
+#    define ZIS_API__IF_LIKELY(EXPR) if (EXPR)
+#    define ZIS_API__IF_UNLIKELY(EXPR) if (EXPR)
+#endif
+
+#if __STDC__ && __STDC_VERSION__ >= 201112L
+#    define ZIS_API__EXPR_WITH_TYPE_CHECKED(EXPR, TYPE) (_Generic((EXPR), TYPE : (EXPR)))
+#else
+#define ZIS_API__EXPR_WITH_TYPE_CHECKED(EXPR, TYPE) (EXPR)
+#endif
+
+/**
+ * Defines a IF branch, testing whether `expr` is `ZIS_OK`.
+ *
+ * @details Example:
+ * ```c
+ * int64_t value;
+ * zis_if_ok (zis_read_int(z, 0, &value)) {
+ *     printf("value = %" PRIi64, value);
+ * }
+ * ```
+ */
+#define zis_if_ok(__expr) \
+    ZIS_API__IF_LIKELY( ZIS_API__EXPR_WITH_TYPE_CHECKED(__expr, int) == ZIS_OK )
+
+/**
+ * Defines a IF branch, testing whether `expr` is `ZIS_THR`.
+ *
+ * @see zis_if_ok()
+ */
+#define zis_if_thr(__expr) \
+    ZIS_API__IF_UNLIKELY( ZIS_API__EXPR_WITH_TYPE_CHECKED(__expr, int) == ZIS_THR )
+
+/**
+ * Defines a IF branch, testing whether `expr` is not `ZIS_OK`.
+ *
+ * @see zis_if_ok()
+ */
+#define zis_if_err(__expr) \
+    ZIS_API__IF_UNLIKELY( ZIS_API__EXPR_WITH_TYPE_CHECKED(__expr, int) != ZIS_OK )
+
+/** @} */
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
