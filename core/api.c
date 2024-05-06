@@ -1148,14 +1148,16 @@ ZIS_API int zis_make_module(zis_t z, unsigned int reg, const struct zis_native_m
 }
 
 ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) {
-    struct zis_object *const  callable_obj = api_get_local(z, regs[1]);
     struct zis_object **const ret_val_ref  = api_ref_local(z, regs[0]);
-    if (zis_unlikely(!(callable_obj && ret_val_ref)))
+    if (zis_unlikely(!ret_val_ref))
         return ZIS_E_IDX;
 
     // prepare + pass_args
     struct zis_func_obj *func_obj;
     if (zis_unlikely(argc == (size_t)-1)) { // --- packed args ---
+        struct zis_object *const callable_obj = api_get_local(z, regs[1]);
+        if (zis_unlikely(!callable_obj))
+            return ZIS_E_IDX;
         struct zis_object *packed_args_obj = api_get_local(z, regs[2]);
         if (zis_unlikely(!packed_args_obj))
             return ZIS_E_IDX;
@@ -1179,6 +1181,14 @@ ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) {
         if (zis_unlikely(!func_obj))
             return ZIS_THR;
     } else {
+        struct zis_object *callable_obj;
+        if (regs[1] != (unsigned int)-1) {
+            callable_obj = api_get_local(z, regs[1]);
+            if (zis_unlikely(!callable_obj))
+                return ZIS_E_IDX;
+        } else {
+            callable_obj = NULL;
+        }
         if (argc > 1 && regs[3] == (unsigned int)-1) { // --- vector ---
             size_t index = regs[2];
             struct zis_object **const argv = z->callstack->frame + index;

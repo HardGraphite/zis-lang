@@ -19,6 +19,7 @@
 #include "funcobj.h"
 #include "mapobj.h"
 #include "moduleobj.h"
+#include "symbolobj.h"
 #include "tupleobj.h"
 #include "typeobj.h"
 
@@ -1182,6 +1183,47 @@ panic_ill:
 
 /* ----- public functions --------------------------------------------------- */
 
+zis_noinline zis_cold_fn static void
+invoke_prepare_xx_format_error_method_api_bad_usage(struct zis_context *z) {
+    struct zis_exception_obj *exc =
+        zis_exception_obj_format(z, "type", NULL, "illegal method invocation");
+    zis_context_set_reg0(z, zis_object_from(exc));
+}
+
+/// Extract method function and store to REG-0.
+/// On error, make an exception (REG-0) and returns false.
+static bool invoke_prepare_xx_extract_method(
+    struct zis_context *z,
+    struct zis_object *object,
+    struct zis_object *method_name_v
+) {
+    if (zis_unlikely(!zis_object_type_is(method_name_v, z->globals->type_Symbol))) {
+        invoke_prepare_xx_format_error_method_api_bad_usage(z);
+        return false;
+    }
+
+    struct zis_symbol_obj *const method_name =
+        zis_object_cast(method_name_v, struct zis_symbol_obj);
+    struct zis_object *const method_func = zis_type_obj_get_method(
+        zis_likely(!zis_object_is_smallint(object)) ?
+            zis_object_type(object) : z->globals->type_Int,
+        zis_object_cast(method_name, struct zis_symbol_obj)
+    );
+
+    if (zis_unlikely(!method_func)) {
+        struct zis_exception_obj *exc = zis_exception_obj_format(
+            z, "type", NULL, "no method %.*s",
+            (int)zis_symbol_obj_data_size(method_name),
+            zis_symbol_obj_data(method_name)
+        );
+        zis_context_set_reg0(z, zis_object_from(exc));
+        return false;
+    }
+
+    z->callstack->frame[0] = method_func;
+    return true;
+}
+
 static void invoke_prepare_xx_pass_args_fail_cleanup(
     struct zis_context *z, const struct invocation_info *restrict ii
 ) {
@@ -1198,11 +1240,20 @@ static void invoke_prepare_xx_pass_args_fail_cleanup(
 }
 
 struct zis_func_obj *zis_invoke_prepare_va(
-    struct zis_context *z, struct zis_object *callable,
+    struct zis_context *z, struct zis_object *callable /* = NULL */,
     struct zis_object **ret_to /* = NULL */, struct zis_object **argv, size_t argc
 ) {
     struct invocation_info ii;
-    z->callstack->frame[0] = callable;
+    if (callable) {
+        z->callstack->frame[0] = callable;
+    } else {
+        if (zis_unlikely(!argc)) {
+            invoke_prepare_xx_format_error_method_api_bad_usage(z);
+            return NULL;
+        }
+        if (!invoke_prepare_xx_extract_method(z, argv[0], z->callstack->frame[0]))
+            return NULL;
+    }
     if (zis_unlikely(!invocation_enter(z, NULL, ret_to ? ret_to : z->callstack->frame, &ii))) {
         return NULL;
     }
@@ -1220,6 +1271,7 @@ struct zis_func_obj *zis_invoke_prepare_pa(
     struct zis_object **ret_to /* = NULL */, struct zis_object *packed_args, size_t argc
 ) {
     struct invocation_info ii;
+    assert(callable); // not nullable
     z->callstack->frame[0] = callable;
     if (zis_unlikely(!invocation_enter(z, NULL, ret_to ? ret_to : z->callstack->frame, &ii))) {
         return NULL;
@@ -1234,11 +1286,22 @@ struct zis_func_obj *zis_invoke_prepare_pa(
 }
 
 struct zis_func_obj *zis_invoke_prepare_da(
-    struct zis_context *z, struct zis_object *callable,
+    struct zis_context *z, struct zis_object *callable /* = NULL */,
     struct zis_object **ret_to /* = NULL */, const unsigned int arg_regs[], size_t argc
 ) {
     struct invocation_info ii;
-    z->callstack->frame[0] = callable;
+    if (callable) {
+        z->callstack->frame[0] = callable;
+    } else {
+        struct zis_object **const frame = z->callstack->frame;
+        if (zis_unlikely(!argc)) {
+            invoke_prepare_xx_format_error_method_api_bad_usage(z);
+            return NULL;
+        }
+        assert(frame + arg_regs[0] <= z->callstack->top);
+        if (!invoke_prepare_xx_extract_method(z, frame[arg_regs[0]], frame[0]))
+            return NULL;
+    }
     if (zis_unlikely(!invocation_enter(z, NULL, ret_to ? ret_to : z->callstack->frame, &ii))) {
         return NULL;
     }

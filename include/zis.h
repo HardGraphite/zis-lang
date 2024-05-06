@@ -605,13 +605,14 @@ ZIS_API int zis_make_type(
 ZIS_API int zis_make_module(zis_t z, unsigned int reg, const struct zis_native_module_def *def) ZIS_NOEXCEPT;
 
 /**
- * Invoke a callable object.
+ * Invoke a callable object or method.
  *
  * @param z zis instance
  * @param regs A vector of register indices. `regs[0]` = return value register,
  * `regs[1]` = object to invoke, `regs[2]`...`regs[argc+1]` = arguments.
- * Specially, `regs[2]` = first one of a vector of elements when `regs[3]` is `-1`;
- * `regs[2]` = the packed arguments (`Array` or `Tuple`) when `argc` is `-1`.
+ * Specially, when `regs[3]` is `-1`, `regs[2]` = the first register of the argument vector;
+ * when `argc` is `-1`, `regs[2]` = the packed arguments (`Array` or `Tuple`);
+ * when `regs[-1]` = `-1`, call the first argument's method whose name is given in REG-0 (a symbol).
  * See @@details for special uses
  * @param argc number of arguments; or `-1` to indicate that `regs[2]` is the
  * packed arguments, which is an Array or a Tuple
@@ -628,6 +629,17 @@ ZIS_API int zis_make_module(zis_t z, unsigned int reg, const struct zis_native_m
  * // #3  packed arguments (argc == -1)
  * zis_make_values(z, 1, "(%%%)", 1, 2, 3); // Pack arguments into a tuple.
  * zis_invoke(z, (unsigned[]){0, 0, 1}, (size_t)-1); // { 1 } means packed arguments at 1.
+ * ```
+ *
+ * @details Here are examples to call method `foo`:
+ * ```c
+ * // #1  enumerated arguments
+ * zis_make_symbol(z, 0, "foo", 3);
+ * zis_invoke(z, (unsigned[]){0, (unsigned)-1, 1, 2, 3}, 3);
+ * // #2  a vector of arguments
+ * zis_make_symbol(z, 0, "foo", 3);
+ * zis_invoke(z, (unsigned[]){0, (unsigned)-1, 1, (unsigned)-1}, 3);
+ * // !! packed arguments not supported
  * ```
  *
  * @note Normally, the minimum length of array `regs` is `(argc + 2)`: 1 ret + 1 obj + N args.
