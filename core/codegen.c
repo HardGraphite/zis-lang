@@ -955,18 +955,24 @@ static int emit_list_like_node(
 /// Handle a Call-like node (Call, Send).
 static int emit_call_node(
     struct zis_codegen *cg, struct zis_ast_node_obj *_node, unsigned int tgt_reg,
-    struct zis_array_obj *_args, struct zis_ast_node_obj *_func
+    struct zis_array_obj *_args, struct zis_object *_func_or_meth /* func: Node; meth: Symbol */
 ) {
+    bool is_send_node;
+    {
+        const enum zis_ast_node_type node_type = zis_ast_node_obj_type(_node);
+        assert(node_type == ZIS_AST_NODE_Call || node_type == ZIS_AST_NODE_Send);
+        is_send_node = node_type == ZIS_AST_NODE_Send;
+    }
     if (zis_unlikely(tgt_reg == NTGT))
         tgt_reg = 0;
     int atgt;
     zis_locals_decl(
         cg, var,
         struct zis_array_obj *args;
-        struct zis_ast_node_obj *func;
+        struct zis_object *func_or_meth;
         struct zis_ast_node_obj *node;
     );
-    var.args = _args, var.func = _func, var.node = _node;
+    var.args = _args, var.func_or_meth = _func_or_meth, var.node = _node;
     struct frame_scope *fs = scope_stack_last_frame_scope(&cg->scope_stack);
     struct zis_assembler *const as = scope_assembler(cg);
     const unsigned int argc = (unsigned int)zis_array_obj_length(var.args);
@@ -981,7 +987,18 @@ static int emit_call_node(
             arg_atgt_list[i] = arg_atgt;
             operand_args |= (atgt_abs(arg_atgt) & 63) << (6 * i);
         }
-        emit_any(cg, var.func, 0);
+        if (!is_send_node) {
+            check_obj_is_node(cg, var.node, var.func_or_meth);
+            emit_any(cg, zis_object_cast(var.func_or_meth, struct zis_ast_node_obj), 0);
+        } else {
+            assert(zis_object_type_is(var.func_or_meth, codegen_z(cg)->globals->type_Symbol));
+            const unsigned int method_name_sym = zis_assembler_func_symbol(
+                as, codegen_z(cg),
+                zis_object_cast(var.func_or_meth, struct zis_symbol_obj)
+            );
+            assert(argc >= 1);
+            zis_assembler_append_ABw(as, ZIS_OPC_LDMTH, atgt_abs(arg_atgt_list[0]), method_name_sym);
+        }
         for (unsigned int i = 0; i < argc; i++)
             atgt_free1(fs, arg_atgt_list[i]);
         if (tgt_reg == ATGT)
@@ -997,7 +1014,17 @@ static int emit_call_node(
     } else if (argc < 64) {
         const unsigned int arg_regs_start = frame_scope_alloc_regs(fs, argc);
         emit_elements(cg, var.node, var.args, arg_regs_start);
-        emit_any(cg, var.func, 0);
+        if (!is_send_node) {
+            check_obj_is_node(cg, var.node, var.func_or_meth);
+            emit_any(cg, zis_object_cast(var.func_or_meth, struct zis_ast_node_obj), 0);
+        } else {
+            assert(zis_object_type_is(var.func_or_meth, codegen_z(cg)->globals->type_Symbol));
+            const unsigned int method_name_sym = zis_assembler_func_symbol(
+                as, codegen_z(cg),
+                zis_object_cast(var.func_or_meth, struct zis_symbol_obj)
+            );
+            zis_assembler_append_ABw(as, ZIS_OPC_LDMTH, arg_regs_start, method_name_sym);
+        }
         frame_scope_free_regs(fs, arg_regs_start, argc);
         if (tgt_reg == ATGT)
             tgt_reg = frame_scope_alloc_regs(fs, 1), atgt = -(int)tgt_reg;
@@ -1513,14 +1540,14 @@ static int emit_Call(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsi
     assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Call);
     struct zis_ast_node_Call_data *node_data =
         _zis_ast_node_obj_data_as(node, struct zis_ast_node_Call_data);
-    return emit_call_node(cg, node, tgt_reg, node_data->args, node_data->value);
+    return emit_call_node(cg, node, tgt_reg, node_data->args, zis_object_from(node_data->value));
 }
 
 static int emit_Send(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
-    zis_unused_var(cg), zis_unused_var(node), zis_unused_var(tgt_reg);
     assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Send);
-    error_not_implemented(cg, __func__, node);
-    // TODO: modify `emit_call_node()` to support this node.
+    struct zis_ast_node_Send_data *node_data =
+        _zis_ast_node_obj_data_as(node, struct zis_ast_node_Send_data);
+    return emit_call_node(cg, node, tgt_reg, node_data->args, zis_object_from(node_data->method));
 }
 
 static int emit_Tuple(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {

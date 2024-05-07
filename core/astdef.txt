@@ -44,7 +44,7 @@ Or             (Node lhs, Node rhs)
 Subscript      (Node value, Node key)
 Field          (Node value, Symbol name)
 Call           (Node value, Array args)
-Send           (Node target, Symbol method, Array args)
+Send           (Symbol method, Array args)
 
 Tuple          (Array args)
 Array          (Array args)

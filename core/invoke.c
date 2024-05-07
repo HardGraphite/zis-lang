@@ -280,6 +280,16 @@ format_error_field_not_exists(
 }
 
 zis_noinline zis_cold_fn static void
+format_error_method_not_exists(
+    struct zis_context *z, struct zis_func_obj *func, unsigned name_sym_id
+) {
+    struct zis_symbol_obj *name = zis_func_obj_symbol(func, name_sym_id);
+    struct zis_exception_obj *exc =
+        zis_exception_obj_format(z, "key", zis_object_from(name), "method not exists");
+    zis_context_set_reg0(z, zis_object_from(exc));
+}
+
+zis_noinline zis_cold_fn static void
 format_error_cond_is_not_bool(
     struct zis_context *z, struct zis_object *value
 ) {
@@ -671,7 +681,23 @@ _interp_loop:
     }
 
     OP_DEFINE(LDMTH) {
-        goto panic_ill; // Not implemented.
+        uint32_t name, obj_;
+        zis_instr_extract_operands_ABw(this_instr, obj_, name);
+        struct zis_object **obj_p = bp + obj_;
+        BOUND_CHECK_REG(obj_p);
+        FUNC_ENSURE;
+        BOUND_CHECK_SYM(name);
+        struct zis_symbol_obj *name_sym = zis_func_obj_symbol(func_obj, name);
+        struct zis_object *obj = *obj_p;
+        struct zis_type_obj *const obj_type =
+            zis_object_is_smallint(obj) ? g->type_Int : zis_object_type(obj);
+        struct zis_object *meth_obj = zis_type_obj_get_method(obj_type, name_sym);
+        if (zis_unlikely(!meth_obj)) {
+            format_error_method_not_exists(z, func_obj, name);
+            THROW_REG0;
+        }
+        IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(IMP) {

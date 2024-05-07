@@ -420,21 +420,29 @@ static void expr_builder_gen_one_expr(
         assert(zis_token_type_is_bin_op(op_type));
         if (zis_unlikely(zis_array_obj_length(eb->operand_stack) < 2))
             goto too_few_operands;
-        result_node = zis_ast_node_new(z, Send, false);
         {
-            struct zis_ast_node_obj *call_node = expr_builder_pop_operand(eb);
-            struct zis_ast_node_obj *target_node = expr_builder_pop_operand(eb);
-            assert(target_node && call_node);
-            check_node_type(p, call_node, ZIS_AST_NODE_Call);
-            struct zis_array_obj *args = zis_ast_node_get_field(call_node, Call, args);
-            struct zis_ast_node_obj *method_node = zis_ast_node_get_field(call_node, Call, value);
+            zis_locals_decl(
+                p, temp_var,
+                struct zis_ast_node_obj *call_node;
+                struct zis_ast_node_obj *target_node;
+                struct zis_array_obj *args;
+                struct zis_symbol_obj *method;
+            );
+            temp_var.call_node = expr_builder_pop_operand(eb);
+            temp_var.target_node = expr_builder_pop_operand(eb);
+            assert(temp_var.target_node && temp_var.call_node);
+            check_node_type(p, temp_var.call_node, ZIS_AST_NODE_Call);
+            temp_var.args = zis_ast_node_get_field(temp_var.call_node, Call, args);
+            struct zis_ast_node_obj *method_node = zis_ast_node_get_field(temp_var.call_node, Call, value);
             check_node_type(p, method_node, ZIS_AST_NODE_Name);
-            struct zis_symbol_obj *method = zis_ast_node_get_field(method_node, Name, value);
-            zis_ast_node_set_field(result_node, Send, target, target_node);
-            zis_ast_node_set_field(result_node, Send, method, method);
-            zis_ast_node_set_field(result_node, Send, args, args);
-            node_copy_loc0(result_node, target_node);
-            node_copy_loc1(result_node, call_node);
+            temp_var.method = zis_ast_node_get_field(method_node, Name, value);
+            zis_array_obj_insert(z, temp_var.args, 0, zis_object_from(temp_var.target_node));
+            result_node = zis_ast_node_new(z, Send, false);
+            zis_ast_node_set_field(result_node, Send, method, temp_var.method);
+            zis_ast_node_set_field(result_node, Send, args, temp_var.args);
+            node_copy_loc0(result_node, temp_var.target_node);
+            node_copy_loc1(result_node, temp_var.call_node);
+            zis_locals_drop(p, temp_var);
         }
         break;
 
