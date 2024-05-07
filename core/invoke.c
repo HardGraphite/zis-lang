@@ -443,7 +443,7 @@ _interp_loop:
     OP_DEFINE(LDNIL) {
         uint32_t tgt, count;
         zis_instr_extract_operands_ABw(this_instr, tgt, count);
-        struct zis_object **tgt_p = bp + tgt, **tgt_last_p = tgt_p + count;
+        struct zis_object **tgt_p = bp + tgt, **tgt_last_p = tgt_p + count - 1;
         BOUND_CHECK_REG(tgt_last_p);
         struct zis_object *const nil = zis_object_from(g->val_nil);
         for (; tgt_p <= tgt_last_p; tgt_p++)
