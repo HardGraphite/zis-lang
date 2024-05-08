@@ -96,7 +96,19 @@ Examples:
 
 An identifier consists of any visible characters excepting whitespaces and punctuations.
 Specially, the first character of an identifier must not be a digit (0,1,2,...,9).
-An identifier cannot be the same with any of the keywords literally.
+A normal identifier cannot be the same with any of the keywords literally.
+To include special characters in an identifier,
+a string-like syntax can be used: `"\" ?lit_string?`.
+
+Examples:
+
+```
+i
+foo_bar_1
+AnIdentifier
+\"func"       #=>  func
+\"<\x41>"     #=>  <A>
+```
 
 ### Keywords
 

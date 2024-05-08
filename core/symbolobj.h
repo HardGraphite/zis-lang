@@ -5,6 +5,7 @@
 #include "object.h"
 
 struct zis_context;
+struct zis_string_obj;
 
 /* ----- symbol ------------------------------------------------------------- */
 
@@ -54,11 +55,17 @@ struct zis_symbol_obj *zis_symbol_registry_get(
     const char *s, size_t n /* = -1 */
 );
 
-/// Create or retrieve a `Symbol` object based on the given UTF-8 strings `s1 s2`.
+/// Create or retrieve a `Symbol` object based on the given UTF-8 strings `s1` `s2`.
 /// If `n1` or `n2` is -1, calculate string lengths with `strlen()`.
 struct zis_symbol_obj *zis_symbol_registry_get2(
     struct zis_context *z,
     const char *s1, size_t n1 /* = -1 */, const char *s2, size_t n2 /* = -1 */
+);
+
+/// Create or retrieve a `Symbol` object based on the given string object.
+struct zis_symbol_obj *zis_symbol_registry_gets(
+    struct zis_context *z,
+    struct zis_string_obj *str
 );
 
 /// Retrieve a `Symbol` object like `zis_symbol_registry_get()`.

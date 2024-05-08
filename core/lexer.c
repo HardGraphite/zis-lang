@@ -649,11 +649,22 @@ scan_next_char:
         stream_ignore_1(input);
         loc_next_char(l);
         first_char = stream_peek(input);
-        if (first_char != '\n')
-            error_unexpected_char(l, first_char);
-        stream_ignore_1(input);
-        loc_next_line(l);
-        goto scan_next_char;
+        if (first_char == '\n') {
+            stream_ignore_1(input);
+            loc_next_line(l);
+            goto scan_next_char;
+        } else if (first_char == '"' || first_char == '\'') {
+            scan_string(l, tok, first_char, true);
+            assert(tok->type == ZIS_TOK_LIT_STRING);
+            tok->value_identifier = zis_symbol_registry_gets(l->z, tok->value_string);
+            tok->type = ZIS_TOK_IDENTIFIER;
+            break;
+        } else {
+            if (first_char == -1)
+                error_unexpected_end_of(l, "input stream");
+            else
+                error_unexpected_char(l, first_char);
+        }
 
     case '!': // "!", "!="
         CASE_OPERATOR_2('!', ZIS_TOK_OP_NOT, ZIS_TOK_OP_NE);
