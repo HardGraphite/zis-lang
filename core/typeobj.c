@@ -200,7 +200,7 @@ size_t zis_type_obj_find_field(
     const struct zis_type_obj *self,
     struct zis_symbol_obj *name
 ) {
-    struct zis_object *const x = zis_map_obj_sym_get(self->_statics, name);
+    struct zis_object *const x = zis_map_obj_sym_get(self->_name_map, name);
     if (zis_unlikely(!x))
         return (size_t)-1;
     assert(zis_object_is_smallint(x));
@@ -214,7 +214,7 @@ size_t zis_type_obj_find_method(
     const struct zis_type_obj *self,
     struct zis_symbol_obj *name
 ) {
-    struct zis_object *const x = zis_map_obj_sym_get(self->_statics, name);
+    struct zis_object *const x = zis_map_obj_sym_get(self->_name_map, name);
     if (zis_unlikely(!x))
         return (size_t)-1;
     assert(zis_object_is_smallint(x));
@@ -237,7 +237,7 @@ struct zis_object *zis_type_obj_get_method(
 ) {
     // See `zis_type_obj_get_method_i()` and `zis_type_obj_find_method()`.
 
-    struct zis_object *const x = zis_map_obj_sym_get(self->_statics, name);
+    struct zis_object *const x = zis_map_obj_sym_get(self->_name_map, name);
     if (zis_unlikely(!x))
         return NULL;
     assert(zis_object_is_smallint(x));

@@ -696,6 +696,7 @@ _interp_loop:
             format_error_method_not_exists(z, func_obj, name);
             THROW_REG0;
         }
+        *bp = meth_obj;
         IP_ADVANCE;
         OP_DISPATCH;
     }
