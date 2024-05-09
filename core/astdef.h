@@ -119,6 +119,11 @@ struct zis_ast_node_Ge_data {
     struct zis_ast_node_obj *rhs;
 };
 
+struct zis_ast_node_Cmp_data {
+    struct zis_ast_node_obj *lhs;
+    struct zis_ast_node_obj *rhs;
+};
+
 struct zis_ast_node_And_data {
     struct zis_ast_node_obj *lhs;
     struct zis_ast_node_obj *rhs;
@@ -227,6 +232,7 @@ struct zis_ast_node_Module_data {
     E(Le             , "Node\0lhs\0Node\0rhs\0") \
     E(Gt             , "Node\0lhs\0Node\0rhs\0") \
     E(Ge             , "Node\0lhs\0Node\0rhs\0") \
+    E(Cmp            , "Node\0lhs\0Node\0rhs\0") \
     E(And            , "Node\0lhs\0Node\0rhs\0") \
     E(Or             , "Node\0lhs\0Node\0rhs\0") \
     E(Subscript      , "Node\0value\0Node\0key\0") \

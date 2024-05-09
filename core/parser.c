@@ -322,6 +322,7 @@ static void expr_builder_gen_one_expr(
     CASE_BIN_OP_(LE, Le)
     CASE_BIN_OP_(GT, Gt)
     CASE_BIN_OP_(GE, Ge)
+    CASE_BIN_OP_(CMP, Cmp)
     CASE_BIN_OP_(AND, And)
     CASE_BIN_OP_(OR, Or)
     CASE_BIN_OP_(SUBSCRIPT, Subscript)

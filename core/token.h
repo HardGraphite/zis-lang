@@ -40,6 +40,7 @@ struct zis_symbol_obj;
     E(LE            , "<=" ,  8) \
     E(GT            , ">"  ,  8) \
     E(GE            , ">=" ,  8) \
+    E(CMP           , "<=>",  8) \
     E(AND           , "&&" , 13) \
     E(OR            , "||" , 14) \
     E(SUBSCRIPT     , "[...]",2) \

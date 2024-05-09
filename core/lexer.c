@@ -598,26 +598,6 @@ scan_next_char:
         }                                                               \
     } while(0)
 
-// For 'C': C, C=, CC, CX.
-#define CASE_OPERATOR_4X(C, TOK_TYPE_C, TOK_TYPE_C_EQL, TOK_TYPE_CC, X, TOK_TYPE_CX) \
-    do {                                                                             \
-        stream_ignore_1(input);                                                      \
-        const int32_t second_char = stream_peek(input);                              \
-        if (second_char == X) {                                                      \
-            token_set_type(tok, TOK_TYPE_CX);                                        \
-            goto loc_next__input_ignore1__token_set_loc1__loc_next__return;          \
-        } else if (second_char == C) {                                               \
-            token_set_type(tok, TOK_TYPE_CC);                                        \
-            goto loc_next__input_ignore1__token_set_loc1__loc_next__return;          \
-        } else if (second_char == '=') {                                             \
-            token_set_type(tok, TOK_TYPE_C_EQL);                                     \
-            goto loc_next__input_ignore1__token_set_loc1__loc_next__return;          \
-        } else {                                                                     \
-            token_set_type(tok, TOK_TYPE_C);                                         \
-            goto token_set_loc1__loc_next__return;                                   \
-        }                                                                            \
-    } while(0)
-
     case '\t':
     case ' ':
         stream_ignore_1(input);
@@ -712,8 +692,30 @@ scan_next_char:
     case ':': // ":"
         CASE_OPERATOR_1(':', ZIS_TOK_OP_COLON);
 
-    case '<': // "<", "<=", "<<", "<-
-        CASE_OPERATOR_4X('<', ZIS_TOK_OP_LT, ZIS_TOK_OP_LE, ZIS_TOK_OP_SHL, '-', ZIS_TOK_L_ARROW);
+    case '<': // "<", "<=", "<<", "<-", "<=>"
+        stream_ignore_1(input);
+        {
+            const int32_t second_char = stream_peek(input);
+            if (second_char == '=') {
+                stream_ignore_1(input);
+                loc_next_char(l);
+                if (stream_peek(input) == '>') {
+                    token_set_type(tok, ZIS_TOK_OP_CMP);
+                    goto loc_next__input_ignore1__token_set_loc1__loc_next__return;
+                }
+                token_set_type(tok, ZIS_TOK_OP_LE);
+                goto token_set_loc1__loc_next__return;
+            } else if (second_char == '<') {
+                token_set_type(tok, ZIS_TOK_OP_SHL);
+                goto loc_next__input_ignore1__token_set_loc1__loc_next__return;
+            } else if (second_char == '-') {
+                token_set_type(tok, ZIS_TOK_L_ARROW);
+                goto loc_next__input_ignore1__token_set_loc1__loc_next__return;
+            } else {
+                token_set_type(tok, ZIS_TOK_OP_LT);
+                goto token_set_loc1__loc_next__return;
+            }
+        }
 
     case '=': // "=", "=="
         CASE_OPERATOR_2('=', ZIS_TOK_OP_EQL, ZIS_TOK_OP_EQ);
@@ -859,7 +861,6 @@ scan_next_char:
 #undef CASE_OPERATOR_2
 #undef CASE_OPERATOR_3
 #undef CASE_OPERATOR_3X
-#undef CASE_OPERATOR_4X
 
     }
     return;

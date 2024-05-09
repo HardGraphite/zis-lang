@@ -1385,6 +1385,11 @@ static int emit_Ge(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsign
     return emit_bin_op_node(cg, node, tgt_reg, ZIS_OPC_CMPGE);
 }
 
+static int emit_Cmp(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
+    assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Cmp);
+    return emit_bin_op_node(cg, node, tgt_reg, ZIS_OPC_CMP);
+}
+
 static int emit_And(struct zis_codegen *cg, struct zis_ast_node_obj *_node, unsigned int tgt_reg) {
     assert(zis_ast_node_obj_type(_node) == ZIS_AST_NODE_And);
     struct zis_ast_node_And_data *_node_data =
