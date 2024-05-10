@@ -189,7 +189,7 @@ zis_static_force_inline void _invocation_pass_args_dis_copy(
 }
 
 /// Pass arguments (discrete).
-zis_static_force_inline bool invocation_pass_args_dis(
+static bool invocation_pass_args_dis(
     struct zis_context *z,
     const unsigned int args_prev_frame_regs[],
     size_t argc,
@@ -237,6 +237,57 @@ zis_static_force_inline bool invocation_pass_args_dis(
     }
 
     return true;
+}
+
+/// Pass arguments like `invocation_pass_args_dis()`.
+/// Modified for the CALL instruction. Includes register index checks.
+zis_static_force_inline bool invocation_pass_args_dis_1(
+    struct zis_context *z,
+    zis_instr_word_t args_prev_frame_regs /* Same with the operands of instruction CALL */,
+    unsigned int argc,
+    struct invocation_info *info
+) {
+    // Adapted from `invocation_pass_args_dis()`.
+
+    const struct zis_func_obj_meta func_meta = info->func_meta;
+    assert(func_meta.nr >= 1U + func_meta.na + (func_meta.no == (unsigned char)-1 ? 1U : func_meta.no));
+    const size_t argc_min = func_meta.na;
+    assert(info->arg_shift > 0);
+    struct zis_object **const arg_list = z->callstack->frame + info->arg_shift;
+    struct zis_object **const caller_frame = info->caller_frame;
+
+    if (zis_likely(argc == argc_min)) {
+        for (uint32_t i = 0; i < argc; i++) {
+            const unsigned int idx = (args_prev_frame_regs >> (7 + 6 * i)) & 63;
+            struct zis_object **arg_p = caller_frame + idx;
+            if (zis_unlikely(arg_p >= arg_list))
+                goto bound_check_fail;
+            arg_list[i] = *arg_p;
+        }
+        if (zis_unlikely(func_meta.no)) {
+            if (func_meta.no != (unsigned char)-1)
+                zis_object_vec_fill(arg_list + argc, zis_object_from(z->globals->val_nil), func_meta.no);
+            else
+                arg_list[argc] = zis_object_from(z->globals->val_empty_tuple);
+        }
+    } else {
+        unsigned int args[4];
+        assert(argc <= sizeof args / sizeof args[0]);
+        for (uint32_t i = 0; i < argc; i++) {
+            const unsigned int idx = (args_prev_frame_regs >> (7 + 6 * i)) & 63;
+            if (zis_unlikely(caller_frame + idx >= arg_list))
+                goto bound_check_fail;
+            args[i] = idx;
+        }
+        return invocation_pass_args_dis(z, args, argc, info);
+    }
+
+    return true;
+
+bound_check_fail:
+    // see: BOUND_CHECK_REG()
+    zis_debug_log(FATAL, "Interp", "register index out of range");
+    zis_context_panic(z, ZIS_CONTEXT_PANIC_ILL);
 }
 
 /// Leave the frame. Returns the caller ip.
@@ -606,15 +657,9 @@ _interp_loop:
         struct invocation_info ii;
         if (zis_unlikely(!invocation_enter(z, ip, ret_p, &ii)))
             THROW_REG0;
-        unsigned int indices[3];
-        for (uint32_t i = 0; i < argc; i++) {
-            const unsigned int idx = (this_instr >> (7 + 6 * i)) & 63;
-            BOUND_CHECK_REG(ii.caller_frame + idx);
-            indices[i] = idx;
-        }
         BP_SP_CHANGED;
         FUNC_CHANGED_TO(zis_object_cast(ii.caller_frame[0], struct zis_func_obj));
-        if (zis_unlikely(!invocation_pass_args_dis(z, indices, argc, &ii)))
+        if (zis_unlikely(!invocation_pass_args_dis_1(z, this_instr, argc, &ii)))
             THROW_REG0;
     } {
     _do_call_func_obj:
