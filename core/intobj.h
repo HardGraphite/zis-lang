@@ -23,9 +23,15 @@ struct zis_object *zis_int_obj_or_smallint_s(
     unsigned int base
 );
 
+/// Return true if the integer is negative, false otherwise.
+bool zis_int_obj_sign(const struct zis_int_obj *self);
+
 /// Get value as `int64_t`. If the value falls out of range of type `int64_t`,
 /// `errno` is set to `ERANGE` and `INT64_MIN` is returned.
 int64_t zis_int_obj_value_i(const struct zis_int_obj *self);
+
+/// Get the lower 63 bits of the integer and return an int64.
+int64_t zis_int_obj_value_trunc(const struct zis_int_obj *self);
 
 /// Get value as `double`. The result may be inaccurate. If the value falls
 /// out of range of type `double`, `errno` is set to `ERANGE` and `HUGE_VAL` is returned.

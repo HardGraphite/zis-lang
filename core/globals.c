@@ -123,9 +123,12 @@ zis_cold_fn static void _init_symbols(
 ) {
 
 #define E(NAME) g-> sym_##NAME = zis_symbol_registry_get(z, #NAME, (size_t)-1);
+    _ZIS_BUILTIN_SYM_LIST1
+#undef E
 
-    _ZIS_BUILTIN_SYM_LIST
 
+#define E(NAME, SYM) g-> sym_##NAME = zis_symbol_registry_get(z, SYM, (size_t)-1);
+    _ZIS_BUILTIN_SYM_LIST2
 #undef E
 
 }

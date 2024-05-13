@@ -3,6 +3,7 @@
 #pragma once
 
 #include <assert.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h> // uintptr_t
 
@@ -212,6 +213,7 @@ do {                                           \
 /* ----- object common methods ---------------------------------------------- */
 
 struct zis_context;
+struct zis_string_obj;
 
 /// Calculate the hash code of an object.
 /// On success, stores the hash code to `*hash_code` and returns true.
@@ -241,5 +243,26 @@ enum zis_object_ordering zis_object_compare(
 /// This operation never fails.
 bool zis_object_equals(
     struct zis_context *z,
-    struct zis_object *obj1, struct zis_object *obj2
+    struct zis_object *lhs, struct zis_object *rhs
+);
+
+/// Generates a string representing the object `obj`.
+/// On failure, stores the thrown object to REG-0 and returns NULL.
+struct zis_string_obj *zis_object_to_string(
+    struct zis_context *z,
+    struct zis_object *obj, bool represent, const char *restrict format /* = NULL */
+);
+
+/// Get element.
+/// On failure, stores the thrown object to REG-0 and returns NULL.
+struct zis_object *zis_object_get_element(
+    struct zis_context *z,
+    struct zis_object *obj, struct zis_object *key
+);
+
+/// Set element.
+/// On failure, stores the thrown object to REG-0 and returns ZIS_THR.
+int zis_object_set_element(
+    struct zis_context *z,
+    struct zis_object *obj, struct zis_object *key, struct zis_object *value
 );

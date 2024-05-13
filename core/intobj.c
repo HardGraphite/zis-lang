@@ -184,6 +184,10 @@ struct zis_object *zis_int_obj_or_smallint_s(
     }
 }
 
+bool zis_int_obj_sign(const struct zis_int_obj *self) {
+    return self->negative;
+}
+
 int64_t zis_int_obj_value_i(const struct zis_int_obj *self) {
     const size_t cell_count = self->cell_count;
     assert(cell_count);
@@ -200,6 +204,20 @@ int64_t zis_int_obj_value_i(const struct zis_int_obj *self) {
     }
     errno = ERANGE;
     return INT64_MIN;
+}
+
+int64_t zis_int_obj_value_trunc(const struct zis_int_obj *self) {
+    const size_t cell_count = self->cell_count;
+    assert(cell_count);
+    if (cell_count == 1) {
+        static_assert(sizeof(bigint_cell_t) < sizeof(int64_t), "");
+        const int64_t v = self->cells[0];
+        return self->negative ? -v : v;
+    } else {
+        static_assert(sizeof(bigint_cell_t) * 2 == sizeof(int64_t), "");
+        const int64_t v = ((int64_t)(self->cells[1] & 0x7fffffff) << BIGINT_CELL_WIDTH) | (int64_t)self->cells[0];
+        return self->negative ? -v : v;
+    }
 }
 
 double zis_int_obj_value_f(const struct zis_int_obj *self) {

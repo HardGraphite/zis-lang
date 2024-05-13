@@ -1,5 +1,6 @@
 #include "invoke.h"
 
+#include <stdarg.h>
 #include <math.h>
 
 #include "assembly.h" // zis_debug_dump_bytecode()
@@ -60,6 +61,60 @@ struct invocation_info {
     struct zis_func_obj_meta func_meta;
 };
 
+zis_noinline static bool _invocation_enter_callable_obj(
+    struct zis_context *z,
+    zis_instr_word_t *caller_ip,
+    struct zis_object **ret_val_reg,
+    struct invocation_info *info
+) {
+    struct zis_object **caller_frame = z->callstack->frame;
+    struct zis_func_obj *func_obj;
+    size_t callable_obj_depth = 0;
+    struct zis_object *callable_obj_list[8];
+    info->caller_frame = caller_frame;
+
+    /// Extract the function object.
+    for (struct zis_object *callable = caller_frame[0];;) {
+        if (zis_unlikely(zis_object_is_smallint(callable))) {
+            format_error_func_type(z, callable);
+            return false;
+        }
+        struct zis_type_obj *const callable_type = zis_object_type(callable);
+        if (zis_likely(callable_type == z->globals->type_Function)) {
+            caller_frame[0] = callable;
+            func_obj = zis_object_cast(callable, struct zis_func_obj);
+            break;
+        }
+        if (zis_unlikely(callable_obj_depth >= sizeof callable_obj_list / sizeof callable_obj_list[0])) {
+            format_error_func_type(z, callable); // FIXME: TOO MANY LEVELS!
+            return false;
+        }
+        callable = zis_type_obj_get_method(callable_type, z->globals->sym_operator_call);
+        if (zis_unlikely(!callable)) {
+            format_error_func_type(z, callable);
+            return false;
+        }
+        callable_obj_list[callable_obj_depth++] = callable;
+    }
+    info->func_meta = func_obj->meta;
+    info->arg_shift = callable_obj_depth + 1;
+
+    /// New frame.
+    const size_t callee_frame_size = func_obj->meta.nr;
+    zis_callstack_enter(z->callstack, callee_frame_size, caller_ip, ret_val_reg);
+    if (func_obj->meta.na >= (unsigned char)callable_obj_depth) {
+        struct zis_object **frame = z->callstack->frame;
+        for (size_t i = 0; i < callable_obj_depth; i++)
+            frame[callable_obj_depth - i] = callable_obj_list[i];
+    } else {
+        format_error_argc(z, zis_object_cast(caller_frame[0], struct zis_func_obj), callable_obj_depth);
+        // FIXME: pass extra arguments as packed.
+        return false;
+    }
+
+    return true;
+}
+
 /// Enter a new frame for a invocation.
 /// REG-0 (caller frame) is the object to call and will be replaced with the real function object.
 /// On error, make an exception (REG-0) and returns false.
@@ -70,23 +125,18 @@ zis_static_force_inline bool invocation_enter(
     struct invocation_info *info
 ) {
     struct zis_object **caller_frame = z->callstack->frame;
-    size_t callee_frame_size;
     info->caller_frame = caller_frame;
 
     /// Extract the function object.
     struct zis_object *const callable = caller_frame[0];
-    if (zis_likely(zis_object_type_is(callable, z->globals->type_Function))) {
-        struct zis_func_obj *func_obj = zis_object_cast(callable, struct zis_func_obj);
-        callee_frame_size = func_obj->meta.nr;
-        info->func_meta = func_obj->meta;
-        info->arg_shift = 1;
-    } else {
-        format_error_func_type(z, callable);
-        return false;
-        // TODO: other callable objects.
-    }
+    if (zis_unlikely(!zis_object_type_is(callable, z->globals->type_Function)))
+        return _invocation_enter_callable_obj(z, caller_ip, ret_val_reg, info);
+    struct zis_func_obj *func_obj = zis_object_cast(callable, struct zis_func_obj);
+    info->func_meta = func_obj->meta;
+    info->arg_shift = 1;
 
     /// New frame.
+    const size_t callee_frame_size = func_obj->meta.nr;
     zis_callstack_enter(z->callstack, callee_frame_size, caller_ip, ret_val_reg);
 
     return true;
@@ -332,11 +382,12 @@ format_error_field_not_exists(
 
 zis_noinline zis_cold_fn static void
 format_error_method_not_exists(
-    struct zis_context *z, struct zis_func_obj *func, unsigned name_sym_id
+    struct zis_context *z, struct zis_object *obj, struct zis_symbol_obj *name
 ) {
-    struct zis_symbol_obj *name = zis_func_obj_symbol(func, name_sym_id);
-    struct zis_exception_obj *exc =
-        zis_exception_obj_format(z, "key", zis_object_from(name), "method not exists");
+    struct zis_exception_obj *exc = zis_exception_obj_format(
+        z, "key", obj, "method `%.*s' does not exist",
+        (int)zis_symbol_obj_data_size(name), zis_symbol_obj_data(name)
+    );
     zis_context_set_reg0(z, zis_object_from(exc));
 }
 
@@ -436,6 +487,28 @@ _interp_loop:
         this_instr = 0; \
         goto _do_throw; \
     } while (0)
+
+/// Calls method `NAME_SYM` with 2 arguments and expects 1 return value in an ABC-type instruction.
+#define CALL_METHOD_ABC_R2A(NAME_SYM) \
+    do {                              \
+        bp[0] = zis_object_from((NAME_SYM)); \
+        goto _do_call_method_reg0_ABC_r2a;   \
+    } while (0)
+
+/// Calls method `NAME_SYM` with 1 argument and expects 1 return value in an ABw-type instruction.
+#define CALL_METHOD_ABw_R1A(NAME_SYM) \
+    do {                              \
+        bp[0] = zis_object_from((NAME_SYM)); \
+        goto _do_call_method_reg0_ABw_r1a;   \
+    } while (0)
+
+/// Calls method `NAME_SYM` with 3 arguments in an ABC-type instruction.
+#define CALL_METHOD_ABC_3A(NAME_SYM) \
+    do {                              \
+        bp[0] = zis_object_from((NAME_SYM)); \
+        goto _do_call_method_reg0_ABC_3a;    \
+    } while (0)
+
 #define BOUND_CHECK_REG(PTR) \
     do {                     \
         assert(PTR >= bp);   \
@@ -444,6 +517,7 @@ _interp_loop:
             goto panic_ill;  \
         }                    \
     } while (0)
+
 #define BOUND_CHECK_SYM(I) \
     do {                   \
         if (zis_unlikely(I >= func_sym_count)) { \
@@ -451,6 +525,7 @@ _interp_loop:
             goto panic_ill;\
         }                  \
     } while (0)
+
 #define BOUND_CHECK_CON(I) \
     do {                   \
         if (zis_unlikely(I >= func_const_count)) { \
@@ -458,6 +533,7 @@ _interp_loop:
             goto panic_ill;\
         }                  \
     } while (0)
+
 #define BOUND_CHECK_GLB(I) \
     do {                   \
         if (zis_unlikely(I >= zis_module_obj_var_count(func_obj->_module))) { \
@@ -465,6 +541,7 @@ _interp_loop:
             goto panic_ill;\
         }                  \
     } while (0)
+
 #define BOUND_CHECK_FLD(OBJ, I) \
     do {                   \
         if (zis_unlikely(I >= zis_object_slot_count((OBJ)))) { \
@@ -725,6 +802,84 @@ _interp_loop:
         goto _do_call_func_obj;
     }
 
+    _do_call_method_reg0_ABC_r2a: // this_instr = <OP> tgt, lhs, rhs; REG-0 = method_sym
+    {
+        uint32_t tgt, lhs, rhs;
+        zis_instr_extract_operands_ABC(this_instr, tgt, lhs, rhs);
+        struct zis_object *obj = bp[lhs];
+        struct zis_type_obj *const obj_type =
+            zis_unlikely(zis_object_is_smallint(obj)) ? g->type_Int : zis_object_type(obj);
+        assert(zis_object_type_is(bp[0], g->type_Symbol));
+        struct zis_symbol_obj *method_name =
+            zis_object_cast(bp[0], struct zis_symbol_obj);
+        struct zis_object *meth_obj = zis_type_obj_get_method(obj_type, method_name);
+        if (zis_unlikely(!meth_obj)) {
+            format_error_method_not_exists(z, obj, method_name);
+            THROW_REG0;
+        }
+        bp[0] = meth_obj;
+        if (zis_likely(tgt < 32 && lhs < 64 && rhs < 64)) {
+            this_instr = zis_instr_make_Aw(0, (tgt << 20) | (2 << 18) | (lhs << (6 * 0)) | (rhs << (6 * 1)));
+            goto _do_call_func_obj;
+        }
+        if (zis_unlikely(zis_invoke_vn(z, bp + tgt, NULL, (struct zis_object *[]){bp[lhs], bp[rhs]}, 2) == ZIS_THR))
+            THROW_REG0;
+        IP_ADVANCE;
+        OP_DISPATCH;
+    }
+
+    _do_call_method_reg0_ABw_r1a: // this_instr = <OP> tgt, val; REG-0 = method_sym
+    {
+        uint32_t tgt, val;
+        zis_instr_extract_operands_ABw(this_instr, tgt, val);
+        struct zis_object *obj = bp[val];
+        struct zis_type_obj *const obj_type =
+            zis_unlikely(zis_object_is_smallint(obj)) ? g->type_Int : zis_object_type(obj);
+        assert(zis_object_type_is(bp[0], g->type_Symbol));
+        struct zis_symbol_obj *method_name =
+            zis_object_cast(bp[0], struct zis_symbol_obj);
+        struct zis_object *meth_obj = zis_type_obj_get_method(obj_type, method_name);
+        if (zis_unlikely(!meth_obj)) {
+            format_error_method_not_exists(z, obj, method_name);
+            THROW_REG0;
+        }
+        bp[0] = meth_obj;
+        if (zis_likely(tgt < 32 && val < 64)) {
+            this_instr = zis_instr_make_Aw(0, (tgt << 20) | (2 << 18) | (val << (6 * 0)));
+            goto _do_call_func_obj;
+        }
+        if (zis_unlikely(zis_invoke_vn(z, bp + tgt, NULL, bp + val, 1) == ZIS_THR))
+            THROW_REG0;
+        IP_ADVANCE;
+        OP_DISPATCH;
+    }
+
+    _do_call_method_reg0_ABC_3a: // this_instr = <OP> arg1, arg2, arg3; REG-0 = method_sym
+    {
+        uint32_t arg1, arg2, arg3;
+        zis_instr_extract_operands_ABC(this_instr, arg1, arg2, arg3);
+        struct zis_object *obj = bp[arg1];
+        struct zis_type_obj *const obj_type =
+            zis_unlikely(zis_object_is_smallint(obj)) ? g->type_Int : zis_object_type(obj);
+        assert(zis_object_type_is(bp[0], g->type_Symbol));
+        struct zis_symbol_obj *method_name =
+            zis_object_cast(bp[0], struct zis_symbol_obj);
+        struct zis_object *meth_obj = zis_type_obj_get_method(obj_type, method_name);
+        if (zis_unlikely(!meth_obj)) {
+            format_error_method_not_exists(z, obj, method_name);
+            THROW_REG0;
+        }
+        bp[0] = meth_obj;
+        if (zis_likely(arg1 < 64 && arg2 < 64 && arg3 < 64)) {
+            this_instr = zis_instr_make_Aw(0, (0) | (2 << 18) | (arg1 << (6 * 0)) | (arg2 << (6 * 1)) | (arg3 << (6 * 2)));
+            goto _do_call_func_obj;
+        }
+        if (zis_unlikely(zis_invoke_vn(z, bp, NULL, (struct zis_object *[]){bp[arg1], bp[arg2], bp[arg3]}, 3) == ZIS_THR))
+            THROW_REG0;
+        IP_ADVANCE;
+        OP_DISPATCH;
+    }
+
     OP_DEFINE(LDMTH) {
         uint32_t name, obj_;
         zis_instr_extract_operands_ABw(this_instr, obj_, name);
@@ -738,7 +893,7 @@ _interp_loop:
             zis_object_is_smallint(obj) ? g->type_Int : zis_object_type(obj);
         struct zis_object *meth_obj = zis_type_obj_get_method(obj_type, name_sym);
         if (zis_unlikely(!meth_obj)) {
-            format_error_method_not_exists(z, func_obj, name);
+            format_error_method_not_exists(z, obj, name_sym);
             THROW_REG0;
         }
         *bp = meth_obj;
@@ -947,19 +1102,79 @@ _interp_loop:
     }
 
     OP_DEFINE(LDELM) {
-        goto panic_ill; // Not implemented.
+        uint32_t key, elm, obj;
+        zis_instr_extract_operands_ABC(this_instr, key, elm, obj);
+        struct zis_object **key_p = bp + key, **elm_p = bp + elm, **obj_p = bp + obj;
+        BOUND_CHECK_REG(key_p);
+        BOUND_CHECK_REG(elm_p);
+        BOUND_CHECK_REG(obj_p);
+        if (zis_likely(elm < 256)) {
+            this_instr = zis_instr_make_ABC(0, elm, obj, key);
+            CALL_METHOD_ABC_R2A(g->sym_operator_get_element);
+        }
+        struct zis_object *key_v = *key_p, *obj_v = *obj_p;
+        struct zis_object *result = zis_object_get_element(z, obj_v, key_v);
+        if (zis_unlikely(result))
+            THROW_REG0;
+        *elm_p = result;
+        IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(STELM) {
-        goto panic_ill; // Not implemented.
+        uint32_t key, elm, obj;
+        zis_instr_extract_operands_ABC(this_instr, key, elm, obj);
+        struct zis_object **key_p = bp + key, **elm_p = bp + elm, **obj_p = bp + obj;
+        BOUND_CHECK_REG(key_p);
+        BOUND_CHECK_REG(elm_p);
+        BOUND_CHECK_REG(obj_p);
+        if (zis_likely(obj < 256)) {
+            this_instr = zis_instr_make_ABC(0, obj, key, elm);
+            CALL_METHOD_ABC_3A(g->sym_operator_get_element);
+        }
+        struct zis_object *key_v = *key_p, *elm_v = *elm_p, *obj_v = *obj_p;
+        if (zis_unlikely(zis_object_set_element(z, obj_v, key_v, elm_v) == ZIS_THR))
+            THROW_REG0;
+        IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(LDELMI) {
-        goto panic_ill; // Not implemented.
+        int32_t key; uint32_t elm, obj;
+        zis_instr_extract_operands_AsBC(this_instr, key, elm, obj);
+        struct zis_object **elm_p = bp + elm, **obj_p = bp + obj;
+        BOUND_CHECK_REG(elm_p);
+        BOUND_CHECK_REG(obj_p);
+        if (zis_likely(elm < 256)) {
+            bp[0] = zis_smallint_to_ptr(key);
+            this_instr = zis_instr_make_ABC(0, elm, obj, 0);
+            CALL_METHOD_ABC_R2A(g->sym_operator_get_element);
+        }
+        struct zis_object *obj_v = *obj_p;
+        struct zis_object *result = zis_object_get_element(z, obj_v, zis_smallint_to_ptr(key));
+        if (zis_unlikely(result))
+            THROW_REG0;
+        *elm_p = result;
+        IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(STELMI) {
-        goto panic_ill; // Not implemented.
+        int32_t key; uint32_t elm, obj;
+        zis_instr_extract_operands_AsBC(this_instr, key, elm, obj);
+        struct zis_object **elm_p = bp + elm, **obj_p = bp + obj;
+        BOUND_CHECK_REG(elm_p);
+        BOUND_CHECK_REG(obj_p);
+        if (zis_likely(obj < 256)) {
+            bp[0] = zis_smallint_to_ptr(key);
+            this_instr = zis_instr_make_ABC(0, obj, 0, elm);
+            CALL_METHOD_ABC_3A(g->sym_operator_get_element);
+        }
+        struct zis_object *elm_v = *elm_p, *obj_v = *obj_p;
+        if (zis_unlikely(zis_object_set_element(z, obj_v, zis_smallint_to_ptr(key), elm_v) == ZIS_THR))
+            THROW_REG0;
+        IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(JMP) {
@@ -1006,35 +1221,182 @@ _interp_loop:
     }
 
     OP_DEFINE(JMPLE) {
-        goto panic_ill; // Not implemented.
+        int32_t offset; uint32_t lhs, rhs;
+        zis_instr_extract_operands_AsBC(this_instr, offset, lhs, rhs);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        const enum zis_object_ordering cmp_res = zis_object_compare(z, lhs_v, rhs_v);
+        if (zis_unlikely(cmp_res == ZIS_OBJECT_IC))
+            THROW_REG0;
+        if (cmp_res != ZIS_OBJECT_GT)
+            IP_JUMP_TO(ip + offset);
+        else
+            IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(JMPLT) {
-        goto panic_ill; // Not implemented.
+        int32_t offset; uint32_t lhs, rhs;
+        zis_instr_extract_operands_AsBC(this_instr, offset, lhs, rhs);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        const enum zis_object_ordering cmp_res = zis_object_compare(z, lhs_v, rhs_v);
+        if (zis_unlikely(cmp_res == ZIS_OBJECT_IC))
+            THROW_REG0;
+        if (cmp_res == ZIS_OBJECT_LT)
+            IP_JUMP_TO(ip + offset);
+        else
+            IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(JMPEQ) {
-        goto panic_ill; // Not implemented.
+        int32_t offset; uint32_t lhs, rhs;
+        zis_instr_extract_operands_AsBC(this_instr, offset, lhs, rhs);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        const bool eq = zis_object_equals(z, lhs_v, rhs_v);
+        if (eq)
+            IP_JUMP_TO(ip + offset);
+        else
+            IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(JMPGT) {
-        goto panic_ill; // Not implemented.
+        int32_t offset; uint32_t lhs, rhs;
+        zis_instr_extract_operands_AsBC(this_instr, offset, lhs, rhs);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        const enum zis_object_ordering cmp_res = zis_object_compare(z, lhs_v, rhs_v);
+        if (zis_unlikely(cmp_res == ZIS_OBJECT_IC))
+            THROW_REG0;
+        if (cmp_res == ZIS_OBJECT_GT)
+            IP_JUMP_TO(ip + offset);
+        else
+            IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(JMPGE) {
-        goto panic_ill; // Not implemented.
+        int32_t offset; uint32_t lhs, rhs;
+        zis_instr_extract_operands_AsBC(this_instr, offset, lhs, rhs);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        const enum zis_object_ordering cmp_res = zis_object_compare(z, lhs_v, rhs_v);
+        if (zis_unlikely(cmp_res == ZIS_OBJECT_IC))
+            THROW_REG0;
+        if (cmp_res != ZIS_OBJECT_LT)
+            IP_JUMP_TO(ip + offset);
+        else
+            IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(JMPNE) {
-        goto panic_ill; // Not implemented.
+        int32_t offset; uint32_t lhs, rhs;
+        zis_instr_extract_operands_AsBC(this_instr, offset, lhs, rhs);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        const bool eq = zis_object_equals(z, lhs_v, rhs_v);
+        if (!eq)
+            IP_JUMP_TO(ip + offset);
+        else
+            IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(CMP) {
-        goto panic_ill; // Not implemented.
+        uint32_t tgt, lhs, rhs;
+        zis_instr_extract_operands_ABC(this_instr, tgt, lhs, rhs);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        do {
+            zis_smallint_t result;
+            if (lhs_v == rhs_v)
+                result = 0;
+            else if (zis_object_is_smallint(lhs_v) && zis_object_is_smallint(rhs_v))
+                result = zis_smallint_from_ptr(lhs_v) < zis_smallint_from_ptr(rhs_v) ? -1 : 1;
+            else
+                break;
+            *tgt_p = zis_smallint_to_ptr(result);
+            IP_ADVANCE;
+            OP_DISPATCH;
+        } while (0);
+        CALL_METHOD_ABC_R2A(g->sym_operator_cmp);
     }
 
     OP_DEFINE(CMPLE) {
-        goto panic_ill; // Not implemented.
+        uint32_t tgt, lhs, rhs;
+        zis_instr_extract_operands_ABC(this_instr, tgt, lhs, rhs);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        const enum zis_object_ordering cmp_res = zis_object_compare(z, lhs_v, rhs_v);
+        if (zis_unlikely(cmp_res == ZIS_OBJECT_IC))
+            THROW_REG0;
+        *tgt_p = zis_object_from(cmp_res != ZIS_OBJECT_GT ? g->val_true : g->val_false);
+        IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(CMPLT) {
@@ -1051,32 +1413,105 @@ _interp_loop:
             BOUND_CHECK_REG(rhs_p);
             rhs_v = *rhs_p;
         }
-        if (zis_object_is_smallint(lhs_v) && zis_object_is_smallint(rhs_v)) {
-            const zis_smallint_t lhs_smi = zis_smallint_from_ptr(lhs_v);
-            const zis_smallint_t rhs_smi = zis_smallint_from_ptr(rhs_v);
-            *tgt_p = zis_object_from(lhs_smi < rhs_smi ? g->val_true : g->val_false);
-        } else {
-            // TODO: other types
-            goto panic_ill; // Not implemented.
-        }
+        const enum zis_object_ordering cmp_res = zis_object_compare(z, lhs_v, rhs_v);
+        if (zis_unlikely(cmp_res == ZIS_OBJECT_IC))
+            THROW_REG0;
+        *tgt_p = zis_object_from(cmp_res == ZIS_OBJECT_LT ? g->val_true : g->val_false);
         IP_ADVANCE;
         OP_DISPATCH;
     }
 
     OP_DEFINE(CMPEQ) {
-        goto panic_ill; // Not implemented.
+        uint32_t tgt, lhs, rhs;
+        zis_instr_extract_operands_ABC(this_instr, tgt, lhs, rhs);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        do {
+            struct zis_bool_obj *result;
+            if (lhs_v == rhs_v)
+                result = g->val_true;
+            else if (zis_object_is_smallint(lhs_v) && zis_object_is_smallint(rhs_v))
+                result = g->val_false;
+            else
+                break;
+            *tgt_p = zis_object_from(result);
+            IP_ADVANCE;
+            OP_DISPATCH;
+        } while (0);
+        CALL_METHOD_ABC_R2A(g->sym_operator_equ);
     }
 
     OP_DEFINE(CMPGT) {
-        goto panic_ill; // Not implemented.
+        uint32_t tgt, lhs, rhs;
+        zis_instr_extract_operands_ABC(this_instr, tgt, lhs, rhs);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        const enum zis_object_ordering cmp_res = zis_object_compare(z, lhs_v, rhs_v);
+        if (zis_unlikely(cmp_res == ZIS_OBJECT_IC))
+            THROW_REG0;
+        *tgt_p = zis_object_from(cmp_res == ZIS_OBJECT_GT ? g->val_true : g->val_false);
+        IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(CMPGE) {
-        goto panic_ill; // Not implemented.
+        uint32_t tgt, lhs, rhs;
+        zis_instr_extract_operands_ABC(this_instr, tgt, lhs, rhs);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        const enum zis_object_ordering cmp_res = zis_object_compare(z, lhs_v, rhs_v);
+        if (zis_unlikely(cmp_res == ZIS_OBJECT_IC))
+            THROW_REG0;
+        *tgt_p = zis_object_from(cmp_res != ZIS_OBJECT_LT ? g->val_true : g->val_false);
+        IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(CMPNE) {
-        goto panic_ill; // Not implemented.
+        uint32_t tgt, lhs, rhs;
+        zis_instr_extract_operands_ABC(this_instr, tgt, lhs, rhs);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        const bool eq = zis_object_equals(z, lhs_v, rhs_v);
+        *tgt_p = zis_object_from(!eq ? g->val_true : g->val_false);
+        IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(ADD) {
@@ -1098,12 +1533,10 @@ _interp_loop:
             const zis_smallint_t rhs_smi = zis_smallint_from_ptr(rhs_v);
             *tgt_p = zis_smallint_to_ptr(lhs_smi + rhs_smi);
             // FIXME: overflow check
-        } else {
-            // TODO: other types
-            goto panic_ill; // Not implemented.
+            IP_ADVANCE;
+            OP_DISPATCH;
         }
-        IP_ADVANCE;
-        OP_DISPATCH;
+        CALL_METHOD_ABC_R2A(g->sym_operator_add);
     }
 
     OP_DEFINE(SUB) {
@@ -1125,12 +1558,10 @@ _interp_loop:
             const zis_smallint_t rhs_smi = zis_smallint_from_ptr(rhs_v);
             *tgt_p = zis_smallint_to_ptr(lhs_smi - rhs_smi);
             // FIXME: overflow check
-        } else {
-            // TODO: other types
-            goto panic_ill; // Not implemented.
+            IP_ADVANCE;
+            OP_DISPATCH;
         }
-        IP_ADVANCE;
-        OP_DISPATCH;
+        CALL_METHOD_ABC_R2A(g->sym_operator_sub);
     }
 
     OP_DEFINE(MUL) {
@@ -1152,56 +1583,244 @@ _interp_loop:
             const zis_smallint_t rhs_smi = zis_smallint_from_ptr(rhs_v);
             *tgt_p = zis_smallint_to_ptr(lhs_smi * rhs_smi);
             // FIXME: overflow check
-        } else {
-            // TODO: other types
-            goto panic_ill; // Not implemented.
+            IP_ADVANCE;
+            OP_DISPATCH;
         }
+        CALL_METHOD_ABC_R2A(g->sym_operator_mul);
+    }
+
+    OP_DEFINE(DIV) {
+        uint32_t tgt, lhs, rhs;
+        zis_instr_extract_operands_ABC(this_instr, tgt, lhs, rhs);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        if (zis_object_is_smallint(lhs_v) && zis_object_is_smallint(rhs_v)) {
+            const zis_smallint_t lhs_smi = zis_smallint_from_ptr(lhs_v);
+            const zis_smallint_t rhs_smi = zis_smallint_from_ptr(rhs_v);
+            *tgt_p = zis_object_from(zis_float_obj_new(z, (double)lhs_smi / (double)rhs_smi));
+            IP_ADVANCE;
+            OP_DISPATCH;
+        }
+        CALL_METHOD_ABC_R2A(g->sym_operator_div);
+    }
+
+    OP_DEFINE(REM) {
+        uint32_t tgt, lhs, rhs;
+        zis_instr_extract_operands_ABC(this_instr, tgt, lhs, rhs);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        if (zis_object_is_smallint(lhs_v) && zis_object_is_smallint(rhs_v)) {
+            const zis_smallint_t lhs_smi = zis_smallint_from_ptr(lhs_v);
+            const zis_smallint_t rhs_smi = zis_smallint_from_ptr(rhs_v);
+            *tgt_p = zis_smallint_to_ptr(lhs_smi % rhs_smi);
+            IP_ADVANCE;
+            OP_DISPATCH;
+        }
+        CALL_METHOD_ABC_R2A(zis_symbol_registry_get(z, "%", 1));
+    }
+
+    OP_DEFINE(POW) {
+        uint32_t tgt, lhs, rhs;
+        zis_instr_extract_operands_ABC(this_instr, tgt, lhs, rhs);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+        }
+        CALL_METHOD_ABC_R2A(zis_symbol_registry_get(z, "**", 2));
+    }
+
+    OP_DEFINE(SHL) {
+        uint32_t tgt, lhs, rhs;
+        zis_instr_extract_operands_ABC(this_instr, tgt, lhs, rhs);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+        }
+        CALL_METHOD_ABC_R2A(zis_symbol_registry_get(z, "<<", 2));
+    }
+
+    OP_DEFINE(SHR) {
+        uint32_t tgt, lhs, rhs;
+        zis_instr_extract_operands_ABC(this_instr, tgt, lhs, rhs);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+        }
+        CALL_METHOD_ABC_R2A(zis_symbol_registry_get(z, ">>", 2));
+    }
+
+    OP_DEFINE(BITAND) {
+        uint32_t tgt, lhs, rhs;
+        zis_instr_extract_operands_ABC(this_instr, tgt, lhs, rhs);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        if (zis_object_is_smallint(lhs_v) && zis_object_is_smallint(rhs_v)) {
+            const zis_smallint_t lhs_smi = zis_smallint_from_ptr(lhs_v);
+            const zis_smallint_t rhs_smi = zis_smallint_from_ptr(rhs_v);
+            if (lhs_smi >= 0 && rhs_smi >= 0) {
+                *tgt_p = zis_smallint_to_ptr(lhs_smi & rhs_smi);
+                IP_ADVANCE;
+                OP_DISPATCH;
+            }
+        }
+        CALL_METHOD_ABC_R2A(zis_symbol_registry_get(z, "&", 1));
+    }
+
+    OP_DEFINE(BITOR) {
+        uint32_t tgt, lhs, rhs;
+        zis_instr_extract_operands_ABC(this_instr, tgt, lhs, rhs);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        if (zis_object_is_smallint(lhs_v) && zis_object_is_smallint(rhs_v)) {
+            const zis_smallint_t lhs_smi = zis_smallint_from_ptr(lhs_v);
+            const zis_smallint_t rhs_smi = zis_smallint_from_ptr(rhs_v);
+            if (lhs_smi >= 0 && rhs_smi >= 0) {
+                *tgt_p = zis_smallint_to_ptr(lhs_smi | rhs_smi);
+                IP_ADVANCE;
+                OP_DISPATCH;
+            }
+        }
+        CALL_METHOD_ABC_R2A(zis_symbol_registry_get(z, "|", 1));
+    }
+
+    OP_DEFINE(BITXOR) {
+        uint32_t tgt, lhs, rhs;
+        zis_instr_extract_operands_ABC(this_instr, tgt, lhs, rhs);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        struct zis_object *lhs_v, *rhs_v;
+        {
+            struct zis_object **lhs_p = bp + lhs;
+            BOUND_CHECK_REG(lhs_p);
+            lhs_v = *lhs_p;
+            struct zis_object **rhs_p = bp + rhs;
+            BOUND_CHECK_REG(rhs_p);
+            rhs_v = *rhs_p;
+        }
+        if (zis_object_is_smallint(lhs_v) && zis_object_is_smallint(rhs_v)) {
+            const zis_smallint_t lhs_smi = zis_smallint_from_ptr(lhs_v);
+            const zis_smallint_t rhs_smi = zis_smallint_from_ptr(rhs_v);
+            if (lhs_smi >= 0 && rhs_smi >= 0) {
+                *tgt_p = zis_smallint_to_ptr(lhs_smi ^ rhs_smi);
+                IP_ADVANCE;
+                OP_DISPATCH;
+            }
+        }
+        CALL_METHOD_ABC_R2A(zis_symbol_registry_get(z, "^", 1));
+    }
+
+    OP_DEFINE(NOT) {
+        uint32_t tgt, val;
+        zis_instr_extract_operands_ABw(this_instr, tgt, val);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        struct zis_object *val_v;
+        {
+            struct zis_object **val_p = bp + val;
+            BOUND_CHECK_REG(val_p);
+            val_v = *val_p;
+        }
+        if (val_v == zis_object_from(g->val_true))
+            val_v = zis_object_from(g->val_false);
+        else if (val_v == zis_object_from(g->val_false))
+            val_v = zis_object_from(g->val_true);
+        else
+            format_error_cond_is_not_bool(z, val_v);
+        *tgt_p = val_v;
         IP_ADVANCE;
         OP_DISPATCH;
     }
 
-    OP_DEFINE(DIV) {
-        goto panic_ill; // Not implemented.
-    }
-
-    OP_DEFINE(REM) {
-        goto panic_ill; // Not implemented.
-    }
-
-    OP_DEFINE(POW) {
-        goto panic_ill; // Not implemented.
-    }
-
-    OP_DEFINE(SHL) {
-        goto panic_ill; // Not implemented.
-    }
-
-    OP_DEFINE(SHR) {
-        goto panic_ill; // Not implemented.
-    }
-
-    OP_DEFINE(BITAND) {
-        goto panic_ill; // Not implemented.
-    }
-
-    OP_DEFINE(BITOR) {
-        goto panic_ill; // Not implemented.
-    }
-
-    OP_DEFINE(BITXOR) {
-        goto panic_ill; // Not implemented.
-    }
-
-    OP_DEFINE(NOT) {
-        goto panic_ill; // Not implemented.
-    }
-
     OP_DEFINE(NEG) {
-        goto panic_ill; // Not implemented.
+        uint32_t tgt, val;
+        zis_instr_extract_operands_ABw(this_instr, tgt, val);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        struct zis_object *val_v;
+        {
+            struct zis_object **val_p = bp + val;
+            BOUND_CHECK_REG(val_p);
+            val_v = *val_p;
+        }
+        if (zis_object_is_smallint(val_v)) {
+            const zis_smallint_t val_smi = zis_smallint_from_ptr(val_v);
+            if (zis_likely(val_smi != ZIS_SMALLINT_MIN)) {
+                *tgt_p = zis_smallint_to_ptr(-val_smi);
+                IP_ADVANCE;
+                OP_DISPATCH;
+            }
+        }
+        CALL_METHOD_ABw_R1A(zis_symbol_registry_get(z, "-#", 2));
     }
 
     OP_DEFINE(BITNOT) {
-        goto panic_ill; // Not implemented.
+        uint32_t tgt, val;
+        zis_instr_extract_operands_ABw(this_instr, tgt, val);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        struct zis_object *val_v;
+        {
+            struct zis_object **val_p = bp + val;
+            BOUND_CHECK_REG(val_p);
+            val_v = *val_p;
+        }
+        if (zis_object_is_smallint(val_v)) {
+            const zis_smallint_t val_smi = zis_smallint_from_ptr(val_v);
+            if (val_smi >= 0) {
+                *tgt_p = zis_smallint_to_ptr(~val_smi);
+                IP_ADVANCE;
+                OP_DISPATCH;
+            }
+        }
+        CALL_METHOD_ABw_R1A(zis_symbol_registry_get(z, "~", 1));
     }
 
     OP_UNDEFINED {
@@ -1210,6 +1829,9 @@ _interp_loop:
     }
 
 #undef THROW_REG0
+#undef CALL_METHOD_ABC_R2A
+#undef CALL_METHOD_ABw_R1A
+#undef CALL_METHOD_ABC_3A
 #undef BOUND_CHECK_REG
 #undef BOUND_CHECK_SYM
 #undef BOUND_CHECK_CON
@@ -1407,4 +2029,53 @@ int zis_invoke_func(struct zis_context *z, struct zis_func_obj *func) {
         return status;
     }
     return invoke_bytecode_func(z, func);
+}
+
+int zis_invoke_vn(
+    struct zis_context *z, struct zis_object **ret_to /* = NULL */,
+    struct zis_object *callable /* = NULL */, struct zis_object *argv[], size_t argc
+) {
+    struct zis_func_obj *const func_obj =
+        zis_invoke_prepare_va(z, callable, ret_to, argv, argc);
+    if (zis_unlikely(!func_obj))
+        return ZIS_THR;
+    return zis_invoke_func(z, func_obj);
+}
+
+int zis_invoke_v(
+    struct zis_context *z, struct zis_object **ret_to /* = NULL */,
+    struct zis_object *callable /* = NULL */, struct zis_object *args[]/* {arg1, arg2, ..., NULL} or NULL */
+) {
+    size_t argc = 0;
+    for (struct zis_object **p = args; *p; p++)
+        argc++;
+    return zis_invoke_vn(z, ret_to, callable, args, argc);
+}
+
+int zis_invoke_l(
+    struct zis_context *z, struct zis_object **ret_to /* = NULL */,
+    struct zis_object *callable /* = NULL */, ... /* arg1, arg2, ..., NULL */
+) {
+    va_list ap;
+    size_t argc = 0, alloc_n = 4;
+    struct zis_object **args = zis_callstack_frame_alloc_temp(z, alloc_n);
+    va_start(ap, callable);
+    while (true) {
+        struct zis_object *arg = va_arg(ap, struct zis_object *);
+        if (!arg)
+            break;
+        assert(argc <= alloc_n);
+        if (zis_unlikely(argc == alloc_n)) {
+            const size_t n = 4;
+            alloc_n += n;
+            struct zis_object **p = zis_callstack_frame_alloc_temp(z, n);
+            zis_unused_var(p), assert(p == args + argc);
+        }
+        args[argc++] = arg;
+    }
+    va_end(ap);
+
+    const int status = zis_invoke_vn(z, ret_to, callable, args, argc);
+    zis_callstack_frame_free_temp(z, alloc_n);
+    return status;
 }
