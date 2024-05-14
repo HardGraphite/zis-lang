@@ -190,6 +190,7 @@ static bool ast_node_is_expr(enum zis_ast_node_type type) {
         type == ZIS_AST_NODE_Le        ||
         type == ZIS_AST_NODE_Gt        ||
         type == ZIS_AST_NODE_Ge        ||
+        type == ZIS_AST_NODE_Cmp       ||
         type == ZIS_AST_NODE_And       ||
         type == ZIS_AST_NODE_Or        ||
         type == ZIS_AST_NODE_Subscript ||
