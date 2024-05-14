@@ -2012,17 +2012,17 @@ int zis_invoke_func(struct zis_context *z, struct zis_func_obj *func) {
     const zis_native_func_t c_func = func->native;
     if (zis_unlikely(c_func)) {
         const int status = c_func(z);
-        if (
-            zis_unlikely(status == ZIS_THR) &&
-            zis_object_type_is(z->callstack->frame[0], z->globals->type_Exception)
-        ) {
-            struct zis_exception_obj *exc_obj =
-                zis_object_cast(z->callstack->frame[0], struct zis_exception_obj);
-            assert(zis_object_type_is(zis_callstack_frame_info(z->callstack)->prev_frame[0], z->globals->type_Function));
-            struct zis_func_obj *func_obj =
-                zis_object_cast(zis_callstack_frame_info(z->callstack)->prev_frame[0], struct zis_func_obj);
-            assert(func_obj->native == c_func);
-            zis_exception_obj_stack_trace(z, exc_obj, func_obj, NULL);
+        if (zis_unlikely(status == ZIS_THR)) {
+            const struct zis_callstack_frame_info *const frame_info = zis_callstack_frame_info(z->callstack);
+            struct zis_object **const frame = z->callstack->frame;
+            if (zis_object_type_is(frame[0], z->globals->type_Exception)) {
+                struct zis_exception_obj *exc_obj = zis_object_cast(frame[0], struct zis_exception_obj);
+                assert(zis_object_type_is(frame_info->prev_frame[0], z->globals->type_Function));
+                struct zis_func_obj *func_obj = zis_object_cast(frame_info->prev_frame[0], struct zis_func_obj);
+                assert(func_obj->native == c_func);
+                zis_exception_obj_stack_trace(z, exc_obj, func_obj, NULL);
+            }
+            frame_info->prev_frame[0] = frame[0];
         }
         void *ret_ip = invocation_leave(z, z->callstack->frame[0]);
         assert(!ret_ip), zis_unused_var(ret_ip);

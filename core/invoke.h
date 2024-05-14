@@ -44,7 +44,8 @@ struct zis_func_obj *zis_invoke_prepare_da(
 /// `zis_invoke_prepare_*() should be called before calling this function;
 /// otherwise, the new frame (and the arguments) shall have been prepared
 /// and the function `func` shall have been stored in the REG-0 in the caller's frame.
-/// If an exception is thrown, the stack trace will be updated.
+/// If an exception is thrown, the stack trace will be updated, and the exception
+/// it self will be copied to REG-0.
 int zis_invoke_func(struct zis_context *z, struct zis_func_obj *func);
 
 /* ----- convenient wrappers ------------------------------------------------ */
