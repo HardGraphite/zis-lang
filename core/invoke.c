@@ -403,11 +403,11 @@ format_error_cond_is_not_bool(
 /// Run the bytecode in the function object.
 /// Then pop the current frame and handles the return value.
 zis_hot_fn static int invoke_bytecode_func(
-    struct zis_context *z, struct zis_func_obj *func_obj
+    struct zis_context *z, struct zis_func_obj *this_func
 ) {
 #define OP_DISPATCH_USE_COMPUTED_GOTO ZIS_USE_COMPUTED_GOTO
 
-    zis_instr_word_t *ip = func_obj->bytecode; // The instruction pointer.
+    zis_instr_word_t *ip = this_func->bytecode; // The instruction pointer.
     zis_instr_word_t this_instr = *ip;
 
 #define IP_ADVANCE     (this_instr = *++ip)
@@ -419,33 +419,33 @@ zis_hot_fn static int invoke_bytecode_func(
 
 #define BP_SP_CHANGED  (bp = stack->frame, sp = stack->top)
 
-    /* func_obj; */
-    assert(zis_callstack_frame_info(stack)->prev_frame[0] == zis_object_from(func_obj));
-    uint32_t func_sym_count = (uint32_t)zis_func_obj_symbol_count(func_obj);
-    uint32_t func_const_count = (uint32_t)zis_func_obj_constant_count(func_obj);
+    /* this_func; */
+    assert(zis_callstack_frame_info(stack)->prev_frame[0] == zis_object_from(this_func));
+    uint32_t func_sym_count = (uint32_t)zis_func_obj_symbol_count(this_func);
+    uint32_t func_const_count = (uint32_t)zis_func_obj_constant_count(this_func);
 
 #define FUNC_ENSURE \
-    do {  /* func_obj shall not be moved */ \
-        assert((void *)func_obj == (void *)zis_callstack_frame_info(stack)->prev_frame[0]); \
-        assert(zis_object_type_is((struct zis_object *)func_obj, g->type_Function));        \
-        assert((size_t)func_sym_count == zis_func_obj_symbol_count(func_obj));     \
-        assert((size_t)func_const_count == zis_func_obj_constant_count(func_obj)); \
+    do {  /* this_func shall not be moved */ \
+        assert((void *)this_func == (void *)zis_callstack_frame_info(stack)->prev_frame[0]); \
+        assert(zis_object_type_is((struct zis_object *)this_func, g->type_Function));        \
+        assert((size_t)func_sym_count == zis_func_obj_symbol_count(this_func));     \
+        assert((size_t)func_const_count == zis_func_obj_constant_count(this_func)); \
     } while (0)
 #define FUNC_CHANGED \
     do {             \
         struct zis_object *p = zis_callstack_frame_info(stack)->prev_frame[0]; \
         assert(zis_object_type_is(p, g->type_Function));                       \
-        func_obj = zis_object_cast(p, struct zis_func_obj);                    \
-        func_sym_count = (uint32_t)zis_func_obj_symbol_count(func_obj);        \
-        func_const_count = (uint32_t)zis_func_obj_constant_count(func_obj);    \
+        this_func = zis_object_cast(p, struct zis_func_obj);                   \
+        func_sym_count = (uint32_t)zis_func_obj_symbol_count(this_func);       \
+        func_const_count = (uint32_t)zis_func_obj_constant_count(this_func);   \
     } while (0)
 #define FUNC_CHANGED_TO(NEW_FUNC) \
     do {                          \
-        func_obj = (NEW_FUNC);    \
-        assert((void *)func_obj == (void *)zis_callstack_frame_info(stack)->prev_frame[0]); \
-        assert(zis_object_type_is((struct zis_object *)func_obj, g->type_Function));        \
-        func_sym_count = (uint32_t)zis_func_obj_symbol_count(func_obj);        \
-        func_const_count = (uint32_t)zis_func_obj_constant_count(func_obj);    \
+        this_func = (NEW_FUNC);   \
+        assert((void *)this_func == (void *)zis_callstack_frame_info(stack)->prev_frame[0]); \
+        assert(zis_object_type_is((struct zis_object *)this_func, g->type_Function));        \
+        func_sym_count = (uint32_t)zis_func_obj_symbol_count(this_func);       \
+        func_const_count = (uint32_t)zis_func_obj_constant_count(this_func);   \
     } while (0)
 
     struct zis_context_globals *const g = z->globals;
@@ -485,7 +485,7 @@ _interp_loop:
 #define THROW_REG0 \
     do {           \
         this_instr = 0; \
-        goto _do_throw; \
+        goto _op_thr;   \
     } while (0)
 
 /// Calls method `NAME_SYM` with 2 arguments and expects 1 return value in an ABC-type instruction.
@@ -536,7 +536,7 @@ _interp_loop:
 
 #define BOUND_CHECK_GLB(I) \
     do {                   \
-        if (zis_unlikely(I >= zis_module_obj_var_count(func_obj->_module))) { \
+        if (zis_unlikely(I >= zis_module_obj_var_count(this_func->_module))) { \
             zis_debug_log(FATAL, "Interp", "global index out of range");      \
             goto panic_ill;\
         }                  \
@@ -597,7 +597,7 @@ _interp_loop:
         BOUND_CHECK_REG(tgt_p);
         FUNC_ENSURE;
         BOUND_CHECK_CON(id);
-        *tgt_p = zis_func_obj_constant(func_obj, id);
+        *tgt_p = zis_func_obj_constant(this_func, id);
         IP_ADVANCE;
         OP_DISPATCH;
     }
@@ -609,7 +609,7 @@ _interp_loop:
         BOUND_CHECK_REG(tgt_p);
         FUNC_ENSURE;
         BOUND_CHECK_SYM(id);
-        *tgt_p = zis_object_from(zis_func_obj_symbol(func_obj, id));
+        *tgt_p = zis_object_from(zis_func_obj_symbol(this_func, id));
         IP_ADVANCE;
         OP_DISPATCH;
     }
@@ -676,7 +676,7 @@ _interp_loop:
         OP_DISPATCH;
     }
 
-    _do_throw:
+    _op_thr:
     OP_DEFINE(THR) {
         uint32_t val;
         zis_instr_extract_operands_Aw(this_instr, val);
@@ -688,7 +688,7 @@ _interp_loop:
             if (val_is_exc) {
                 assert(zis_object_type_is(*val_p, g->type_Exception));
                 struct zis_exception_obj *exc = zis_object_cast(*val_p, struct zis_exception_obj);
-                zis_exception_obj_stack_trace(z, exc, func_obj, ip);
+                zis_exception_obj_stack_trace(z, exc, this_func, ip);
             }
             // TODO: check if caught.
             struct zis_object **new_val_p = zis_callstack_frame_info(stack)->ret_val_reg;
@@ -725,6 +725,7 @@ _interp_loop:
         OP_DISPATCH;
     }
 
+    _op_call:
     OP_DEFINE(CALL) {
         uint32_t ret, argc;
         ret = this_instr >> 27;
@@ -740,8 +741,8 @@ _interp_loop:
             THROW_REG0;
     } {
     _do_call_func_obj:
-        if (func_obj->native) {
-            const int status = func_obj->native(z);
+        if (this_func->native) {
+            const int status = this_func->native(z);
             if (zis_unlikely(status == ZIS_THR))
                 THROW_REG0;
             assert(status == ZIS_OK);
@@ -751,8 +752,8 @@ _interp_loop:
             FUNC_CHANGED;
             IP_ADVANCE;
         } else {
-            assert(zis_func_obj_bytecode_length(func_obj));
-            IP_JUMP_TO(func_obj->bytecode);
+            assert(zis_func_obj_bytecode_length(this_func));
+            IP_JUMP_TO(this_func->bytecode);
         }
         OP_DISPATCH;
     }
@@ -820,7 +821,7 @@ _interp_loop:
         bp[0] = meth_obj;
         if (zis_likely(tgt < 32 && lhs < 64 && rhs < 64)) {
             this_instr = zis_instr_make_Aw(0, (tgt << 20) | (2 << 18) | (lhs << (6 * 0)) | (rhs << (6 * 1)));
-            goto _do_call_func_obj;
+            goto _op_call;
         }
         if (zis_unlikely(zis_invoke_vn(z, bp + tgt, NULL, (struct zis_object *[]){bp[lhs], bp[rhs]}, 2) == ZIS_THR))
             THROW_REG0;
@@ -846,7 +847,7 @@ _interp_loop:
         bp[0] = meth_obj;
         if (zis_likely(tgt < 32 && val < 64)) {
             this_instr = zis_instr_make_Aw(0, (tgt << 20) | (2 << 18) | (val << (6 * 0)));
-            goto _do_call_func_obj;
+            goto _op_call;
         }
         if (zis_unlikely(zis_invoke_vn(z, bp + tgt, NULL, bp + val, 1) == ZIS_THR))
             THROW_REG0;
@@ -872,7 +873,7 @@ _interp_loop:
         bp[0] = meth_obj;
         if (zis_likely(arg1 < 64 && arg2 < 64 && arg3 < 64)) {
             this_instr = zis_instr_make_Aw(0, (0) | (2 << 18) | (arg1 << (6 * 0)) | (arg2 << (6 * 1)) | (arg3 << (6 * 2)));
-            goto _do_call_func_obj;
+            goto _op_call;
         }
         if (zis_unlikely(zis_invoke_vn(z, bp, NULL, (struct zis_object *[]){bp[arg1], bp[arg2], bp[arg3]}, 3) == ZIS_THR))
             THROW_REG0;
@@ -887,7 +888,7 @@ _interp_loop:
         BOUND_CHECK_REG(obj_p);
         FUNC_ENSURE;
         BOUND_CHECK_SYM(name);
-        struct zis_symbol_obj *name_sym = zis_func_obj_symbol(func_obj, name);
+        struct zis_symbol_obj *name_sym = zis_func_obj_symbol(this_func, name);
         struct zis_object *obj = *obj_p;
         struct zis_type_obj *const obj_type =
             zis_object_is_smallint(obj) ? g->type_Int : zis_object_type(obj);
@@ -910,7 +911,7 @@ _interp_loop:
         BOUND_CHECK_SYM(name);
         const int flags = ZIS_MOD_LDR_SEARCH_LOADED | ZIS_MOD_LDR_UPDATE_LOADED;
         struct zis_module_obj *module =
-            zis_module_loader_import(z, NULL, zis_func_obj_symbol(func_obj, name), NULL, flags);
+            zis_module_loader_import(z, NULL, zis_func_obj_symbol(this_func, name), NULL, flags);
         if (zis_unlikely(!module))
             THROW_REG0;
         *tgt_p = zis_object_from(module);
@@ -950,15 +951,15 @@ _interp_loop:
         FUNC_ENSURE;
         BOUND_CHECK_SYM(name);
         size_t id =
-            zis_module_obj_find(func_obj->_module, zis_func_obj_symbol(func_obj, name));
+            zis_module_obj_find(this_func->_module, zis_func_obj_symbol(this_func, name));
         if (zis_unlikely(id == (size_t)-1)) {
             struct zis_object *v =
-                zis_module_obj_parent_get(z, func_obj->_module, zis_func_obj_symbol(func_obj, name));
+                zis_module_obj_parent_get(z, this_func->_module, zis_func_obj_symbol(this_func, name));
             if (!v) {
-                format_error_global_not_found(z, func_obj, name);
+                format_error_global_not_found(z, this_func, name);
                 THROW_REG0;
             }
-            id = zis_module_obj_set(z, func_obj->_module, zis_func_obj_symbol(func_obj, name), v);
+            id = zis_module_obj_set(z, this_func->_module, zis_func_obj_symbol(this_func, name), v);
         }
         if (zis_likely(id <= ZIS_INSTR_U16_MAX)) {
             assert(*ip == this_instr);
@@ -968,7 +969,7 @@ _interp_loop:
         }
         struct zis_object **val_p = bp + val;
         BOUND_CHECK_REG(val_p);
-        *val_p = zis_module_obj_get_i(func_obj->_module, id);
+        *val_p = zis_module_obj_get_i(this_func->_module, id);
         IP_ADVANCE;
         OP_DISPATCH;
     }
@@ -981,7 +982,7 @@ _interp_loop:
         FUNC_ENSURE;
         BOUND_CHECK_SYM(name);
         const size_t id =
-            zis_module_obj_set(z, func_obj->_module, zis_func_obj_symbol(func_obj, name), *val_p);
+            zis_module_obj_set(z, this_func->_module, zis_func_obj_symbol(this_func, name), *val_p);
         if (zis_likely(id <= ZIS_INSTR_U16_MAX)) {
             assert(*ip == this_instr);
             assert((enum zis_opcode)zis_instr_extract_opcode(this_instr) == ZIS_OPC_STGLB);
@@ -999,7 +1000,7 @@ _interp_loop:
         BOUND_CHECK_REG(val_p);
         FUNC_ENSURE;
         BOUND_CHECK_GLB(id);
-        *val_p = zis_module_obj_get_i(func_obj->_module, id);
+        *val_p = zis_module_obj_get_i(this_func->_module, id);
         IP_ADVANCE;
         OP_DISPATCH;
     }
@@ -1011,7 +1012,7 @@ _interp_loop:
         BOUND_CHECK_REG(val_p);
         FUNC_ENSURE;
         BOUND_CHECK_GLB(id);
-        zis_module_obj_set_i(func_obj->_module, id, *val_p);
+        zis_module_obj_set_i(this_func->_module, id, *val_p);
         IP_ADVANCE;
         OP_DISPATCH;
     }
@@ -1024,21 +1025,21 @@ _interp_loop:
         BOUND_CHECK_REG(obj_p);
         FUNC_ENSURE;
         BOUND_CHECK_SYM(name);
-        struct zis_symbol_obj *name_sym = zis_func_obj_symbol(func_obj, name);
+        struct zis_symbol_obj *name_sym = zis_func_obj_symbol(this_func, name);
         struct zis_object *obj = *obj_p;
         struct zis_type_obj *const obj_type = zis_object_type_1(obj);
         if (obj_type == g->type_Module) {
             struct zis_module_obj *const mod = zis_object_cast(obj, struct zis_module_obj);
             struct zis_object *const val = zis_module_obj_get(mod, name_sym);
             if (zis_unlikely(!val)){
-                format_error_global_not_found(z, func_obj, name);
+                format_error_global_not_found(z, this_func, name);
                 THROW_REG0;
             }
             *fld_p = val;
         } else {
             const size_t index = zis_type_obj_find_field(obj_type, name_sym);
             if (zis_unlikely(index == (size_t)-1)) {
-                format_error_field_not_exists(z, func_obj, name);
+                format_error_field_not_exists(z, this_func, name);
                 THROW_REG0;
             }
             assert(index < zis_object_slot_count(obj));
@@ -1056,7 +1057,7 @@ _interp_loop:
         BOUND_CHECK_REG(obj_p);
         FUNC_ENSURE;
         BOUND_CHECK_SYM(name);
-        struct zis_symbol_obj *name_sym = zis_func_obj_symbol(func_obj, name);
+        struct zis_symbol_obj *name_sym = zis_func_obj_symbol(this_func, name);
         struct zis_object *obj = *obj_p;
         struct zis_type_obj *const obj_type = zis_object_type_1(obj);
         if (obj_type == g->type_Module) {
@@ -1065,7 +1066,7 @@ _interp_loop:
         } else {
             const size_t index = zis_type_obj_find_field(obj_type, name_sym);
             if (zis_unlikely(index == (size_t)-1)) {
-                format_error_field_not_exists(z, func_obj, name);
+                format_error_field_not_exists(z, this_func, name);
                 THROW_REG0;
             }
             assert(index < zis_object_slot_count(obj));
@@ -1840,7 +1841,8 @@ _interp_loop:
 
 panic_ill:
     zis_debug_log_1(DUMP, "Interp", "zis_debug_dump_bytecode()", fp, {
-        zis_debug_dump_bytecode(z, func_obj, (uint32_t)(ip - func_obj->bytecode), fp);
+        FUNC_ENSURE;
+        zis_debug_dump_bytecode(z, this_func, (uint32_t)(ip - this_func->bytecode), fp);
     });
     zis_context_panic(z, ZIS_CONTEXT_PANIC_ILL);
 
