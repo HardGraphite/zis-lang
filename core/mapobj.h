@@ -141,3 +141,10 @@ int zis_map_obj_foreach(
     struct zis_context *z, struct zis_map_obj *self,
     int (*fn)(struct zis_object *key, struct zis_object *val, void *arg), void *fn_arg
 );
+
+/// Find a key by its associated value.
+/// Returns NULL if not found.
+struct zis_object *zis_map_obj_reverse_lookup(
+    struct zis_context *z, struct zis_map_obj *self,
+    struct zis_object *value
+);

@@ -57,7 +57,7 @@ size_t zis_exception_obj_stack_trace_length(
 /// Traverse the stack trace.
 int zis_exception_obj_walk_stack_trace(
     struct zis_context *z, struct zis_exception_obj *self,
-    int (*fn)(unsigned int index, struct zis_func_obj *func_obj, unsigned int instr_offset, void *arg),
+    int (*fn)(struct zis_context *, unsigned int index, struct zis_func_obj *func_obj, unsigned int instr_offset, void *arg),
     void *fn_arg
 );
 

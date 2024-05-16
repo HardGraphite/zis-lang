@@ -455,6 +455,31 @@ break_loop:
     return fn_ret;
 }
 
+struct _reverse_lookup_state {
+    struct zis_context *z;
+    struct zis_object *value;
+    struct zis_object *found_key;
+};
+
+static int _reverse_lookup_fn(struct zis_object *_key, struct zis_object *_val, void *_arg) {
+    struct _reverse_lookup_state *const state = _arg;
+    if (_val == state->value) {
+        state->found_key = _key;
+        return 1;
+    }
+    return 0;
+}
+
+struct zis_object *zis_map_obj_reverse_lookup(
+    struct zis_context *z, struct zis_map_obj *self,
+    struct zis_object *value
+) {
+    struct _reverse_lookup_state state = { .z = z, .value = value, .found_key = NULL };
+    if (zis_map_obj_foreach(z, self, _reverse_lookup_fn, &state))
+        return state.found_key;
+    return NULL;
+}
+
 ZIS_NATIVE_TYPE_DEF(
     Map,
     struct zis_map_obj,

@@ -604,6 +604,43 @@ struct zis_module_obj *zis_module_loader_get_loaded(
     return NULL;
 }
 
+struct _find_loaded_name_state {
+    struct zis_context *z;
+    struct zis_type_obj *type_Map;
+    struct zis_symbol_obj **name;
+    struct zis_module_obj *module;
+};
+
+static int _find_loaded_name_fn(struct zis_object *_key, struct zis_object *_val, void *_arg) {
+    struct _find_loaded_name_state *const state = _arg;
+    if (_val == zis_object_from(state->module)) {
+        assert(zis_object_type_is(_key, state->z->globals->type_Symbol));
+        state->name[0] = zis_object_cast(_key, struct zis_symbol_obj);
+        state->name[1] = NULL;
+        return 1;
+    } else if (zis_object_type_is(_val, state->type_Map)) {
+        struct zis_object *sub_name = zis_map_obj_reverse_lookup(
+            state->z, zis_object_cast(_val, struct zis_map_obj),
+            zis_object_from(state->module)
+        );
+        assert(zis_object_type_is(_key, state->z->globals->type_Symbol));
+        assert(zis_object_type_is(sub_name, state->z->globals->type_Symbol));
+        state->name[0] = zis_object_cast(_key, struct zis_symbol_obj);
+        state->name[1] = zis_object_cast(sub_name, struct zis_symbol_obj);
+    }
+    return 0;
+}
+
+bool zis_module_loader_find_loaded_name(
+    struct zis_context *z,
+    struct zis_symbol_obj *name[ZIS_PARAMARRAY_STATIC 2],
+    struct zis_module_obj *module
+) {
+    name[0] = NULL, name[1] = NULL;
+    struct _find_loaded_name_state state = { z, z->globals->type_Map, name, module };
+    return zis_map_obj_foreach(z, z->module_loader->data.loaded_modules, _find_loaded_name_fn, &state);
+}
+
 static bool _module_loader_load_top(
     struct zis_context *z,
     struct zis_module_obj *_module,

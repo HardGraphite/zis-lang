@@ -145,7 +145,7 @@ size_t zis_exception_obj_stack_trace_length(
 
 int zis_exception_obj_walk_stack_trace(
     struct zis_context *z, struct zis_exception_obj *self,
-    int (*fn)(unsigned int index, struct zis_func_obj *func_obj, unsigned int instr_offset, void *arg),
+    int (*fn)(struct zis_context *, unsigned int index, struct zis_func_obj *func_obj, unsigned int instr_offset, void *arg),
     void *fn_arg
 ) {
     const size_t n = zis_exception_obj_stack_trace_length(z, self);
@@ -162,6 +162,7 @@ int zis_exception_obj_walk_stack_trace(
         assert(zis_object_type_is(v[i * 2], z->globals->type_Function));
         assert(zis_object_is_smallint(v[i * 2 + 1]));
         fn_ret = fn(
+            z,
             i,
             zis_object_cast(v[i * 2], struct zis_func_obj),
             (unsigned int)zis_smallint_from_ptr(v[i * 2 + 1]),
@@ -176,15 +177,31 @@ int zis_exception_obj_walk_stack_trace(
 }
 
 static int _print_stack_trace_fn(
-    unsigned int index, struct zis_func_obj *func_obj, unsigned int instr_offset, void *_arg
+    struct zis_context *z, unsigned int index,
+    struct zis_func_obj *func_obj, unsigned int instr_offset, void *_arg
 ) {
     struct zis_stream_obj *out_stream = _arg;
     zis_unused_var(out_stream);
     char buffer[80];
-    // TODO: print pretty function name and source location.
-    snprintf(buffer, sizeof buffer, " [%u] <Function@%p>+%u\n", index, (void *)func_obj, instr_offset);
-    // TODO: print to the `out_stream`.
+    snprintf(buffer, sizeof buffer, "[%02u] ", index);
     fputs(buffer, stdout);
+    do {
+        struct zis_string_obj *func_name =
+            zis_context_guess_variable_name(z, zis_object_from(func_obj));
+        if (func_name) {
+            size_t n = zis_string_obj_value(func_name, buffer, sizeof buffer - 1);
+            if (n != (size_t)-1) {
+                buffer[n] = 0;
+                break;
+            }
+        }
+        strcpy(buffer, "??");
+    } while (0);
+    fputs(buffer, stdout);
+    snprintf(buffer, sizeof buffer, " (+%u)\n", instr_offset);
+    fputs(buffer, stdout);
+    // TODO: print source location.
+    // TODO: print to the `out_stream`.
     return 0;
 }
 
