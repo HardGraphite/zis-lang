@@ -1380,8 +1380,11 @@ ZIS_API int zis_load_global(zis_t z, unsigned int reg, const char *name, size_t 
         return ZIS_E_IDX;
     struct zis_module_obj *mod = zis_func_obj_module(api_get_current_func(z));
     struct zis_object *obj = zis_module_obj_get(mod, name_sym);
-    if (zis_unlikely(!obj))
-        return api_load_global_err_not_found(z, name, name_len);
+    if (zis_unlikely(!obj)) {
+        obj = zis_module_obj_parent_get(z, mod, name_sym);
+        if (zis_unlikely(!obj))
+            return api_load_global_err_not_found(z, name, name_len);
+    }
     *obj_ref = obj;
     return ZIS_OK;
 }

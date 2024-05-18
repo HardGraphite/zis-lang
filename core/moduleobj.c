@@ -12,6 +12,7 @@
 #include "funcobj.h"
 #include "mapobj.h"
 #include "symbolobj.h"
+#include "tupleobj.h"
 #include "typeobj.h"
 
 struct zis_module_obj *zis_module_obj_new(
@@ -312,8 +313,43 @@ int zis_module_obj_do_init(
     return zis_invoke_func(z, initializer);
 }
 
+static int T_Module_M_list_vars(struct zis_context *z) {
+#define T_Module_Md_list_vars { "list_vars", {1, 0, 1}, T_Module_M_list_vars }
+    /*#DOCSTR# func Module:list_vars() :: Array[Tuple[Symbol, Object]]
+    Lists the variables in the module. Returns an array of name-value pairs. */
+    struct zis_object **frame = z->callstack->frame;
+    zis_locals_decl(
+        z, var,
+        struct zis_module_obj *self;
+        struct zis_array_obj  *list;
+        struct zis_object     *pair[2];
+    );
+    zis_locals_zero(var);
+    var.self = zis_object_cast(frame[1], struct zis_module_obj);
+    const size_t var_count = zis_array_slots_obj_length(var.self->_variables);
+    var.list = zis_array_obj_new2(z, var_count, NULL, 0);
+    for (size_t i = 0; i < var_count; i++) {
+        var.pair[0] = zis_map_obj_reverse_lookup(z, var.self->_name_map, zis_smallint_to_ptr((zis_smallint_t)i));
+        if (!var.pair[0])
+            break;
+        var.pair[1] = zis_array_slots_obj_get(var.self->_variables, i);
+        assert(var.pair[0]), assert(var.pair[1]);
+        zis_array_obj_append(z, var.list, zis_object_from(zis_tuple_obj_new(z, var.pair, 2)));
+    }
+    frame[0] = zis_object_from(var.list);
+    zis_locals_drop(z, var);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_LIST_DEF(
+    module_methods,
+    T_Module_Md_list_vars,
+);
+
 ZIS_NATIVE_TYPE_DEF_NB(
     Module,
     struct zis_module_obj,
-    NULL, NULL, NULL
+    NULL,
+    ZIS_NATIVE_FUNC_LIST_VAR(module_methods),
+    NULL
 );

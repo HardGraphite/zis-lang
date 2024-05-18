@@ -91,15 +91,22 @@ static void F_print__print_1(zis_t z, struct zis_object *value, struct zis_strea
     zis_stream_obj_write_chars(stream, buffer, strlen(buffer));
 }
 
-// print(value)
+// print(*value)
 static int F_print(zis_t z) {
     // TODO: re-write this function.
 
     struct zis_stream_obj *stream = z->globals->val_stream_stdout;
-    F_print__print_1(z, z->callstack->frame[1], stream);
+    struct zis_object **reg1 = &z->callstack->frame[1];
+    assert(zis_object_type_is(*reg1, z->globals->type_Tuple));
+    for (size_t i = 0, n = zis_tuple_obj_length(zis_object_cast(*reg1, struct zis_tuple_obj)); i < n; i++) {
+        if (i)
+            zis_stream_obj_write_char(stream, ' ');
+        F_print__print_1(z, zis_tuple_obj_data(zis_object_cast(*reg1, struct zis_tuple_obj))[i], stream);
+    }
     zis_stream_obj_write_char(stream, '\n');
     zis_stream_obj_flush_chars(stream);
 
+    z->callstack->frame[0] = zis_object_from(z->globals->val_nil);
     return ZIS_OK;
 }
 
@@ -188,7 +195,7 @@ zis_cold_fn static int F_init(zis_t z) {
 
 static const struct zis_native_func_def M_funcs[] = {
     { NULL    , {0, 0, 1}, F_init     },
-    { "print" , {1, 0, 1}, F_print    },
+    { "print" , {0, (unsigned char)-1, 1}, F_print    },
     { "input" , {0, 1, 1}, F_input    },
     { NULL    , {0, 0, 0}, NULL       },
 };
