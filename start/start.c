@@ -125,7 +125,7 @@ static void parse_command_line_args(
 
 static int start(zis_t z, void *_args) {
     struct command_line_args *const args = _args;
-    int exit_status = EXIT_SUCCESS;
+    int exit_status;
     const char *imp_what;
     int imp_flags;
 
@@ -162,7 +162,11 @@ static int start(zis_t z, void *_args) {
     imp_flags |= ZIS_IMP_MAIN;
     zis_make_int(z, 1, (int64_t)args->rest_args_num);
     zis_make_int(z, 2, (intptr_t)args->rest_args);
-    if (zis_import(z, 0, imp_what, imp_flags) == ZIS_THR) {
+    const int status = zis_import(z, 0, imp_what, imp_flags);
+    if (status >= 0) {
+        exit_status = status;
+    } else {
+        assert(status == ZIS_THR);
         zis_move_local(z, 1, 0);
         zis_make_stream(z, 2, ZIS_IOS_STDX, 2); // stderr
         zis_read_exception(z, 1, ZIS_RDE_DUMP, 2);

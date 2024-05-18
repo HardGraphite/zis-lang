@@ -669,7 +669,8 @@ ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) ZIS_NOEX
  * @param reg register index
  * @param what module name, or file path; see @@details
  * @param flags `ZIS_IMP_*` values; see @@details
- * @return `ZIS_OK` or `ZIS_THR`; `ZIS_E_ARG` (illegal `flags` or `what`).
+ * @return `ZIS_OK` or `ZIS_THR`; `ZIS_E_ARG` (illegal `flags` or `what`);
+ * the returned integer from `main()` function if `flags` contains `ZIS_IMP_MAIN`.
  *
  * @details Examples:
  * ```c

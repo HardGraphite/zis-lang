@@ -1280,8 +1280,9 @@ static int api_import_call_main(zis_t z, struct zis_object **res_ref) {
 
     const struct zis_func_obj_meta func_meta = zis_object_cast(main_fn, struct zis_func_obj)->meta;
     struct zis_func_obj *func_obj;
+    struct zis_object *func_ret_val;
     if (!func_meta.na && !func_meta.no) {
-        func_obj = zis_invoke_prepare_va(z, main_fn, NULL, NULL, 0);
+        func_obj = zis_invoke_prepare_va(z, main_fn, &func_ret_val, NULL, 0);
     } else {
         int64_t argc_i64, argv_i64;
         status = zis_read_int(z, 1, &argc_i64);
@@ -1301,12 +1302,21 @@ static int api_import_call_main(zis_t z, struct zis_object **res_ref) {
             struct zis_string_obj *arg = zis_string_obj_new(z, argv[i], (size_t)-1);
             zis_array_obj_set(var.args, (size_t)i, zis_object_from(arg));
         }
-        func_obj = zis_invoke_prepare_va(z, main_fn, NULL, (struct zis_object **)&var.args, 1);
+        func_obj = zis_invoke_prepare_va(z, main_fn, &func_ret_val, (struct zis_object **)&var.args, 1);
         zis_locals_drop(z, var);
     }
     if (func_obj) {
         assert(zis_object_from(func_obj) == main_fn);
         status = zis_invoke_func(z, func_obj);
+        if (status == ZIS_OK) {
+            if (zis_object_is_smallint(func_ret_val)) {
+                const zis_smallint_t x = zis_smallint_from_ptr(func_ret_val);
+                status = (int)((zis_smallint_unsigned_t)x & 0xff);
+            } else if (zis_object_type(func_ret_val) == z->globals->type_Int) {
+                const int64_t x = zis_int_obj_value_trunc(zis_object_cast(func_ret_val, struct zis_int_obj));
+                status = (int)((uint64_t)x) & 0xff;
+            }
+        }
     } else {
         status = ZIS_THR;
     }

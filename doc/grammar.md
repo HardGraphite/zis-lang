@@ -381,6 +381,8 @@ if the module is run as the entry point.
 
 The function may accept one argument, an array of command line arguments.
 Or it can take on argument, which does not cause an error.
+The function can return an integer as the exit code.
+A non-Int return value will be replaced with "`0`", which represents success.
 
 Here is an example:
 
