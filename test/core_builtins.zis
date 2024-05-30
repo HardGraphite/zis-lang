@@ -1,0 +1,48 @@
+import testing
+
+## Nil
+
+func test_Nil_operator_equ()
+    testing.check_equal(nil == nil, true)
+    testing.check_equal(nil == 1, false)
+end
+
+func test_Nil_operator_cmp()
+    testing.check_equal(nil <=> nil, 0)
+end
+
+func test_Nil_hash()
+    testing.check_equal(nil:hash(), -1)
+    testing.check_equal(nil:hash(), -1)
+end
+
+func test_Nil_to_string()
+    testing.check_equal(nil:to_string(), 'nil')
+    testing.check_equal(nil:to_string(), 'nil')
+end
+
+## Bool
+
+func test_Bool_operator_equ()
+    testing.check_equal(true  == true , true )
+    testing.check_equal(false == false, true )
+    testing.check_equal(false == true , false)
+    testing.check_equal(true  == false, false)
+end
+
+func test_Bool_operator_cmp()
+    testing.check_equal(true  <=> true , 0)
+    testing.check_equal(false <=> false, 0)
+    testing.check_equal(false <=> true ,-1)
+    testing.check_equal(true  <=> false, 1)
+end
+
+func test_Bool_hash()
+    testing.check_equal(true:hash() , 1)
+    testing.check_equal(false:hash(), 0)
+end
+
+func test_Bool_to_string()
+    testing.check_equal(true:to_string() , 'true' )
+    testing.check_equal(false:to_string(), 'false')
+end

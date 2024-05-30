@@ -3,6 +3,7 @@ add_library(zis_test_util STATIC "test.c")
 
 ## zis_add_test("*.{c,cc}" [LINK_CORE] [ENABLE_EXPORTS] [INCLUDE ...] [LINK ...])
 ## zis_add_test("*.cmake")
+## zis_add_test("*.zis")
 function(zis_add_test filename)
     get_filename_component(filename_stem "${filename}" NAME_WLE)
     set(test_name "zis_test_${filename_stem}")
@@ -29,6 +30,17 @@ function(zis_add_test filename)
         )
     elseif(filename MATCHES ".+\\.cmake$")
         include("${filename}")
+    elseif(filename MATCHES ".+\\.zis$")
+        add_test(
+            NAME ${test_name}
+            COMMAND "$<TARGET_FILE:${zis_start_tgt}>" "@testing" "${CMAKE_CURRENT_SOURCE_DIR}/${filename}"
+        )
+        if(TARGET zis_mod_testing)
+            set_tests_properties(
+                ${test_name} PROPERTIES
+                ENVIRONMENT "ZIS_PATH=$<TARGET_FILE_DIR:zis_mod_testing>"
+            )
+        endif()
     else()
         message(SEND_ERROR "Unexpected file for tests: ${filename}")
         return()
@@ -53,4 +65,7 @@ endif()
 if(ZIS_BUILD_START)
     zis_add_test(start_cliutil.c   )
     zis_add_test(start_run.cmake   )
+endif()
+if(ZIS_MOD_TESTING)
+    zis_add_test(core_builtins.zis )
 endif()

@@ -209,6 +209,10 @@ static struct zis_string_obj *_guess_name_gen_str(struct _guess_name_state *rest
     return zis_string_obj_new(state->z, buffer, state->size);
 }
 
+static void _guess_name_clear(struct _guess_name_state *restrict state) {
+    state->size = 0;
+}
+
 static void _guess_name_append(struct _guess_name_state *restrict state, const char *s, size_t n) {
     if (!state->external_buffer) {
         if (state->size + n <= sizeof state->buffer) {
@@ -253,7 +257,7 @@ static bool _guess_name_of_var_in_mod(
             return true;
         }
     }
-    return NULL;
+    return false;
 }
 
 static bool _guess_name_of_type_member_in_mod(
@@ -289,7 +293,7 @@ static bool _guess_name_of_type_member_in_mod(
         }
     }
     if (!(type_var && type_member_name))
-        return NULL;
+        return false;
     _guess_name_of_var_in_mod(state, mod, zis_object_from(type_var));
     _guess_name_append_char(state, var_is_method ? ':' : '.');
     assert(zis_object_type_is(type_member_name, state->z->globals->type_Symbol));
@@ -318,24 +322,32 @@ static bool _guess_name_of_type(struct _guess_name_state *restrict state, struct
             break;
         }
     }
-    if (!module)
-        return false;
-    if (!_guess_name_of_mod(state, module))
-        return false;
-    _guess_name_append_char(state, '.');
-    if (_guess_name_of_var_in_mod(state, module, zis_object_from(var)))
-        return true;
-    return _guess_name_of_type_member_in_mod(state, module, zis_object_from(var), false);
+    if (module) {
+        if (!_guess_name_of_mod(state, module))
+            _guess_name_append(state, "??", 2);
+        _guess_name_append_char(state, '.');
+        if (_guess_name_of_var_in_mod(state, module, zis_object_from(var)))
+            return true;
+        if (_guess_name_of_type_member_in_mod(state, module, zis_object_from(var), false))
+            return true;
+    }
+    module = state->z->globals->val_mod_prelude;
+    _guess_name_clear(state);
+    return _guess_name_of_var_in_mod(state, module, zis_object_from(var));
 }
 
 static bool _guess_name_of_func(struct _guess_name_state *restrict state, struct zis_func_obj *var) {
     struct zis_module_obj *module = zis_func_obj_module(var);
     if (!_guess_name_of_mod(state, module))
-        return false;
+        _guess_name_append(state, "??", 2);
     _guess_name_append_char(state, '.');
     if (_guess_name_of_var_in_mod(state, module, zis_object_from(var)))
         return true;
-    return _guess_name_of_type_member_in_mod(state, module, zis_object_from(var), true);
+    if (_guess_name_of_type_member_in_mod(state, module, zis_object_from(var), true))
+        return true;
+    module = state->z->globals->val_mod_prelude;
+    _guess_name_clear(state);
+    return _guess_name_of_var_in_mod(state, module, zis_object_from(var));
 }
 
 struct zis_string_obj *
