@@ -1250,6 +1250,11 @@ static int emit_BitXor(struct zis_codegen *cg, struct zis_ast_node_obj *node, un
     return emit_bin_op_node(cg, node, tgt_reg, ZIS_OPC_BITXOR);
 }
 
+static int emit_Pow(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
+    assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Pow);
+    return emit_bin_op_node(cg, node, tgt_reg, ZIS_OPC_POW);
+}
+
 static int emit_Assign(struct zis_codegen *cg, struct zis_ast_node_obj *_node, unsigned int tgt_reg) {
     assert(zis_ast_node_obj_type(_node) == ZIS_AST_NODE_Assign);
     struct zis_ast_node_Assign_data *_node_data =

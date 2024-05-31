@@ -84,6 +84,11 @@ struct zis_ast_node_BitXor_data {
     struct zis_ast_node_obj *rhs;
 };
 
+struct zis_ast_node_Pow_data {
+    struct zis_ast_node_obj *lhs;
+    struct zis_ast_node_obj *rhs;
+};
+
 struct zis_ast_node_Assign_data {
     struct zis_ast_node_obj *lhs;
     struct zis_ast_node_obj *rhs;
@@ -225,6 +230,7 @@ struct zis_ast_node_Module_data {
     E(BitAnd         , "Node\0lhs\0Node\0rhs\0") \
     E(BitOr          , "Node\0lhs\0Node\0rhs\0") \
     E(BitXor         , "Node\0lhs\0Node\0rhs\0") \
+    E(Pow            , "Node\0lhs\0Node\0rhs\0") \
     E(Assign         , "Node\0lhs\0Node\0rhs\0") \
     E(Eq             , "Node\0lhs\0Node\0rhs\0") \
     E(Ne             , "Node\0lhs\0Node\0rhs\0") \

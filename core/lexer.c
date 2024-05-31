@@ -658,11 +658,11 @@ scan_next_char:
     case '&': // "&", "&=", "&&"
         CASE_OPERATOR_3('&', ZIS_TOK_OP_BIT_AND, ZIS_TOK_OP_BIT_AND_EQL, ZIS_TOK_OP_AND);
 
-    case '*': // "*", "*="
-        CASE_OPERATOR_2('*', ZIS_TOK_OP_MUL, ZIS_TOK_OP_MUL_EQL);
+    case '*': // "*", "*=", "**"
+        CASE_OPERATOR_3('*', ZIS_TOK_OP_MUL, ZIS_TOK_OP_MUL_EQL, ZIS_TOK_OP_POW);
 
     case '+': // "+", "+="
-        CASE_OPERATOR_2('*', ZIS_TOK_OP_ADD, ZIS_TOK_OP_ADD_EQL);
+        CASE_OPERATOR_2('+', ZIS_TOK_OP_ADD, ZIS_TOK_OP_ADD_EQL);
 
     case ',': // ","
         CASE_OPERATOR_1(',', ZIS_TOK_COMMA);

@@ -315,6 +315,7 @@ static void expr_builder_gen_one_expr(
     CASE_BIN_OP_(BIT_AND, BitAnd)
     CASE_BIN_OP_(BIT_OR, BitOr)
     CASE_BIN_OP_(BIT_XOR, BitXor)
+    CASE_BIN_OP_(POW, Pow)
     CASE_BIN_OP_(EQL, Assign)
     CASE_BIN_OP_(EQ, Eq)
     CASE_BIN_OP_(NE, Ne)

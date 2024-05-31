@@ -33,6 +33,7 @@ struct zis_symbol_obj;
     E(BIT_AND       , "&"  , 10) \
     E(BIT_OR        , "|"  , 12) \
     E(BIT_XOR       , "^"  , 11) \
+    E(POW           , "**" ,  3) \
     E(EQL           , "="  ,-15) \
     E(EQ            , "==" ,  9) \
     E(NE            , "!=" ,  9) \

@@ -155,6 +155,7 @@ Binary operators:
 |     `&`      |     10     | bitwise and               |
 |    &#124;    |     12     | bitwise or                |
 |     `^`      |     11     | bitwise exclusive-or      |
+|     `**`     |     3      | power                     |
 |     `=`      |    -15     | assignment                |
 |     `+=`     |    -15     | assignment by sum         |
 |     `-=`     |    -15     | assignment by difference  |
