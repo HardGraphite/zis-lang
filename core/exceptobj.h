@@ -43,14 +43,10 @@ struct zis_exception_obj *zis_exception_obj_vformat(
     const char *restrict what_fmt, va_list what_args
 );
 
-struct zis_exception_obj_format_common_char4 {
-    char data[4];
-};
-
 enum zis_exception_obj_format_common_template {
-    ZIS_EXC_FMT_UNSUPPORTED_OPERATION_UN, ///< (char4 op, object *obj1) => "unsupported operation: $op $(typeof $obj1)"
-    ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN, ///< (char4 op, object *obj1, object *obj2) => "unsupported operation: $(typeof $obj1) $op $(typeof $obj2)"
-    ZIS_EXC_FMT_UNSUPPORTED_OPERATION_SUBS, ///< (char4 op, object *obj1, object *obj2) => "unsupported operation: $(typeof $obj1) $op[0] $(typeof $obj2) $op[1]"
+    ZIS_EXC_FMT_UNSUPPORTED_OPERATION_UN, ///< (const char *op, object *obj1) => "unsupported operation: $op $(typeof $obj1)"
+    ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN, ///< (const char *op, object *obj1, object *obj2) => "unsupported operation: $(typeof $obj1) $op $(typeof $obj2)"
+    ZIS_EXC_FMT_UNSUPPORTED_OPERATION_SUBS, ///< (const char *op, object *obj1, object *obj2) => "unsupported operation: $(typeof $obj1) $op[0] $(typeof $obj2) $op[1]"
 };
 
 /// Create an `Exception` with formatted string based on a templated.

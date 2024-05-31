@@ -46,3 +46,94 @@ func test_Bool_to_string()
     testing.check_equal(true:to_string() , 'true' )
     testing.check_equal(false:to_string(), 'false')
 end
+
+## Float
+
+func test_Float_operator_neg()
+    testing.check_equal(1.1, - -1.1)
+    testing.check_equal(-1.1, -1.1)
+    testing.check_equal(0.0, - -0.0)
+end
+
+func test_Float_operator_add()
+    testing.check_equal(0.0 + 0.0, 0.0)
+    testing.check_equal(0.0 + 1.0, 1.0)
+    testing.check_equal(0.0 + 1  , 1.0)
+    testing.check_equal(1.2 + 3.4, 4.6)
+    testing.check_equal(-1.2 + 3.4, 2.2)
+end
+
+func test_Float_operator_sub()
+    testing.check_equal(0.0 - 0.0, 0.0)
+    testing.check_equal(1.0 - 0.0, 1.0)
+    testing.check_equal(0.0 - 1.0, -1.0)
+    testing.check_equal(0.0 - 1  , -1.0)
+    testing.check_equal(-1.2 - 3.4, -4.6)
+end
+
+func test_Float_operator_mul()
+    testing.check_equal(0.0 * 0.0, 0.0)
+    testing.check_equal(2.0 * 1.0, 2.0)
+    testing.check_equal(2.0 * 1  , 2.0)
+    testing.check_equal(-1.5 * 2.5, -3.75)
+end
+
+func test_Float_operator_div()
+    testing.check_equal((1.0 / 0.0):is_inf(), true)
+    testing.check_equal(3.0 / 3.0, 1.0)
+    testing.check_equal(3.0 / 2, 1.5)
+    testing.check_equal(-3.0 / 2, -1.5)
+end
+
+func test_Float_operator_rem()
+    testing.check_equal((1.0 % 0.0):is_nan(), true)
+    testing.check_equal(3.0 % 2.0, 1.0)
+    testing.check_equal(-3.0 % 2.0, -1.0)
+end
+
+func test_Float_operator_pow()
+    testing.check_equal(1.0 ** 0, 1.0)
+    testing.check_equal(2.0 ** 3, 8.0)
+    testing.check_equal(4.0 ** 0.5, 2.0)
+end
+
+func test_Float_operator_equ()
+    testing.check_equal(0.0 == 0.0, true)
+    testing.check_equal(0.0 == -0.0, true)
+    testing.check_equal(1.0 == 1.0, true)
+    testing.check_equal(1.0 == 1, true)
+    testing.check_equal(0.0 == false, false)
+    testing.check_equal(1.0 == true, false)
+end
+
+func test_Float_operator_cmp()
+    testing.check_equal(0.0 <=> 0.0, 0)
+    testing.check_equal(0.0 <=> 0, 0)
+    testing.check_equal(0.0 <=> 1.2, -1)
+    testing.check_equal(0.0 <=> -1.2, 1)
+end
+
+func test_Float_abs()
+    testing.check_equal(1.0:abs(), 1.0)
+    testing.check_equal((-1.0):abs(), 1.0)
+end
+
+func test_Float_round()
+    testing.check_equal(1.2:round(), 1.0)
+    testing.check_equal(1.5:round(), 2.0)
+    testing.check_equal(2.5:round(), 2.0)
+    testing.check_equal(0.035:round(0.01), 0.04)
+    testing.check_equal(0.045:round(0.01), 0.04)
+end
+
+func test_Float_floor()
+    testing.check_equal(1.5:floor(), 1.0)
+    testing.check_equal(2.5:floor(), 2.0)
+    testing.check_equal(0.035:floor(0.01), 0.03)
+end
+
+func test_Float_ceil()
+    testing.check_equal(1.5:ceil(), 2.0)
+    testing.check_equal(2.5:ceil(), 3.0)
+    testing.check_equal(0.035:ceil(0.01), 0.04)
+end

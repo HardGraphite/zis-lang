@@ -846,7 +846,7 @@ _interp_loop:
         }
         bp[0] = meth_obj;
         if (zis_likely(tgt < 32 && val < 64)) {
-            this_instr = zis_instr_make_Aw(0, (tgt << 20) | (2 << 18) | (val << (6 * 0)));
+            this_instr = zis_instr_make_Aw(0, (tgt << 20) | (1 << 18) | (val << (6 * 0)));
             goto _op_call;
         }
         if (zis_unlikely(zis_invoke_vn(z, bp + tgt, NULL, bp + val, 1) == ZIS_THR))

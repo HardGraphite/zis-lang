@@ -25,8 +25,8 @@ func Object:to_string(?format :: String|Bool) :: String
 
 Generates a string representing the object.
 
-The optional argument `format` should be a string specifying how to format it
-or `true` to convert to a string representation.
+The optional argument `format` should be a string specifying how to format it,
+or `true` to convert to a literal representation.
 
 ### Comparison: `<=>()` and `==()`
 

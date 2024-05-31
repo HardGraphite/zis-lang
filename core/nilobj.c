@@ -26,7 +26,7 @@ struct zis_nil_obj *_zis_nil_obj_new(struct zis_context *z) {
 
 static int T_Nil_M_operator_equ(struct zis_context *z) {
 #define T_Nil_Md_operator_equ { "==", {2, 0, 2}, T_Nil_M_operator_equ }
-    /*#DOCSTR# func Nil:\'=='(other) :: Bool
+    /*#DOCSTR# func Nil:\'=='(other :: Nil) :: Bool
     Operator ==. */
     assert_arg1_Nil(z);
     struct zis_context_globals *g = z->globals;
@@ -38,14 +38,14 @@ static int T_Nil_M_operator_equ(struct zis_context *z) {
 
 static int T_Nil_M_operator_cmp(struct zis_context *z) {
 #define T_Nil_Md_operator_cmp { "<=>", {2, 0, 2}, T_Nil_M_operator_cmp }
-    /*#DOCSTR# func Nil:\'<=>'(other) :: Int
+    /*#DOCSTR# func Nil:\'<=>'(other :: Nil) :: Int
     Operator <=>. */
     assert_arg1_Nil(z);
     struct zis_object **frame = z->callstack->frame;
     if (frame[1] != frame[2]) {
         frame[0] = zis_object_from(zis_exception_obj_format_common(
             z, ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN,
-            (struct zis_exception_obj_format_common_char4){"<=>"}, frame[1], frame[2]
+            "<=>", frame[1], frame[2]
         ));
         return ZIS_THR;
     }

@@ -120,8 +120,6 @@ static void _represent_type_of_obj(
 struct zis_exception_obj *zis_exception_obj_format_common(
     struct zis_context *z, int _template, ...
 ) {
-    struct char4 { char data[4]; };
-
     const enum zis_exception_obj_format_common_template template =
         (enum zis_exception_obj_format_common_template)_template;
     zis_locals_decl(
@@ -136,42 +134,39 @@ struct zis_exception_obj *zis_exception_obj_format_common(
     switch (template) {
     case ZIS_EXC_FMT_UNSUPPORTED_OPERATION_UN: {
         char buffer[1][80];
-        struct zis_exception_obj_format_common_char4 char4 =
-            va_arg(ap, struct zis_exception_obj_format_common_char4);
+        const char *op = va_arg(ap, const char *);
         _represent_type_of_obj(z, va_arg(ap, struct zis_object *), buffer[0], sizeof buffer[0]);
         var.result = zis_exception_obj_format(
             z, "type", NULL, "unsupported operation: %s %s",
-            char4.data, buffer[0]
+            op, buffer[0]
         );
         break;
     }
 
     case ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN: {
         char buffer[2][80];
-        struct zis_exception_obj_format_common_char4 char4 =
-            va_arg(ap, struct zis_exception_obj_format_common_char4);
+        const char *op = va_arg(ap, const char *);
         var.args[0] = va_arg(ap, struct zis_object *);
         var.args[1] = va_arg(ap, struct zis_object *);
         _represent_type_of_obj(z, var.args[0], buffer[0], sizeof buffer[0]);
         _represent_type_of_obj(z, var.args[1], buffer[1], sizeof buffer[1]);
         var.result = zis_exception_obj_format(
             z, "type", NULL, "unsupported operation: %s %s %s",
-            buffer[0], char4.data, buffer[1]
+            buffer[0], op, buffer[1]
         );
         break;
     }
 
     case ZIS_EXC_FMT_UNSUPPORTED_OPERATION_SUBS: {
         char buffer[2][80];
-        struct zis_exception_obj_format_common_char4 char4 =
-            va_arg(ap, struct zis_exception_obj_format_common_char4);
+        const char *op = va_arg(ap, const char *);
         var.args[0] = va_arg(ap, struct zis_object *);
         var.args[1] = va_arg(ap, struct zis_object *);
         _represent_type_of_obj(z, var.args[0], buffer[0], sizeof buffer[0]);
         _represent_type_of_obj(z, var.args[1], buffer[1], sizeof buffer[1]);
         var.result = zis_exception_obj_format(
             z, "type", NULL, "unsupported operation: %s%c%s%c",
-            buffer[0], char4.data[0], buffer[1], char4.data[1]
+            buffer[0], op[0], buffer[1], op[1]
         );
         break;
     }

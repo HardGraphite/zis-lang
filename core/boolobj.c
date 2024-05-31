@@ -23,7 +23,7 @@ struct zis_bool_obj *_zis_bool_obj_new(struct zis_context *z, bool v) {
 
 static int T_Bool_M_operator_equ(struct zis_context *z) {
 #define T_Bool_Md_operator_equ { "==", {2, 0, 2}, T_Bool_M_operator_equ }
-    /*#DOCSTR# func Bool:\'=='(other) :: Bool
+    /*#DOCSTR# func Bool:\'=='(other :: Bool) :: Bool
     Operator ==. */
     assert_arg1_Bool(z);
     struct zis_context_globals *g = z->globals;
@@ -35,7 +35,7 @@ static int T_Bool_M_operator_equ(struct zis_context *z) {
 
 static int T_Bool_M_operator_cmp(struct zis_context *z) {
 #define T_Bool_Md_operator_cmp { "<=>", {2, 0, 2}, T_Bool_M_operator_cmp }
-    /*#DOCSTR# func Bool:\'<=>'(other) :: Int
+    /*#DOCSTR# func Bool:\'<=>'(other :: Bool) :: Int
     Operator <=>. */
     assert_arg1_Bool(z);
     struct zis_context_globals *g = z->globals;
@@ -45,7 +45,7 @@ static int T_Bool_M_operator_cmp(struct zis_context *z) {
     } else if (zis_unlikely(!zis_object_type_is(frame[2], g->type_Bool))) {
         frame[0] = zis_object_from(zis_exception_obj_format_common(
             z, ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN,
-            (struct zis_exception_obj_format_common_char4){"<=>"}, frame[1], frame[2]
+            "<=>", frame[1], frame[2]
         ));
         return ZIS_THR;
     } else {
