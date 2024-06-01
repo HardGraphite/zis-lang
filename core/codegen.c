@@ -179,16 +179,20 @@ static unsigned int frame_scope_alloc_regs(
                 zis_debug_log(TRACE, "CGen", "frame_scope_alloc_regs(%u) -> %u (free_list[%zu])", n, reg_start, i);
                 return reg_start;
             }
-            if (regs_i_n < min_n && regs_i_n >= n) {
+            if (regs_i_n > n && regs_i_n < min_n) {
                 min_n = regs_i_n;
                 min_n_i = i;
             }
         }
-        const unsigned int reg = free_regs_list[min_n_i].start;
-        free_regs_list[min_n_i].start = reg + n;
-        assert(free_regs_list[min_n_i].start < free_regs_list[min_n_i].end);
-        zis_debug_log(TRACE, "CGen", "frame_scope_alloc_regs(%u) -> %u (free_list[%zu][0:%u])", n, reg, min_n_i, n);
-        return reg;
+        if (min_n != UINT_MAX) {
+            assert(min_n > n);
+            assert(min_n_i < free_regs_list_len);
+            const unsigned int reg = free_regs_list[min_n_i].start;
+            free_regs_list[min_n_i].start = reg + n;
+            assert(free_regs_list[min_n_i].start + 1 < free_regs_list[min_n_i].end);
+            zis_debug_log(TRACE, "CGen", "frame_scope_alloc_regs(%u) -> %u (free_list[%zu][0:%u])", n, reg, min_n_i, n);
+            return reg;
+        }
     }
 
     const unsigned int reg = fs->reg_allocated_max + 1;
