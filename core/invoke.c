@@ -674,10 +674,30 @@ _interp_loop:
         *tgt_p = zis_object_from(zis_map_obj_new(z, 0.0f, val_count));
         if (val_count) {
             BOUND_CHECK_REG(val_end_p - 1);
+            struct zis_object **map_reg;
+            if (tgt) {
+                map_reg = tgt_p;
+            } else {
+                // REG-0 may be modified because methods `hash()` and `==()` may
+                // be called during Map updating. So, keep it somewhere else.
+                map_reg = zis_callstack_frame_alloc_temp(z, 1);
+                *map_reg = *tgt_p;
+            }
             for (; val_p < val_end_p; val_p += 2) {
-                struct zis_map_obj *map = zis_object_cast(*tgt_p, struct zis_map_obj);
-                if (zis_map_obj_set(z, map, val_p[0], val_p[1]) != ZIS_OK)
+                assert(zis_object_type_is(*map_reg, g->type_Map));
+                struct zis_map_obj *map = zis_object_cast(*map_reg, struct zis_map_obj);
+                if (zis_map_obj_set(z, map, val_p[0], val_p[1]) != ZIS_OK) {
+                    if (map_reg != tgt_p) {
+                        assert(tgt == 0);
+                        zis_callstack_frame_free_temp(z, 1);
+                    }
                     THROW_REG0;
+                }
+            }
+            if (map_reg != tgt_p) {
+                assert(tgt == 0);
+                *tgt_p = *map_reg;
+                zis_callstack_frame_free_temp(z, 1);
             }
             assert(stack->top == sp);
         }
