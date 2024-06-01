@@ -2,7 +2,9 @@
 //%% name = testing
 //%% description = Provides basic testing support.
 
+#include <assert.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <zis.h>
@@ -12,13 +14,56 @@
 static int F_check_equal(zis_t z) {
 #define Fd_check_equal { "check_equal", {2, 1, 5}, F_check_equal }
     /*#DOCSTR# func check_equal(actual, expected, ?message) */
-    zis_make_symbol(z, 0, "==", 2);
-    zis_if_thr (zis_invoke(z, (unsigned int []){0, (unsigned)-1, 1, 2}, 2))
-        return ZIS_THR;
+    union {
+        bool b[2];
+        int64_t i[2];
+        double f[2];
+        char *s[2];
+    } values;
+
     bool equals;
-    zis_if_thr (zis_read_bool(z, 0, &equals)) {
-        return ZIS_THR;
-    } else if (!equals) {
+    // Check whether values equal by type. This is a workaround when the comparison
+    // methods are not available yet for some types.
+    if (zis_read_nil(z, 1) == ZIS_OK) {
+        equals = zis_read_nil(z, 2) == ZIS_OK;
+    } else if (zis_read_bool(z, 1, values.b + 0) == ZIS_OK) {
+        equals =
+            zis_read_bool(z, 1, values.b + 1) == ZIS_OK &&
+            values.b[0] == values.b[1];
+    } else if (zis_read_int(z, 2, values.i + 0) == ZIS_OK) {
+        equals =
+            zis_read_int(z, 1, values.i + 1) == ZIS_OK &&
+            values.i[0] == values.i[1];
+    } else if (zis_read_float(z, 2, values.f + 0) == ZIS_OK) {
+        equals =
+            zis_read_float(z, 1, values.f + 1) == ZIS_OK &&
+            values.f[0] == values.f[1];
+    } else if (zis_read_string(z, 1, NULL, &(size_t){0}) == ZIS_OK) {
+        size_t sizes[2];
+        if (zis_read_string(z, 2, NULL, sizes + 1) == ZIS_OK) {
+            zis_read_string(z, 1, NULL, sizes + 0);
+            if (sizes[0] == sizes[1]) {
+                values.s[0] = malloc(sizes[0]), values.s[1] = malloc(sizes[1]);
+                zis_read_string(z, 1, values.s[0], sizes + 0);
+                zis_read_string(z, 2, values.s[1], sizes + 1);
+                assert(sizes[0] == sizes[1]);
+                equals = memcmp(values.s[0], values.s[1], sizes[0]) == 0;
+                free(values.s[0]), free(values.s[1]);
+            } else {
+                equals = false;
+            }
+        } else {
+            equals = false;
+        }
+    } else {
+        zis_make_symbol(z, 0, "==", 2);
+        zis_if_thr (zis_invoke(z, (unsigned int []){0, (unsigned)-1, 1, 2}, 2))
+            return ZIS_THR;
+        zis_if_thr (zis_read_bool(z, 0, &equals))
+            return ZIS_THR;
+    }
+
+    if (!equals) {
         zis_load_global(z, 4, "print", (size_t)-1);
         zis_make_string(z, 5, "!! FAIL", (size_t)-1);
         zis_invoke(z, (unsigned int []){0, 4, 5, 3}, 2);
