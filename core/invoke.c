@@ -518,6 +518,15 @@ _interp_loop:
         }                    \
     } while (0)
 
+#define BOUND_CHECK_REG_VEC(BASE_PTR, LEN) \
+    do {                                   \
+        assert((BASE_PTR) >= bp);          \
+        if (zis_unlikely(((BASE_PTR) + (LEN) - 1) > sp)) { \
+            zis_debug_log(FATAL, "Interp", "register index out of range"); \
+            goto panic_ill;                \
+        }                                  \
+    } while (0)
+
 #define BOUND_CHECK_SYM(I) \
     do {                   \
         if (zis_unlikely(I >= func_sym_count)) { \
@@ -639,7 +648,7 @@ _interp_loop:
         zis_instr_extract_operands_ABC(this_instr, tgt, val_start, val_count);
         struct zis_object **tgt_p = bp + tgt, **val_p = bp + val_start;
         BOUND_CHECK_REG(tgt_p);
-        BOUND_CHECK_REG(val_p + val_count - 1);
+        BOUND_CHECK_REG_VEC(val_p, val_count);
         *tgt_p = zis_object_from(zis_tuple_obj_new(z, val_p, val_count));
         IP_ADVANCE;
         OP_DISPATCH;
@@ -650,7 +659,7 @@ _interp_loop:
         zis_instr_extract_operands_ABC(this_instr, tgt, val_start, val_count);
         struct zis_object **tgt_p = bp + tgt, **val_p = bp + val_start;
         BOUND_CHECK_REG(tgt_p);
-        BOUND_CHECK_REG(val_p + val_count - 1);
+        BOUND_CHECK_REG_VEC(val_p, val_count);
         *tgt_p = zis_object_from(zis_array_obj_new(z, val_p, val_count));
         IP_ADVANCE;
         OP_DISPATCH;
