@@ -228,6 +228,13 @@ static void frame_scope_free_regs(
 
     if (freed_regs.end - 1 == fs->reg_allocated_max) {
         fs->reg_allocated_max -= n;
+        if (fs->free_regs_list_len) {
+            const size_t last_i = fs->free_regs_list_len - 1;
+            if (fs->free_regs_list[last_i].end - 1 == fs->reg_allocated_max) {
+                fs->reg_allocated_max = fs->free_regs_list[last_i].start - 1;
+                frame_scope__free_regs_list_remove(fs, last_i);
+            }
+        }
         zis_debug_log(TRACE, "CGen", "frame_scope_free_regs(%u, %u) (shrink tail)", regs_start, n);
         return;
     }
