@@ -118,6 +118,7 @@ zis_noinline static bool _invocation_enter_callable_obj(
 /// Enter a new frame for a invocation.
 /// REG-0 (caller frame) is the object to call and will be replaced with the real function object.
 /// On error, make an exception (REG-0) and returns false.
+/// This function guarantees that no object is allocated during call.
 zis_static_force_inline bool invocation_enter(
     struct zis_context *z,
     zis_instr_word_t *caller_ip,
@@ -144,9 +145,9 @@ zis_static_force_inline bool invocation_enter(
 
 /// Pass arguments (a vector).
 /// On error, make an exception (REG-0) and returns false.
-zis_static_force_inline bool invocation_pass_args_vec(
+static bool invocation_pass_args_vec(
     struct zis_context *z,
-    struct zis_object **argv,
+    struct zis_object *const *argv,
     size_t argc,
     struct invocation_info *info
 ) {
@@ -181,7 +182,7 @@ zis_static_force_inline bool invocation_pass_args_vec(
         } else {
             zis_object_vec_copy(arg_list, argv, argc_min);
             struct zis_tuple_obj *const va_list_ =
-                zis_tuple_obj_new(z, argv + argc_min, argc - argc_min);
+                zis_tuple_obj_new(z, (struct zis_object **)argv + argc_min, argc - argc_min);
             arg_list[argc_min] = zis_object_from(va_list_);
         }
     }
@@ -190,7 +191,7 @@ zis_static_force_inline bool invocation_pass_args_vec(
 }
 
 /// Pass arguments (packed).
-zis_static_force_inline bool invocation_pass_args_pac(
+static bool invocation_pass_args_pac(
     struct zis_context *z,
     struct zis_object *packed_args, size_t argc,
     struct invocation_info *info
@@ -291,7 +292,7 @@ static bool invocation_pass_args_dis(
 
 /// Pass arguments like `invocation_pass_args_dis()`.
 /// Modified for the CALL instruction. Includes register index checks.
-zis_static_force_inline bool invocation_pass_args_dis_1(
+static bool invocation_pass_args_dis_1(
     struct zis_context *z,
     zis_instr_word_t args_prev_frame_regs /* Same with the operands of instruction CALL */,
     unsigned int argc,
@@ -450,6 +451,11 @@ zis_hot_fn static int invoke_bytecode_func(
 
     struct zis_context_globals *const g = z->globals;
 
+    struct {
+        struct zis_symbol_obj *method;
+        uint32_t extra_arg_regs; // arg2 and arg3
+    } internal_call_param; // See macro CALL_METHOD() and label _do_internal_send.
+
 #if OP_DISPATCH_USE_COMPUTED_GOTO // vvv
 
     // https://gcc.gnu.org/onlinedocs/gcc/Labels-as-Values.html
@@ -482,31 +488,22 @@ _interp_loop:
 
 #endif // ^^^ OP_DISPATCH_USE_COMPUTED_GOTO
 
+/// Throws the object in `bp[0]` (REG-0).
 #define THROW_REG0 \
     do {           \
         this_instr = 0; \
         goto _op_thr;   \
     } while (0)
 
-/// Calls method `NAME_SYM` with 2 arguments and expects 1 return value in an ABC-type instruction.
-#define CALL_METHOD_ABC_R2A(NAME_SYM) \
-    do {                              \
-        bp[0] = zis_object_from((NAME_SYM)); \
-        goto _do_call_method_reg0_ABC_r2a;   \
-    } while (0)
-
-/// Calls method `NAME_SYM` with 1 argument and expects 1 return value in an ABw-type instruction.
-#define CALL_METHOD_ABw_R1A(NAME_SYM) \
-    do {                              \
-        bp[0] = zis_object_from((NAME_SYM)); \
-        goto _do_call_method_reg0_ABw_r1a;   \
-    } while (0)
-
-/// Calls method `NAME_SYM` with 3 arguments in an ABC-type instruction.
-#define CALL_METHOD_ABC_3A(NAME_SYM) \
-    do {                              \
-        bp[0] = zis_object_from((NAME_SYM)); \
-        goto _do_call_method_reg0_ABC_3a;    \
+/// Calls method `NAME` of object `bp[OBJ_REG]` with optional arguments
+/// `bp[ARG2_REG]` and `bp[ARG3_REG]` and stores the return value to `bp[RET_REG]`.
+#define CALL_METHOD(RET_REG, NAME, ARGC, OBJ_REG, ARG2_REG, ARG3_REG) \
+    do {                                                              \
+        assert((ARGC) <= 3 && (RET_REG) <= 0x3fff && (OBJ_REG) <= 0xffff && (ARG2_REG) <= 0xffff && (ARG3_REG) <= 0xffff); \
+        this_instr = (ARGC) | (RET_REG) << 2 | (OBJ_REG) << 16;       \
+        internal_call_param.extra_arg_regs = (ARG2_REG) | (ARG3_REG) << 16; \
+        internal_call_param.method = (NAME);                          \
+        goto _do_internal_send;                                       \
     } while (0)
 
 #define BOUND_CHECK_REG(PTR) \
@@ -754,7 +751,6 @@ _interp_loop:
         OP_DISPATCH;
     }
 
-    _op_call:
     OP_DEFINE(CALL) {
         uint32_t ret, argc;
         ret = this_instr >> 27;
@@ -832,82 +828,72 @@ _interp_loop:
         goto _do_call_func_obj;
     }
 
-    _do_call_method_reg0_ABC_r2a: // this_instr = <OP> tgt, lhs, rhs; REG-0 = method_sym
-    {
-        uint32_t tgt, lhs, rhs;
-        zis_instr_extract_operands_ABC(this_instr, tgt, lhs, rhs);
-        struct zis_object *obj = bp[lhs];
-        struct zis_type_obj *const obj_type =
-            zis_unlikely(zis_object_is_smallint(obj)) ? g->type_Int : zis_object_type(obj);
-        assert(zis_object_type_is(bp[0], g->type_Symbol));
-        struct zis_symbol_obj *method_name =
-            zis_object_cast(bp[0], struct zis_symbol_obj);
-        struct zis_object *meth_obj = zis_type_obj_get_method(obj_type, method_name);
-        if (zis_unlikely(!meth_obj)) {
-            format_error_method_not_exists(z, obj, method_name);
-            THROW_REG0;
-        }
-        bp[0] = meth_obj;
-        if (zis_likely(tgt < 32 && lhs < 64 && rhs < 64)) {
-            this_instr = zis_instr_make_Aw(0, (tgt << 20) | (2 << 18) | (lhs << (6 * 0)) | (rhs << (6 * 1)));
-            goto _op_call;
-        }
-        if (zis_unlikely(zis_invoke_vn(z, bp + tgt, NULL, (struct zis_object *[]){bp[lhs], bp[rhs]}, 2) == ZIS_THR))
-            THROW_REG0;
-        IP_ADVANCE;
-        OP_DISPATCH;
-    }
+    _do_internal_send: {
+        /*
+         * `this_instr[1:0]` = argc; `this_instr[15:2]` = ret_reg; `this_instr[31:16]` = arg1_reg;
+         * `internal_call_param.extra_arg_regs[15:0]` = arg2_reg; `internal_call_param.extra_arg_regs[31:16]` = arg3_reg;
+         * `internal_call_param.method` = method_name.
+         * See macro `CALL_METHOD()`.
+         */
 
-    _do_call_method_reg0_ABw_r1a: // this_instr = <OP> tgt, val; REG-0 = method_sym
-    {
-        uint32_t tgt, val;
-        zis_instr_extract_operands_ABw(this_instr, tgt, val);
-        struct zis_object *obj = bp[val];
-        struct zis_type_obj *const obj_type =
-            zis_unlikely(zis_object_is_smallint(obj)) ? g->type_Int : zis_object_type(obj);
-        assert(zis_object_type_is(bp[0], g->type_Symbol));
-        struct zis_symbol_obj *method_name =
-            zis_object_cast(bp[0], struct zis_symbol_obj);
-        struct zis_object *meth_obj = zis_type_obj_get_method(obj_type, method_name);
-        if (zis_unlikely(!meth_obj)) {
-            format_error_method_not_exists(z, obj, method_name);
-            THROW_REG0;
-        }
-        bp[0] = meth_obj;
-        if (zis_likely(tgt < 32 && val < 64)) {
-            this_instr = zis_instr_make_Aw(0, (tgt << 20) | (1 << 18) | (val << (6 * 0)));
-            goto _op_call;
-        }
-        if (zis_unlikely(zis_invoke_vn(z, bp + tgt, NULL, bp + val, 1) == ZIS_THR))
-            THROW_REG0;
-        IP_ADVANCE;
-        OP_DISPATCH;
-    }
+        static_assert(sizeof this_instr == 32 / 8, "");
+        static_assert(sizeof internal_call_param.extra_arg_regs == 32 / 8, "");
+        const unsigned int argc = this_instr & 3;
+        const unsigned int ret_reg = (this_instr & 0xffff) >> 2;
+        const unsigned int arg_regs[3] = {
+            this_instr >> 16,
+            internal_call_param.extra_arg_regs & 0xffff,
+            internal_call_param.extra_arg_regs >> 16,
+        };
+        struct zis_symbol_obj *const method_name = internal_call_param.method;
+        assert(argc >= 1 && argc <= 3);
+        assert(bp + ret_reg <= sp);
+        assert(bp + arg_regs[0] <= sp && bp + arg_regs[1] <= sp && bp + arg_regs[2] <= sp);
+        assert(zis_object_type_is(zis_object_from(method_name), g->type_Symbol));
 
-    _do_call_method_reg0_ABC_3a: // this_instr = <OP> arg1, arg2, arg3; REG-0 = method_sym
-    {
-        uint32_t arg1, arg2, arg3;
-        zis_instr_extract_operands_ABC(this_instr, arg1, arg2, arg3);
-        struct zis_object *obj = bp[arg1];
-        struct zis_type_obj *const obj_type =
-            zis_unlikely(zis_object_is_smallint(obj)) ? g->type_Int : zis_object_type(obj);
-        assert(zis_object_type_is(bp[0], g->type_Symbol));
-        struct zis_symbol_obj *method_name =
-            zis_object_cast(bp[0], struct zis_symbol_obj);
-        struct zis_object *meth_obj = zis_type_obj_get_method(obj_type, method_name);
-        if (zis_unlikely(!meth_obj)) {
-            format_error_method_not_exists(z, obj, method_name);
+        struct zis_object *const args[3] = {
+            bp[arg_regs[0]], bp[arg_regs[1]], bp[arg_regs[2]]
+        };
+        struct zis_object *method_obj = zis_type_obj_get_method(
+            zis_unlikely(zis_object_is_smallint(args[0])) ?
+                g->type_Int : zis_object_type(args[0]),
+            method_name
+        );
+        if (zis_unlikely(!method_obj)) {
+            format_error_method_not_exists(z, args[0], method_name);
             THROW_REG0;
         }
-        bp[0] = meth_obj;
-        if (zis_likely(arg1 < 64 && arg2 < 64 && arg3 < 64)) {
-            this_instr = zis_instr_make_Aw(0, (0) | (2 << 18) | (arg1 << (6 * 0)) | (arg2 << (6 * 1)) | (arg3 << (6 * 2)));
-            goto _op_call;
-        }
-        if (zis_unlikely(zis_invoke_vn(z, bp, NULL, (struct zis_object *[]){bp[arg1], bp[arg2], bp[arg3]}, 3) == ZIS_THR))
+
+        struct invocation_info ii;
+        bp[0] = method_obj;
+        if (zis_unlikely(!invocation_enter(z, ip, bp + ret_reg, &ii)))
             THROW_REG0;
-        IP_ADVANCE;
-        OP_DISPATCH;
+        BP_SP_CHANGED;
+        FUNC_CHANGED_TO(zis_object_cast(ii.caller_frame[0], struct zis_func_obj));
+
+        if (zis_likely(argc <= ii.func_meta.na || ii.func_meta.no != (unsigned char)-1)) {
+            // No object allocation. No need to worry about `args` been moved.
+            // See similar usage in function `invocation_pass_args_pac()`.
+            if (zis_unlikely(!invocation_pass_args_vec(z, args, argc, &ii)))
+                THROW_REG0;
+        } else if (arg_regs[0] && (arg_regs[1] || argc <= 1) && (arg_regs[2] || argc <= 2)) {
+            // REG-0 is not used for argument passing.
+            if (zis_unlikely(!invocation_pass_args_dis(z, arg_regs, argc, &ii)))
+                THROW_REG0;
+        } else {
+            // REG-0 is used for argument passing, which has been assign with
+            // the function object to call. Temporarily recover it.
+            zis_locals_decl_1(z, var, struct zis_object *func);
+            var.func = ii.caller_frame[0];
+            ii.caller_frame[0] = args[0], ii.caller_frame[1] = args[1], ii.caller_frame[2] = args[2];
+            const bool ok = invocation_pass_args_dis(z, arg_regs, argc, &ii);
+            ii.caller_frame[0] = var.func;
+            zis_locals_drop(z, var);
+            if (zis_unlikely(!ok))
+                THROW_REG0;
+        }
+
+        goto _do_call_func_obj;
     }
 
     OP_DEFINE(LDMTH) {
@@ -1138,17 +1124,7 @@ _interp_loop:
         BOUND_CHECK_REG(key_p);
         BOUND_CHECK_REG(elm_p);
         BOUND_CHECK_REG(obj_p);
-        if (zis_likely(elm < 256)) {
-            this_instr = zis_instr_make_ABC(0, elm, obj, key);
-            CALL_METHOD_ABC_R2A(g->sym_operator_get_element);
-        }
-        struct zis_object *key_v = *key_p, *obj_v = *obj_p;
-        struct zis_object *result = zis_object_get_element(z, obj_v, key_v);
-        if (zis_unlikely(result))
-            THROW_REG0;
-        *elm_p = result;
-        IP_ADVANCE;
-        OP_DISPATCH;
+        CALL_METHOD(elm, g->sym_operator_get_element, 2, obj, key, 0);
     }
 
     OP_DEFINE(STELM) {
@@ -1158,15 +1134,7 @@ _interp_loop:
         BOUND_CHECK_REG(key_p);
         BOUND_CHECK_REG(elm_p);
         BOUND_CHECK_REG(obj_p);
-        if (zis_likely(obj < 256)) {
-            this_instr = zis_instr_make_ABC(0, obj, key, elm);
-            CALL_METHOD_ABC_3A(g->sym_operator_get_element);
-        }
-        struct zis_object *key_v = *key_p, *elm_v = *elm_p, *obj_v = *obj_p;
-        if (zis_unlikely(zis_object_set_element(z, obj_v, key_v, elm_v) == ZIS_THR))
-            THROW_REG0;
-        IP_ADVANCE;
-        OP_DISPATCH;
+        CALL_METHOD(0, g->sym_operator_set_element, 3, obj, key, elm);
     }
 
     OP_DEFINE(LDELMI) {
@@ -1175,18 +1143,8 @@ _interp_loop:
         struct zis_object **elm_p = bp + elm, **obj_p = bp + obj;
         BOUND_CHECK_REG(elm_p);
         BOUND_CHECK_REG(obj_p);
-        if (zis_likely(elm < 256)) {
-            bp[0] = zis_smallint_to_ptr(key);
-            this_instr = zis_instr_make_ABC(0, elm, obj, 0);
-            CALL_METHOD_ABC_R2A(g->sym_operator_get_element);
-        }
-        struct zis_object *obj_v = *obj_p;
-        struct zis_object *result = zis_object_get_element(z, obj_v, zis_smallint_to_ptr(key));
-        if (zis_unlikely(result))
-            THROW_REG0;
-        *elm_p = result;
-        IP_ADVANCE;
-        OP_DISPATCH;
+        bp[0] = zis_smallint_to_ptr(key);
+        CALL_METHOD(elm, g->sym_operator_get_element, 2, obj, 0/*key*/, 0);
     }
 
     OP_DEFINE(STELMI) {
@@ -1195,16 +1153,8 @@ _interp_loop:
         struct zis_object **elm_p = bp + elm, **obj_p = bp + obj;
         BOUND_CHECK_REG(elm_p);
         BOUND_CHECK_REG(obj_p);
-        if (zis_likely(obj < 256)) {
-            bp[0] = zis_smallint_to_ptr(key);
-            this_instr = zis_instr_make_ABC(0, obj, 0, elm);
-            CALL_METHOD_ABC_3A(g->sym_operator_get_element);
-        }
-        struct zis_object *elm_v = *elm_p, *obj_v = *obj_p;
-        if (zis_unlikely(zis_object_set_element(z, obj_v, zis_smallint_to_ptr(key), elm_v) == ZIS_THR))
-            THROW_REG0;
-        IP_ADVANCE;
-        OP_DISPATCH;
+        bp[0] = zis_smallint_to_ptr(key);
+        CALL_METHOD(0, g->sym_operator_set_element, 3, obj, 0/*key*/, elm);
     }
 
     OP_DEFINE(JMP) {
@@ -1404,7 +1354,7 @@ _interp_loop:
             IP_ADVANCE;
             OP_DISPATCH;
         } while (0);
-        CALL_METHOD_ABC_R2A(g->sym_operator_cmp);
+        CALL_METHOD(tgt, g->sym_operator_cmp, 2, lhs, rhs, 0);
     }
 
     OP_DEFINE(CMPLE) {
@@ -1477,7 +1427,7 @@ _interp_loop:
             IP_ADVANCE;
             OP_DISPATCH;
         } while (0);
-        CALL_METHOD_ABC_R2A(g->sym_operator_equ);
+        CALL_METHOD(tgt, g->sym_operator_equ, 2, lhs, rhs, 0);
     }
 
     OP_DEFINE(CMPGT) {
@@ -1566,7 +1516,7 @@ _interp_loop:
             IP_ADVANCE;
             OP_DISPATCH;
         }
-        CALL_METHOD_ABC_R2A(g->sym_operator_add);
+        CALL_METHOD(tgt, g->sym_operator_add, 2, lhs, rhs, 0);
     }
 
     OP_DEFINE(SUB) {
@@ -1591,7 +1541,7 @@ _interp_loop:
             IP_ADVANCE;
             OP_DISPATCH;
         }
-        CALL_METHOD_ABC_R2A(g->sym_operator_sub);
+        CALL_METHOD(tgt, g->sym_operator_sub, 2, lhs, rhs, 0);
     }
 
     OP_DEFINE(MUL) {
@@ -1616,7 +1566,7 @@ _interp_loop:
             IP_ADVANCE;
             OP_DISPATCH;
         }
-        CALL_METHOD_ABC_R2A(g->sym_operator_mul);
+        CALL_METHOD(tgt, g->sym_operator_mul, 2, lhs, rhs, 0);
     }
 
     OP_DEFINE(DIV) {
@@ -1640,7 +1590,7 @@ _interp_loop:
             IP_ADVANCE;
             OP_DISPATCH;
         }
-        CALL_METHOD_ABC_R2A(g->sym_operator_div);
+        CALL_METHOD(tgt, g->sym_operator_div, 2, lhs, rhs, 0);;
     }
 
     OP_DEFINE(REM) {
@@ -1664,7 +1614,7 @@ _interp_loop:
             IP_ADVANCE;
             OP_DISPATCH;
         }
-        CALL_METHOD_ABC_R2A(zis_symbol_registry_get(z, "%", 1));
+        CALL_METHOD(tgt, zis_symbol_registry_get(z, "%", 1), 2, lhs, rhs, 0);
     }
 
     OP_DEFINE(POW) {
@@ -1678,7 +1628,7 @@ _interp_loop:
             struct zis_object **rhs_p = bp + rhs;
             BOUND_CHECK_REG(rhs_p);
         }
-        CALL_METHOD_ABC_R2A(zis_symbol_registry_get(z, "**", 2));
+        CALL_METHOD(tgt, zis_symbol_registry_get(z, "**", 2), 2, lhs, rhs, 0);
     }
 
     OP_DEFINE(SHL) {
@@ -1692,7 +1642,7 @@ _interp_loop:
             struct zis_object **rhs_p = bp + rhs;
             BOUND_CHECK_REG(rhs_p);
         }
-        CALL_METHOD_ABC_R2A(zis_symbol_registry_get(z, "<<", 2));
+        CALL_METHOD(tgt, zis_symbol_registry_get(z, "<<", 2), 2, lhs, rhs, 0);
     }
 
     OP_DEFINE(SHR) {
@@ -1706,7 +1656,7 @@ _interp_loop:
             struct zis_object **rhs_p = bp + rhs;
             BOUND_CHECK_REG(rhs_p);
         }
-        CALL_METHOD_ABC_R2A(zis_symbol_registry_get(z, ">>", 2));
+        CALL_METHOD(tgt, zis_symbol_registry_get(z, ">>", 2), 2, lhs, rhs, 0);
     }
 
     OP_DEFINE(BITAND) {
@@ -1732,7 +1682,7 @@ _interp_loop:
                 OP_DISPATCH;
             }
         }
-        CALL_METHOD_ABC_R2A(zis_symbol_registry_get(z, "&", 1));
+        CALL_METHOD(tgt, zis_symbol_registry_get(z, "&", 1), 2, lhs, rhs, 0);
     }
 
     OP_DEFINE(BITOR) {
@@ -1758,7 +1708,7 @@ _interp_loop:
                 OP_DISPATCH;
             }
         }
-        CALL_METHOD_ABC_R2A(zis_symbol_registry_get(z, "|", 1));
+        CALL_METHOD(tgt, zis_symbol_registry_get(z, "|", 1), 2, lhs, rhs, 0);
     }
 
     OP_DEFINE(BITXOR) {
@@ -1784,7 +1734,7 @@ _interp_loop:
                 OP_DISPATCH;
             }
         }
-        CALL_METHOD_ABC_R2A(zis_symbol_registry_get(z, "^", 1));
+        CALL_METHOD(tgt, zis_symbol_registry_get(z, "^", 1), 2, lhs, rhs, 0);
     }
 
     OP_DEFINE(NOT) {
@@ -1828,7 +1778,7 @@ _interp_loop:
                 OP_DISPATCH;
             }
         }
-        CALL_METHOD_ABw_R1A(zis_symbol_registry_get(z, "-#", 2));
+        CALL_METHOD(tgt, zis_symbol_registry_get(z, "-#", 2), 1, val, 0, 0);
     }
 
     OP_DEFINE(BITNOT) {
@@ -1850,7 +1800,7 @@ _interp_loop:
                 OP_DISPATCH;
             }
         }
-        CALL_METHOD_ABw_R1A(zis_symbol_registry_get(z, "~", 1));
+        CALL_METHOD(tgt, zis_symbol_registry_get(z, "~", 1), 1, val, 0, 0);
     }
 
     OP_UNDEFINED {
@@ -1859,9 +1809,7 @@ _interp_loop:
     }
 
 #undef THROW_REG0
-#undef CALL_METHOD_ABC_R2A
-#undef CALL_METHOD_ABw_R1A
-#undef CALL_METHOD_ABC_3A
+#undef CALL_METHOD
 #undef BOUND_CHECK_REG
 #undef BOUND_CHECK_SYM
 #undef BOUND_CHECK_CON
