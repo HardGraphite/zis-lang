@@ -1556,14 +1556,6 @@ ZIS_API int zis_load_element(
         *val_ref = val;
         return ZIS_OK;
     }
-    if (obj_type == g->type_Tuple) {
-        struct zis_tuple_obj *const tuple = zis_object_cast(obj, struct zis_tuple_obj);
-        struct zis_object *const val = zis_tuple_obj_Mx_get_element(z, tuple, key);
-        if (zis_unlikely(!val))
-            return api_xxx_element_err_look_up(z, obj, "index", key);
-        *val_ref = val;
-        return ZIS_OK;
-    }
     if (obj_type == g->type_Map) {
         struct zis_map_obj *const map = zis_object_cast(obj, struct zis_map_obj);
         const int status = zis_map_obj_get(z, map, key, val_ref);
@@ -1573,7 +1565,11 @@ ZIS_API int zis_load_element(
             return api_xxx_element_err_look_up(z, obj, "index", key);
         return status;
     }
-    return api_xxx_element_err_not_subscriptable(z, obj);
+    struct zis_object *const val = zis_object_get_element(z, obj, key);
+    if (zis_unlikely(!val))
+        return ZIS_THR;
+    *val_ref = val;
+    return ZIS_OK;
 }
 
 ZIS_API int zis_store_element(
