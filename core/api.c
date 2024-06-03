@@ -46,11 +46,14 @@
 #endif
 
 #if defined(_WIN32) || defined(__CYGWIN__)
-#    define ZIS_API __declspec(dllexport)
+#    define ZIS_API      __declspec(dllexport, noinline)
+#    define ZIS_API_VAR  __declspec(dllexport)
 #elif (__GNUC__ + 0 >= 4) || defined(__clang__)
-#    define ZIS_API __attribute__((used, visibility("default")))
+#    define ZIS_API      __attribute__((used, visibility("default"), noinline))
+#    define ZIS_API_VAR  __attribute__((used, visibility("default")))
 #else
-#    define ZIS_API
+#    define ZIS_API      zis_noinline
+#    define ZIS_API_VAR
 #endif
 
 static struct zis_object **api_ref_local(zis_t z, unsigned int i) {
@@ -121,7 +124,7 @@ zis_noinline static int api_format_exception_with_name(
 
 /* ----- zis-api-general ---------------------------------------------------- */
 
-ZIS_API const struct zis_build_info zis_build_info = {
+ZIS_API_VAR const struct zis_build_info zis_build_info = {
     .system    = ZIS_SYSTEM_NAME,
     .machine   = ZIS_ARCH_NAME,
     .compiler  = ZIS_BUILD_COMPILER_INFO,
