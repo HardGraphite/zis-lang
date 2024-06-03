@@ -1,5 +1,6 @@
 #include "object.h"
 
+#include "attributes.h"
 #include "context.h"
 #include "globals.h"
 #include "invoke.h"
@@ -179,4 +180,21 @@ int zis_object_set_element(
 ) {
     zis_context_set_reg0(z, zis_object_from(z->globals->sym_operator_get_element));
     return zis_invoke_vn(z, NULL, NULL, (struct zis_object *[]){obj, key, value}, 3);
+}
+
+zis_noinline size_t _zis_object_index_convert_slow(
+    zis_smallint_unsigned_t length, zis_smallint_t index
+) {
+    assert(index <= 0 || (zis_smallint_unsigned_t)index > length); // Handled in `zis_object_index_convert()`.
+
+    if (zis_unlikely(index >= 0))
+        return (size_t)-1;
+
+    assert(length <= ZIS_SMALLINT_MAX);
+    index += (zis_smallint_t)length;
+    if (zis_unlikely((zis_smallint_unsigned_t)index >= length))
+        return (size_t)-1;
+
+    assert(index >= 0 && (zis_smallint_unsigned_t)index < length);
+    return (zis_smallint_unsigned_t)index;
 }

@@ -137,3 +137,57 @@ func test_Float_ceil()
     testing.check_equal(2.5:ceil(), 3.0)
     testing.check_equal(0.035:ceil(0.01), 0.04)
 end
+
+## Tuple
+
+func test_Tuple_operator_add()
+    testing.check_equal(() + (), ())
+    testing.check_equal((1,) + (), (1,))
+    testing.check_equal(() + (1,), (1,))
+    testing.check_equal((1,2) + (3,4), (1,2,3,4))
+end
+
+func test_Tuple_operator_get_element()
+    tuple = (2, 4, 6)
+    testing.check_equal(tuple[1], 2)
+    testing.check_equal(tuple[2], 4)
+    testing.check_equal(tuple[3], 6)
+    testing.check_equal(tuple[-1], 6)
+    testing.check_equal(tuple[-2], 4)
+    testing.check_equal(tuple[-3], 2)
+end
+
+func test_Tuple_operator_equ()
+    testing.check_equal(() == (), true)
+    testing.check_equal((1,) == (1,), true)
+    testing.check_equal((1, 2, 3) == (1, 2, 3), true)
+    testing.check_equal((1, 2, 3) == (1, 2, 4), false)
+    testing.check_equal((1, 2, 3) == (3, 2, 1), false)
+    testing.check_equal((1, 2, 3) == (1, 2, 3, 4), false)
+end
+
+func test_Tuple_operator_cmp()
+    testing.check_equal(() <=> (), 0)
+    testing.check_equal((1,) <=> (1,), 0)
+    testing.check_equal((1, 2, 3) <=> (1, 2, 3), 0)
+    testing.check_equal((1, 2, 3) <=> (1, 2, 4), -1)
+    testing.check_equal((1, 2, 3) <=> (3, 2, 1), -1)
+    testing.check_equal((1, 2, 3) <=> (1,), 1)
+end
+
+func test_Tuple_length()
+    testing.check_equal(():length(), 0)
+    testing.check_equal((1,):length(), 1)
+    testing.check_equal((1,2,3):length(), 3)
+end
+
+func test_Tuple_hash()
+    testing.check_equal(():hash(), ():hash())
+    testing.check_equal((1,2,3):hash(), (1,2,3):hash())
+end
+
+func test_Tuple_to_string()
+    testing.check_equal(():to_string(), "()")
+    testing.check_equal((nil,):to_string(), "(nil,)")
+    testing.check_equal((true, false):to_string(), "(true, false)")
+end

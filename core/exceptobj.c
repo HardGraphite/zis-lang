@@ -165,11 +165,16 @@ struct zis_exception_obj *zis_exception_obj_format_common(
         _represent_type_of_obj(z, var.args[0], buffer[0], sizeof buffer[0]);
         _represent_type_of_obj(z, var.args[1], buffer[1], sizeof buffer[1]);
         var.result = zis_exception_obj_format(
-            z, "type", NULL, "unsupported operation: %s%c%s%c",
-            buffer[0], op[0], buffer[1], op[1]
+            z, "type", NULL, "unsupported operation: %s %c %s %s",
+            buffer[0], op[0], buffer[1], op + 1
         );
         break;
     }
+
+    case ZIS_EXC_FMT_INDEX_OUT_OF_RANGE:
+        var.args[0] = va_arg(ap, struct zis_object *);
+        var.result = zis_exception_obj_format(z, "key", var.args[0], "index out of range");
+        break;
 
     default:
         var.result = NULL;

@@ -89,6 +89,11 @@ else() # GCC, Clang, ...
         $<$<COMPILE_LANGUAGE:C>:-Werror=implicit-function-declaration>
         $<$<COMPILE_LANGUAGE:C>:-Werror=return-type>
     )
+    if(CMAKE_C_COMPILER_ID MATCHES ".*Clang")
+        add_compile_options(
+            -Wno-string-plus-int
+        )
+    endif()
 endif()
 
 if(ZIS_BUILD_CORE)

@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <stdint.h> // uintptr_t
 
+#include "attributes.h"
 #include "platform.h"
 #include "smallint.h"
 
@@ -210,7 +211,7 @@ do {                                           \
 #define zis_object_ref_bytes(obj, slot_cnt) \
     (assert(!zis_object_is_smallint(obj)), (obj)->_body + sizeof(void *) * (slot_cnt))
 
-/* ----- object common methods ---------------------------------------------- */
+/* ----- object common methods and functions -------------------------------- */
 
 struct zis_context;
 struct zis_string_obj;
@@ -266,3 +267,16 @@ int zis_object_set_element(
     struct zis_context *z,
     struct zis_object *obj, struct zis_object *key, struct zis_object *value
 );
+
+size_t _zis_object_index_convert_slow(zis_smallint_unsigned_t, zis_smallint_t);
+
+/// Convert a 1-based negative-able index to a C-style 0-based one.
+/// When `index` is greater than 0, it is converted to `index - 1`;
+/// when `index` is less than 0, it is converted to `length + index`.
+/// Returns -1 if the index is out of range.
+zis_static_force_inline size_t
+zis_object_index_convert(zis_smallint_unsigned_t length, zis_smallint_t index) {
+    if (zis_likely(index > 0 && (zis_smallint_unsigned_t)index <= length))
+        return (zis_smallint_unsigned_t)index - 1U;
+    return _zis_object_index_convert_slow(length, index);
+}

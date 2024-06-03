@@ -9,6 +9,14 @@ that the method is associated with.
 
 ## Standard named methods
 
+### `length()`
+
+```
+func Object:length() :: Int
+```
+
+Returns the number of elements in a container.
+
 ### `hash()`
 
 ```
