@@ -153,7 +153,7 @@ static int _module_loader_search_fn(const zis_path_char_t *mod_name, void *_arg)
     zis_path_char_t *buffer = state->buffer;
 
     for (size_t i = 0; ; i++) {
-        struct zis_object *entry = zis_array_obj_get(d->search_path, i);
+        struct zis_object *entry = zis_array_obj_get_checked(d->search_path, i);
         if (!entry)
             break;
         if (!zis_object_type_is(entry, z->globals->type_Path))
@@ -485,7 +485,7 @@ void zis_module_loader_add_path(struct zis_context *z, struct zis_path_obj *path
     struct module_loader_data *const d = &z->module_loader->data;
 
     for (size_t i = 0; ; i++) {
-        struct zis_object *e = zis_array_obj_get(d->search_path, i);
+        struct zis_object *e = zis_array_obj_get_checked(d->search_path, i);
         if (!e)
             break;
         if (!zis_object_type_is(e, z->globals->type_Path))

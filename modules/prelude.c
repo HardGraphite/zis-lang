@@ -75,7 +75,7 @@ static void F_print__print_1(zis_t z, struct zis_object *value, struct zis_strea
         var.v = zis_object_cast(value, struct zis_array_obj);
         zis_stream_obj_write_char(stream, '[');
         for (size_t i = 0; ; i++) {
-            struct zis_object *elem = zis_array_obj_get(var.v, i);
+            struct zis_object *elem = zis_array_obj_get_checked(var.v, i);
             if (!elem)
                 break;
             F_print__print_1(z, elem, stream);

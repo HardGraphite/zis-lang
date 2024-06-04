@@ -187,7 +187,7 @@ int zis_module_obj_foreach_parent(
     if (zis_object_type(_self->_parent) == z->globals->type_Array) {
         for (size_t i = 0; ; i++) {
             struct zis_object *const parent =
-                zis_array_obj_get(zis_object_cast(var.self->_parent, struct zis_array_obj), i);
+                zis_array_obj_get_checked(zis_object_cast(var.self->_parent, struct zis_array_obj), i);
             if (!parent)
                 break;
             assert(zis_object_type(parent) == z->globals->type_Module);

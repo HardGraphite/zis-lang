@@ -90,8 +90,16 @@ zis_static_force_inline size_t zis_array_obj_length(
     return self->length;
 }
 
-/// Get element with bounds checking. Return NULL if `i` is out of range,
+/// Get element without bounds checking.
 zis_static_force_inline struct zis_object *zis_array_obj_get(
+    const struct zis_array_obj *self, size_t i
+) {
+    assert(i < self->length);
+    return zis_array_slots_obj_get(self->_data, i);
+}
+
+/// Get element with bounds checking. Return NULL if `i` is out of range,
+zis_static_force_inline zis_nodiscard struct zis_object *zis_array_obj_get_checked(
     const struct zis_array_obj *self, size_t i
 ) {
     if (zis_unlikely(i >= self->length))
@@ -99,8 +107,16 @@ zis_static_force_inline struct zis_object *zis_array_obj_get(
     return zis_array_slots_obj_get(self->_data, i);
 }
 
+/// Set element without bounds checking.
+zis_static_force_inline void zis_array_obj_set(
+    struct zis_array_obj *self, size_t i, struct zis_object *v
+) {
+    assert(i < self->length);
+    zis_array_slots_obj_set(self->_data, i, v);
+}
+
 /// Set element with bounds checking. Return false if `i` is out of range,
-zis_static_force_inline bool zis_array_obj_set(
+zis_static_force_inline zis_nodiscard bool zis_array_obj_set_checked(
     struct zis_array_obj *self, size_t i, struct zis_object *v
 ) {
     if (zis_unlikely(i >= self->length))

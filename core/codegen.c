@@ -909,7 +909,7 @@ static struct zis_ast_node_obj *emit_elements(
     );
     var.node = _node, var.elements = _elements;
     for (unsigned int i = 0; ; i++) {
-        struct zis_object *sub_node = zis_array_obj_get(var.elements, i);
+        struct zis_object *sub_node = zis_array_obj_get_checked(var.elements, i);
         if (!sub_node)
             break;
         check_obj_is_node(cg, var.node, sub_node);
@@ -1082,7 +1082,7 @@ static struct zis_ast_node_obj *emit_block(
     );
     var.node = _node, var.block = _block;
     for (size_t i = 0; ; i++) {
-        struct zis_object *sub_node = zis_array_obj_get(var.block, i);
+        struct zis_object *sub_node = zis_array_obj_get_checked(var.block, i);
         if (!sub_node)
             break;
         check_obj_is_node(cg, var.node, sub_node);
@@ -1706,9 +1706,9 @@ static int emit_Cond(struct zis_codegen *cg, struct zis_ast_node_obj *_node, uns
     label_end = zis_assembler_alloc_label(as);
     for (size_t i = 0, n = zis_array_obj_length(var.args); i < n ; i += 2) {
         {
-            struct zis_object *x0 = zis_array_obj_get(var.args, i);
+            struct zis_object *x0 = zis_array_obj_get_checked(var.args, i);
             assert(x0);
-            struct zis_object *x1 = zis_array_obj_get(var.args, i + 1);
+            struct zis_object *x1 = zis_array_obj_get_checked(var.args, i + 1);
             if (zis_unlikely(!x1)) {
                 error(
                     cg, var.node, "illegal <%s> node args (%zu): %s",
@@ -1788,7 +1788,7 @@ static int emit_Func(struct zis_codegen *cg, struct zis_ast_node_obj *_node, uns
         error_too_many_args(cg, var.node);
     struct zis_type_obj *type_sym = codegen_z(cg)->globals->type_Symbol;
     for (size_t i = 0; ; i++) {
-        struct zis_object *arg_decl = zis_array_obj_get(var.args, i);
+        struct zis_object *arg_decl = zis_array_obj_get_checked(var.args, i);
         if (!arg_decl)
             break;
         if (!zis_object_type_is(arg_decl, type_sym)) // TODO: support optional arguments.
