@@ -191,3 +191,89 @@ func test_Tuple_to_string()
     testing.check_equal((nil,):to_string(), "(nil,)")
     testing.check_equal((true, false):to_string(), "(true, false)")
 end
+
+## Array
+
+func test_Array_operator_add()
+    testing.check_equal([] + [], [])
+    testing.check_equal([1, 2, 3] + [4], [1, 2, 3, 4])
+end
+
+func test_Array_operator_get_element()
+    array = [1, 3, 5]
+    testing.check_equal(array[1], 1)
+    testing.check_equal(array[2], 3)
+    testing.check_equal(array[3], 5)
+    testing.check_equal(array[-1], 5)
+    testing.check_equal(array[-2], 3)
+    testing.check_equal(array[-3], 1)
+end
+
+func test_Array_operator_set_element()
+    array = [1, 3, 5]
+    array[1] = 11
+    array[-1] = 15
+    testing.check_equal(array, [11, 3, 15])
+end
+
+func test_Array_operator_equ()
+    testing.check_equal([] == [], true)
+    testing.check_equal([1,2,3] == [1,2,3], true)
+    testing.check_equal([1,2,3] == [1,3,2], false)
+end
+
+func test_Array_operator_cmp()
+    testing.check_equal([] <=> [], 0)
+    testing.check_equal([1,2,3] <=> [1,2,3], 0)
+    testing.check_equal([1,2,3] <=> [1,3,2], -1)
+end
+
+func test_Array_length()
+    testing.check_equal([]:length(), 0)
+    testing.check_equal([1,2,3]:length(), 3)
+end
+
+func test_Array_to_string()
+    testing.check_equal([]:to_string(), "[]")
+    testing.check_equal([true,false,nil]:to_string(), "[true, false, nil]")
+end
+
+func test_Array_append()
+    array = []
+    array:append(1)
+    testing.check_equal(array, [1])
+    array:append(2)
+    testing.check_equal(array, [1, 2])
+    array:append(3)
+    testing.check_equal(array, [1, 2, 3])
+end
+
+func test_Array_pop()
+    array = [3, 2, 1]
+    testing.check_equal(array:pop(), 1)
+    testing.check_equal(array:pop(), 2)
+    testing.check_equal(array:pop(), 3)
+    testing.check_equal(array, [])
+end
+
+func test_Array_insert()
+    array = []
+    array:insert(1, 1)
+    testing.check_equal(array, [1])
+    array:insert(1, 2)
+    testing.check_equal(array, [2, 1])
+    array:insert(-1, 3)
+    testing.check_equal(array, [2, 1, 3])
+    array:insert(2, 4)
+    testing.check_equal(array, [2, 4, 1, 3])
+    array:insert(-2, 5)
+    testing.check_equal(array, [2, 4, 1, 5, 3])
+end
+
+func test_Array_remove()
+    array = [3, 2, 1]
+    array:remove(1)
+    testing.check_equal(array, [2, 1])
+    array:remove(-1)
+    testing.check_equal(array, [2])
+end

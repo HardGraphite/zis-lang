@@ -178,7 +178,7 @@ int zis_object_set_element(
     struct zis_context *z,
     struct zis_object *obj, struct zis_object *key, struct zis_object *value
 ) {
-    zis_context_set_reg0(z, zis_object_from(z->globals->sym_operator_get_element));
+    zis_context_set_reg0(z, zis_object_from(z->globals->sym_operator_set_element));
     return zis_invoke_vn(z, NULL, NULL, (struct zis_object *[]){obj, key, value}, 3);
 }
 

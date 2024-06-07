@@ -5,6 +5,10 @@
 #include "locals.h"
 #include "ndefutil.h"
 #include "objmem.h"
+#include "stack.h"
+
+#include "exceptobj.h"
+#include "stringobj.h"
 
 /* ----- array slots -------------------------------------------------------- */
 
@@ -121,7 +125,7 @@ struct zis_array_obj *zis_array_obj_new2(
             zis_object_vec_copy(data->_data, v, n);
             zis_object_vec_zero(data->_data + n, reserve - n);
         } else {
-            data = zis_array_slots_obj_new(z, NULL, n);
+            data = zis_array_slots_obj_new(z, NULL, reserve);
         }
         self = var.self;
         zis_locals_drop(z, var);
@@ -129,6 +133,53 @@ struct zis_array_obj *zis_array_obj_new2(
         zis_object_assert_no_write_barrier(self);
     }
     return self;
+}
+
+struct zis_array_obj *zis_array_obj_concat(
+    struct zis_context *z,
+    struct zis_array_obj *v[], size_t n
+) {
+    assert(v && n != (size_t)-1);
+
+    size_t new_array_len = 0;
+    for (size_t i = 0; i < n; i++) {
+        struct zis_array_obj *array_i = v[i];
+        const size_t array_i_len = zis_array_obj_length(array_i);
+        new_array_len += array_i_len;
+    }
+
+    if (zis_unlikely(!new_array_len))
+        return zis_array_obj_new(z, NULL, 0);
+
+    struct zis_array_obj *new_array = zis_array_obj_new2(z, new_array_len, NULL, 0);
+    new_array->length = new_array_len;
+    for (size_t i = 0, copied_count = 0; i < n; i++) {
+        struct zis_array_obj *array_i = v[i];
+        const size_t array_i_len = zis_array_obj_length(array_i);
+        assert(copied_count + array_i_len <= new_array_len);
+        zis_object_vec_copy(new_array->_data->_data + copied_count, array_i->_data->_data, array_i_len);
+        zis_object_write_barrier_n(new_array, array_i->_data->_data, array_i_len);
+        copied_count += array_i_len;
+    }
+
+    return new_array;
+}
+
+void zis_array_obj_reserve(struct zis_context *z, struct zis_array_obj *self, size_t new_cap) {
+    struct zis_array_slots_obj *self_data = self->_data;
+    const size_t old_cap = zis_array_slots_obj_length(self_data);
+
+    if (old_cap >= new_cap)
+        return;
+
+    zis_locals_decl_1(z, var, struct zis_array_obj *self);
+    var.self = self;
+    self_data = zis_array_slots_obj_new2(z, new_cap, self_data);
+    self = var.self;
+    zis_locals_drop(z, var);
+
+    self->_data = self_data;
+    zis_object_write_barrier(self, self_data);
 }
 
 void zis_array_obj_clear(struct zis_array_obj *self) {
@@ -255,119 +306,382 @@ bool zis_array_obj_remove(
     return true;
 }
 
-struct zis_object *zis_array_obj_Mx_get_element(
-    struct zis_context *z, const struct zis_array_obj *self,
-    struct zis_object *index_obj
-) {
-    if (zis_object_is_smallint(index_obj)) {
-        zis_smallint_t idx = zis_smallint_from_ptr(index_obj);
-        const size_t len = self->length;
-        assert(len <= ZIS_SMALLINT_MAX);
-        const zis_smallint_t len_smi = (zis_smallint_t)len;
-        if (idx > 0) {
-            idx--;
-            if (zis_unlikely(idx >= len_smi))
-                return NULL;
-        } else {
-            if (zis_unlikely(idx == 0))
-                return NULL;
-            idx = len_smi + idx;
-            if (zis_unlikely((size_t)idx >= len))
-                return NULL;
-        }
-        assert(idx >= 0 && idx < len_smi);
-        return zis_array_slots_obj_get(self->_data, (size_t)idx);
+#define assert_arg1_Array(__z) \
+    (assert(zis_object_type_is((__z)->callstack->frame[1], (__z)->globals->type_Array)))
+
+static int T_Array_M_operator_add(struct zis_context *z) {
+#define T_Array_Md_operator_add { "+", {2, 0, 2}, T_Array_M_operator_add }
+    /*#DOCSTR# func Array:\'+'(other :: Array) :: Array
+    Concatenates two arrays. */
+    assert_arg1_Array(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_context_globals *g = z->globals;
+    if (zis_unlikely(!zis_object_type_is(frame[2], g->type_Array))) {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN,
+            "+", frame[1], frame[2]
+        ));
+        return ZIS_THR;
     }
-    zis_unused_var(z);
-    return NULL;
+    struct zis_array_obj *result =
+        zis_array_obj_concat(z, (struct zis_array_obj **)(frame + 1), 2);
+    frame[0] = zis_object_from(result);
+    return ZIS_OK;
 }
 
-bool zis_array_obj_Mx_set_element(
-    struct zis_context *z, struct zis_array_obj *self,
-    struct zis_object *index_obj, struct zis_object *value
-) {
-    if (zis_object_is_smallint(index_obj)) {
-        zis_smallint_t idx = zis_smallint_from_ptr(index_obj);
-        const size_t len = self->length;
-        assert(len <= ZIS_SMALLINT_MAX);
-        const zis_smallint_t len_smi = (zis_smallint_t)len;
-        if (idx > 0) {
-            idx--;
-            if (zis_unlikely(idx >= len_smi))
-                return false;
-        } else {
-            if (zis_unlikely(idx == 0))
-                return false;
-            idx = len_smi + idx;
-            if (zis_unlikely((size_t)idx >= len))
-                return false;
-        }
-        assert(idx >= 0 && idx < len_smi);
-        zis_array_slots_obj_set(self->_data, (size_t)idx, value);
-        return true;
+static int T_Array_M_operator_get_elem(struct zis_context *z) {
+#define T_Array_Md_operator_get_elem { "[]", {2, 0, 2}, T_Array_M_operator_get_elem }
+    /*#DOCSTR# func Array:\'[]'(index :: Int) :: Any
+    Gets an element by index. */
+    assert_arg1_Array(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_context_globals *g = z->globals;
+
+    struct zis_object *result;
+    struct zis_array_obj *self = zis_object_cast(frame[1], struct zis_array_obj);
+    if (zis_object_is_smallint(frame[2])) {
+        const size_t index = zis_object_index_convert(
+            zis_array_obj_length(self),
+            zis_smallint_from_ptr(frame[2])
+        );
+        if (zis_unlikely(index == (size_t)-1))
+            goto thr_index_out_of_range;
+        result = zis_array_obj_get(self, index);
+    } else if (zis_object_type(frame[2]) == g->type_Int) {
+    thr_index_out_of_range:
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_INDEX_OUT_OF_RANGE, frame[2]
+        ));
+        return ZIS_THR;
+    } else {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_UNSUPPORTED_OPERATION_SUBS,
+            "[]", frame[1], frame[2]
+        ));
+        return ZIS_THR;
     }
-    zis_unused_var(z);
-    return false;
+
+    frame[0] = result;
+    return ZIS_OK;
 }
 
-bool zis_array_obj_Mx_insert_element(
-    struct zis_context *z, struct zis_array_obj *self,
-    struct zis_object *index_obj, struct zis_object *value
-) {
-    if (zis_object_is_smallint(index_obj)) {
-        zis_smallint_t idx = zis_smallint_from_ptr(index_obj);
-        const size_t len = self->length;
-        assert(len <= ZIS_SMALLINT_MAX);
-        const zis_smallint_t len_smi = (zis_smallint_t)len;
-        if (idx > 0) {
-            idx--;
-            if (zis_unlikely(idx > len_smi))
-                return false;
-        } else {
-            if (zis_unlikely(idx == 0))
-                return false;
-            idx = len_smi + 1 + idx;
-            if (zis_unlikely((size_t)idx > len))
-                return false;
-        }
-        assert(idx >= 0 && idx <= len_smi);
-        return zis_array_obj_insert(z, self, (size_t)idx, value);
+static int T_Array_M_operator_set_elem(struct zis_context *z) {
+#define T_Array_Md_operator_set_elem { "[]=", {3, 0, 3}, T_Array_M_operator_set_elem }
+    /*#DOCSTR# func Array:\'[]='(index :: Int, value :: Any)
+    Sets an element by index. */
+    assert_arg1_Array(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_context_globals *g = z->globals;
+
+    struct zis_array_obj *self = zis_object_cast(frame[1], struct zis_array_obj);
+    if (zis_object_is_smallint(frame[2])) {
+        const size_t index = zis_object_index_convert(
+            zis_array_obj_length(self),
+            zis_smallint_from_ptr(frame[2])
+        );
+        if (zis_unlikely(index == (size_t)-1))
+            goto thr_index_out_of_range;
+        zis_array_obj_set(self, index, frame[3]);
+    } else if (zis_object_type(frame[2]) == g->type_Int) {
+    thr_index_out_of_range:
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_INDEX_OUT_OF_RANGE, frame[2]
+        ));
+        return ZIS_THR;
+    } else {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_UNSUPPORTED_OPERATION_SUBS,
+            "[]=", frame[1], frame[2]
+        ));
+        return ZIS_THR;
     }
-    zis_unused_var(z);
-    return false;
+
+    frame[0] = frame[3];
+    return ZIS_OK;
 }
 
-bool zis_array_obj_Mx_remove_element(
-    struct zis_context *z, struct zis_array_obj *self,
-    struct zis_object *index_obj
-) {
-    if (zis_object_is_smallint(index_obj)) {
-        zis_smallint_t idx = zis_smallint_from_ptr(index_obj);
-        const size_t len = self->length;
-        assert(len <= ZIS_SMALLINT_MAX);
-        const zis_smallint_t len_smi = (zis_smallint_t)len;
-        if (idx > 0) {
-            idx--;
-            if (zis_unlikely(idx >= len_smi))
-                return false;
-        } else {
-            if (zis_unlikely(idx == 0))
-                return false;
-            if (idx == -1)
-                return zis_array_obj_pop(self) ? true : false;
-            idx = len_smi + idx;
-            if (zis_unlikely((size_t)idx >= len))
-                return false;
+static int T_Array_M_operator_equ(struct zis_context *z) {
+#define T_Array_Md_operator_equ { "==", {2, 0, 2}, T_Array_M_operator_equ }
+    /*#DOCSTR# func Array:\'=='(other :: Array) :: Bool
+    Operator ==. */
+    assert_arg1_Array(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+
+    bool equals;
+    if (zis_unlikely(!zis_object_type_is(frame[2], g->type_Array))) {
+        equals = false;
+    } else if (
+        zis_array_obj_length(zis_object_cast(frame[1], struct zis_array_obj)) !=
+        zis_array_obj_length(zis_object_cast(frame[2], struct zis_array_obj))
+    ) {
+        equals = false;
+    } else {
+        for (size_t i = 0; ; i++) {
+            struct zis_array_obj *lhs = zis_object_cast(frame[1], struct zis_array_obj);
+            struct zis_object *lhs_elem = zis_array_obj_get_checked(lhs, i);
+            struct zis_array_obj *rhs = zis_object_cast(frame[2], struct zis_array_obj);
+            struct zis_object *rhs_elem = zis_array_obj_get_checked(rhs, i);
+            if (!lhs_elem) {
+                equals = rhs_elem ? false : true;
+                break;
+            } else if (!rhs_elem) {
+                equals = false;
+                break;
+            }
+            equals = zis_object_equals(z, lhs_elem, rhs_elem);
+            if (!equals)
+                break;
         }
-        assert(idx >= 0 && idx < len_smi);
-        return zis_array_obj_remove(z, self, (size_t)idx);
     }
-    zis_unused_var(z);
-    return false;
+
+    frame[0] = zis_object_from(equals ? g->val_true : g->val_false);
+    return ZIS_OK;
 }
+
+static int T_Array_M_operator_cmp(struct zis_context *z) {
+#define T_Array_Md_operator_cmp { "<=>", {2, 0, 2}, T_Array_M_operator_cmp }
+    /*#DOCSTR# func Array:\'<=>'(other :: Array) :: Int
+    Operator <=>. */
+    assert_arg1_Array(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+
+    if (zis_unlikely(!zis_object_type_is(frame[2], g->type_Array))) {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN,
+            "<=>", frame[1], frame[2]
+        ));
+        return ZIS_THR;
+    }
+    int result;
+    for (size_t i = 0; ; i++) {
+        struct zis_array_obj *lhs = zis_object_cast(frame[1], struct zis_array_obj);
+        struct zis_object *lhs_elem = zis_array_obj_get_checked(lhs, i);
+        struct zis_array_obj *rhs = zis_object_cast(frame[2], struct zis_array_obj);
+        struct zis_object *rhs_elem = zis_array_obj_get_checked(rhs, i);
+        if (!lhs_elem) {
+            result = rhs_elem ? -1 : 0;
+            break;
+        } else if (!rhs_elem) {
+            result = 1;
+            break;
+        }
+        const enum zis_object_ordering o = zis_object_compare(z, lhs_elem, rhs_elem);
+        if (o == ZIS_OBJECT_IC)
+            return ZIS_THR;
+        if (o != ZIS_OBJECT_EQ) {
+            assert(o == ZIS_OBJECT_LT || ZIS_OBJECT_GT);
+            static_assert(ZIS_OBJECT_LT < 0 && ZIS_OBJECT_GT > 0, "");
+            result = o;
+            break;
+        }
+    }
+
+    frame[0] = zis_smallint_try_to_ptr(result);
+    if (zis_unlikely(!frame[0]))
+        frame[0] = zis_smallint_to_ptr(result / 8);
+    return ZIS_OK;
+}
+
+static int T_Array_M_length(struct zis_context *z) {
+#define T_Array_Md_length { "length", {1, 0, 1}, T_Array_M_length }
+    /*#DOCSTR# func Array:length() :: Int
+    Returns the total number of elements. */
+    assert_arg1_Array(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_array_obj *self = zis_object_cast(frame[1], struct zis_array_obj);
+    const size_t len = zis_array_obj_length(self);
+    assert(len <= ZIS_SMALLINT_MAX);
+    frame[0] = zis_smallint_to_ptr((zis_smallint_t)len);
+    return ZIS_OK;
+}
+
+static int T_Array_M_hash(struct zis_context *z) {
+#define T_Array_Md_hash { "hash", {1, 0, 1}, T_Array_M_hash }
+    /*#DOCSTR# func Array:hash() :: Int
+    Generates a hash code for this array. */
+    assert_arg1_Array(z);
+    struct zis_object **frame = z->callstack->frame;
+
+    size_t hash_code = 1;
+    for (size_t i = 0; ; i++) {
+        struct zis_array_obj *array = zis_object_cast(frame[1], struct zis_array_obj);
+        struct zis_object *element = zis_array_obj_get_checked(array, i);
+        if (!element)
+            break;
+        size_t element_hash_code;
+        if (zis_unlikely(!zis_object_hash(&element_hash_code, z, element)))
+            return ZIS_THR;
+        zis_hash_combine(&hash_code, element_hash_code);
+    }
+
+    const zis_smallint_t result = (zis_smallint_t)zis_hash_truncate(hash_code);
+    frame[0] = zis_smallint_to_ptr(result);
+    return ZIS_OK;
+}
+
+static int T_Array_M_to_string(struct zis_context *z) {
+#define T_Array_Md_to_string { "to_string", {1, 1, 2}, T_Array_M_to_string }
+    /*#DOCSTR# func Array:to_string(?fmt) :: String
+    Returns string representation for this array. */
+    assert_arg1_Array(z);
+    struct zis_object **frame = z->callstack->frame;
+
+    struct zis_string_obj **str_obj_p = (struct zis_string_obj **)(frame + 2);
+    *str_obj_p = zis_string_obj_new(z, "[", 1);
+    for (size_t i = 0; ; i++) {
+        struct zis_array_obj *array = zis_object_cast(frame[1], struct zis_array_obj);
+        if (i >= zis_array_obj_length(array))
+            break;
+        if (i)
+            *str_obj_p = zis_string_obj_concat(z, *str_obj_p, zis_string_obj_new(z, ", ", 2));
+        *str_obj_p = zis_string_obj_concat(
+            z, *str_obj_p,
+            zis_object_to_string(z, zis_array_obj_get(array, i), true, NULL)
+        );
+    }
+    *str_obj_p = zis_string_obj_concat(z, *str_obj_p, zis_string_obj_new(z, "]" , 1));
+
+    assert(zis_object_type_is(zis_object_from(*str_obj_p), z->globals->type_String));
+    frame[0] = zis_object_from(*str_obj_p);
+    return ZIS_OK;
+}
+
+static int T_Array_M_append(struct zis_context *z) {
+#define T_Array_Md_append { "append", {2, 0, 2}, T_Array_M_append }
+    /*#DOCSTR# func Array:append(value :: Any)
+    Inserts an element to the end. */
+    assert_arg1_Array(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+
+    struct zis_array_obj *self = zis_object_cast(frame[1], struct zis_array_obj);
+    zis_array_obj_append(z, self, frame[2]);
+    frame[0] = zis_object_from(g->val_nil);
+    return ZIS_OK;
+}
+
+static int T_Array_M_pop(struct zis_context *z) {
+#define T_Array_Md_pop { "pop", {1, 0, 1}, T_Array_M_pop }
+    /*#DOCSTR# func Array:pop() :: Any
+    Deletes and returns the last element. */
+    assert_arg1_Array(z);
+    struct zis_object **frame = z->callstack->frame;
+
+    struct zis_array_obj *self = zis_object_cast(frame[1], struct zis_array_obj);
+    struct zis_object *value = zis_array_obj_pop(self);
+    if (!value) {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_INDEX_OUT_OF_RANGE, zis_smallint_to_ptr(-1)
+        ));
+        return ZIS_THR;
+    }
+    frame[0] = value;
+    return ZIS_OK;
+}
+
+static int T_Array_M_insert(struct zis_context *z) {
+#define T_Array_Md_insert { "insert", {3, 0, 3}, T_Array_M_insert }
+    /*#DOCSTR# func Array:insert(position :: Int, value :: Any)
+    Inserts an element. */
+    assert_arg1_Array(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+
+    struct zis_array_obj *self = zis_object_cast(frame[1], struct zis_array_obj);
+    if (zis_object_is_smallint(frame[2])) {
+        zis_smallint_t index_smi = zis_smallint_from_ptr(frame[2]);
+        assert(zis_array_obj_length(self) <= ZIS_SMALLINT_MAX);
+        const zis_smallint_t len_smi = (zis_smallint_t)(zis_smallint_unsigned_t)zis_array_obj_length(self);
+        // Not using `zis_object_index_convert()` here because the index can be greater than the length.
+        if (index_smi > 0) {
+            index_smi--;
+            if (zis_unlikely(index_smi > len_smi))
+                goto thr_index_out_of_range;
+        } else {
+            if (zis_unlikely(index_smi == 0))
+                goto thr_index_out_of_range;
+            index_smi += len_smi + 1;
+            if (zis_unlikely((zis_smallint_unsigned_t)index_smi > (zis_smallint_unsigned_t)len_smi))
+                goto thr_index_out_of_range;
+        }
+        assert(index_smi >= 0 && index_smi <= len_smi);
+        const size_t index = (zis_smallint_unsigned_t)index_smi;
+        zis_array_obj_insert(z, self, index, frame[3]);
+    } else if (zis_object_type(frame[2]) == g->type_Int) {
+    thr_index_out_of_range:
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_INDEX_OUT_OF_RANGE, frame[2]
+        ));
+        return ZIS_THR;
+    } else {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_WRONG_ARGUMENT_TYPE,
+            "position", frame[2]
+        ));
+        return ZIS_THR;
+    }
+
+    frame[0] = zis_object_from(g->val_nil);
+    return ZIS_OK;
+}
+
+static int T_Array_M_remove(struct zis_context *z) {
+#define T_Array_Md_remove { "remove", {2, 0, 2}, T_Array_M_remove }
+    /*#DOCSTR# func Array:remove(position :: Int)
+    Removes an element. */
+    assert_arg1_Array(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+
+    struct zis_array_obj *self = zis_object_cast(frame[1], struct zis_array_obj);
+    if (zis_object_is_smallint(frame[2])) {
+        const size_t index = zis_object_index_convert(
+            zis_array_obj_length(self),
+            zis_smallint_from_ptr(frame[2])
+        );
+        if (zis_unlikely(index == (size_t)-1))
+            goto thr_index_out_of_range;
+        zis_array_obj_remove(z, self, index);
+    } else if (zis_object_type(frame[2]) == g->type_Int) {
+    thr_index_out_of_range:
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_INDEX_OUT_OF_RANGE, frame[2]
+        ));
+        return ZIS_THR;
+    } else {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_WRONG_ARGUMENT_TYPE,
+            "position", frame[2]
+        ));
+        return ZIS_THR;
+    }
+
+    frame[0] = zis_object_from(g->val_nil);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_LIST_DEF(
+    array_methods,
+    T_Array_Md_operator_add,
+    T_Array_Md_operator_get_elem,
+    T_Array_Md_operator_set_elem,
+    T_Array_Md_operator_equ,
+    T_Array_Md_operator_cmp,
+    T_Array_Md_length,
+    T_Array_Md_hash,
+    T_Array_Md_to_string,
+    T_Array_Md_append,
+    T_Array_Md_pop,
+    T_Array_Md_insert,
+    T_Array_Md_remove,
+);
 
 ZIS_NATIVE_TYPE_DEF(
     Array,
     struct zis_array_obj, length,
-    NULL, NULL, NULL
+    NULL,
+    ZIS_NATIVE_FUNC_LIST_VAR(array_methods),
+    NULL
 );

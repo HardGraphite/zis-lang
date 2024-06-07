@@ -171,6 +171,17 @@ struct zis_exception_obj *zis_exception_obj_format_common(
         break;
     }
 
+    case ZIS_EXC_FMT_WRONG_ARGUMENT_TYPE: {
+        char arg_type_buf[80];
+        const char *arg_name = va_arg(ap, const char *);
+        _represent_type_of_obj(z, va_arg(ap, struct zis_object *), arg_type_buf, sizeof arg_type_buf);
+        var.result = zis_exception_obj_format(
+            z, "type", NULL, "argument %s cannot be %s",
+            arg_name, arg_type_buf
+        );
+        break;
+    }
+
     case ZIS_EXC_FMT_INDEX_OUT_OF_RANGE:
         var.args[0] = va_arg(ap, struct zis_object *);
         var.result = zis_exception_obj_format(z, "key", var.args[0], "index out of range");

@@ -1511,14 +1511,6 @@ ZIS_API int zis_store_field(
     }
 }
 
-zis_noinline static int api_xxx_element_err_not_subscriptable(
-    zis_t z, struct zis_object *obj
-) {
-    return api_format_exception_with_name(
-        z, "type", obj, "not subscriptable", NULL, 0, (unsigned int)-1
-    );
-}
-
 zis_noinline static int api_xxx_element_err_look_up(
     zis_t z, struct zis_object *obj, const char *restrict key_desc, struct zis_object *key
 ) {
@@ -1548,14 +1540,6 @@ ZIS_API int zis_load_element(
         return ZIS_E_IDX;
     struct zis_type_obj *const obj_type = zis_object_type_1(obj);
     const struct zis_context_globals *const g = z->globals;
-    if (obj_type == g->type_Array) {
-        struct zis_array_obj *const array = zis_object_cast(obj, struct zis_array_obj);
-        struct zis_object *const val = zis_array_obj_Mx_get_element(z, array, key);
-        if (zis_unlikely(!val))
-            return api_xxx_element_err_look_up(z, obj, "index", key);
-        *val_ref = val;
-        return ZIS_OK;
-    }
     if (obj_type == g->type_Map) {
         struct zis_map_obj *const map = zis_object_cast(obj, struct zis_map_obj);
         const int status = zis_map_obj_get(z, map, key, val_ref);
@@ -1586,23 +1570,17 @@ ZIS_API int zis_store_element(
         return ZIS_E_IDX;
     struct zis_type_obj *const obj_type = zis_object_type_1(obj);
     const struct zis_context_globals *const g = z->globals;
-    if (obj_type == g->type_Array) {
-        struct zis_array_obj *const array = zis_object_cast(obj, struct zis_array_obj);
-        const bool ok = zis_array_obj_Mx_set_element(z, array, key, val);
-        if (!ok)
-            return api_xxx_element_err_look_up(z, obj, "index", key);
-        return ZIS_OK;
-    }
     if (obj_type == g->type_Map) {
         struct zis_map_obj *const map = zis_object_cast(obj, struct zis_map_obj);
         return zis_map_obj_set(z, map, key, val);
     }
-    return api_xxx_element_err_not_subscriptable(z, obj);
+    return zis_object_set_element(z, obj, key, val);
 }
 
 ZIS_API int zis_insert_element(
     zis_t z, unsigned int reg_obj, unsigned int reg_key, unsigned int reg_val
 ) {
+    struct zis_symbol_obj *const sym_insert = zis_symbol_registry_get(z, "insert", 6);
     struct zis_object *const obj = api_get_local(z, reg_obj);
     if (zis_unlikely(!obj))
         return ZIS_E_IDX;
@@ -1612,19 +1590,12 @@ ZIS_API int zis_insert_element(
     struct zis_object *const val = api_get_local(z, reg_val);
     if (zis_unlikely(!val))
         return ZIS_E_IDX;
-    struct zis_type_obj *const obj_type = zis_object_type_1(obj);
-    const struct zis_context_globals *const g = z->globals;
-    if (obj_type == g->type_Array) {
-        struct zis_array_obj *const array = zis_object_cast(obj, struct zis_array_obj);
-        const bool ok = zis_array_obj_Mx_insert_element(z, array, key, val);
-        if (!ok)
-            return api_xxx_element_err_look_up(z, obj, "index", key);
-        return ZIS_OK;
-    }
-    return api_xxx_element_err_not_subscriptable(z, obj);
+    zis_context_set_reg0(z, zis_object_from(sym_insert));
+    return zis_invoke_vn(z, NULL, NULL, (struct zis_object *[]){obj, key, val}, 3);
 }
 
 ZIS_API int zis_remove_element(zis_t z, unsigned int reg_obj, unsigned int reg_key) {
+    struct zis_symbol_obj *const sym_remove = zis_symbol_registry_get(z, "remove", 6);
     struct zis_object *const obj = api_get_local(z, reg_obj);
     if (zis_unlikely(!obj))
         return ZIS_E_IDX;
@@ -1633,16 +1604,10 @@ ZIS_API int zis_remove_element(zis_t z, unsigned int reg_obj, unsigned int reg_k
         return ZIS_E_IDX;
     struct zis_type_obj *const obj_type = zis_object_type_1(obj);
     const struct zis_context_globals *const g = z->globals;
-    if (obj_type == g->type_Array) {
-        struct zis_array_obj *const array = zis_object_cast(obj, struct zis_array_obj);
-        const bool ok = zis_array_obj_Mx_remove_element(z, array, key);
-        if (!ok)
-            return api_xxx_element_err_look_up(z, obj, "index", key);
-        return ZIS_OK;
-    }
     if (obj_type == g->type_Map) {
         struct zis_map_obj *const map = zis_object_cast(obj, struct zis_map_obj);
         return zis_map_obj_unset(z, map, key); // FIXME: may returns ZIS_E_ARG.
     }
-    return api_xxx_element_err_not_subscriptable(z, obj);
+    zis_context_set_reg0(z, zis_object_from(sym_remove));
+    return zis_invoke_vn(z, NULL, NULL, (struct zis_object *[]){obj, key}, 2);
 }

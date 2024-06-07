@@ -77,7 +77,7 @@ func Object:\'^'(other) :: Any
 
 ```
 func Object:\'[]'(key) :: Any   #=>   object[key]
-func Object:\'[]='(key, value)  #=>   object[key] = value
+func Object:\'[]='(key, value) :: Any  #=>   object[key] = value
 ```
 
 ### Invocation: `()`
