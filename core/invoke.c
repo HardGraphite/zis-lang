@@ -1143,6 +1143,11 @@ _interp_loop:
         struct zis_object **elm_p = bp + elm, **obj_p = bp + obj;
         BOUND_CHECK_REG(elm_p);
         BOUND_CHECK_REG(obj_p);
+        zis_debug_log_when(
+            elm == 0 || obj == 0,
+            ERROR, "Interp", "\"LDELMI %i, %u, %u\": REG-0 is occupied by operands",
+            key, elm, obj
+        );
         bp[0] = zis_smallint_to_ptr(key);
         CALL_METHOD(elm, g->sym_operator_get_element, 2, obj, 0/*key*/, 0);
     }
@@ -1153,6 +1158,11 @@ _interp_loop:
         struct zis_object **elm_p = bp + elm, **obj_p = bp + obj;
         BOUND_CHECK_REG(elm_p);
         BOUND_CHECK_REG(obj_p);
+        zis_debug_log_when(
+            elm == 0 || obj == 0,
+            ERROR, "Interp", "\"STELMI %i, %u, %u\": REG-0 is occupied by operands",
+            key, elm, obj
+        );
         bp[0] = zis_smallint_to_ptr(key);
         CALL_METHOD(0, g->sym_operator_set_element, 3, obj, 0/*key*/, elm);
     }

@@ -1309,13 +1309,13 @@ static int emit_Assign(struct zis_codegen *cg, struct zis_ast_node_obj *_node, u
         }
     } else {
         int rhs_atgt; unsigned int rhs_reg;
-        const bool tgt_reg_is_normal = tgt_reg != NTGT && tgt_reg != ATGT;
+        const bool tgt_reg_is_normal = tgt_reg != NTGT && tgt_reg != ATGT && tgt_reg != 0;
         if (!tgt_reg_is_normal) {
             rhs_atgt = emit_any(cg, var.rhs, ATGT);
             rhs_reg = atgt_abs(rhs_atgt);
         } else {
             rhs_atgt = 0, rhs_reg = tgt_reg;
-            emit_any(cg, var.rhs, tgt_reg);
+            emit_any(cg, var.rhs, rhs_reg);
         }
         struct frame_scope *fs = scope_stack_last_frame_scope(&cg->scope_stack);
 
@@ -1337,6 +1337,7 @@ static int emit_Assign(struct zis_codegen *cg, struct zis_ast_node_obj *_node, u
                         if (zis_object_is_smallint(key)) {
                             const zis_smallint_t key_smi = zis_smallint_from_ptr(key);
                             if (ZIS_INSTR_I9_MIN <= key_smi && key_smi <= ZIS_INSTR_I9_MAX) {
+                                assert(rhs_reg != 0);
                                 zis_assembler_append_AsBC(
                                     as, ZIS_OPC_STELMI,
                                     (int32_t)key_smi, rhs_reg, atgt_abs(value_atgt)
@@ -1504,7 +1505,7 @@ static int emit_Subscript(struct zis_codegen *cg, struct zis_ast_node_obj *_node
                 struct zis_object *key = zis_ast_node_get_field(var.key, Constant, value);
                 if (zis_object_is_smallint(key)) {
                     const zis_smallint_t key_smi = zis_smallint_from_ptr(key);
-                    if (ZIS_INSTR_I9_MIN <= key_smi && key_smi <= ZIS_INSTR_I9_MAX) {
+                    if (ZIS_INSTR_I9_MIN <= key_smi && key_smi <= ZIS_INSTR_I9_MAX && tgt_reg != 0) {
                         zis_assembler_append_AsBC(
                             as, ZIS_OPC_LDELMI,
                             (int32_t)key_smi, tgt_reg, atgt_abs(value_atgt)

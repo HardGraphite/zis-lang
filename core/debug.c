@@ -1,6 +1,7 @@
 #include "debug.h"
 
 #include <assert.h>
+#include <stdlib.h>
 
 #include "platform.h"
 #include "strutil.h"
