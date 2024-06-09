@@ -491,7 +491,7 @@ __attribute__((format(__printf__, 5, 6)))
 ZIS_API int zis_make_exception(
     zis_t z, unsigned int reg,
     const char *type, unsigned int reg_data, const char *msg_fmt, ...
-    ) ZIS_NOEXCEPT;
+) ZIS_NOEXCEPT;
 
 #define ZIS_RDE_TEST     0x00 ///< `zis_read_exception()`: do nothing.
 #define ZIS_RDE_TYPE     0x01 ///< `zis_read_exception()`: get the `type` field.
@@ -560,7 +560,7 @@ ZIS_API int zis_read_exception(zis_t z, unsigned int reg, int flag, unsigned int
  * int status = zis_make_stream(z, reg, ZIS_IOS_TEXT, NULL, reg_str_obj);
  * ```
  */
-ZIS_API int zis_make_stream(zis_t z, unsigned int reg, int flags, ...);
+ZIS_API int zis_make_stream(zis_t z, unsigned int reg, int flags, ...) ZIS_NOEXCEPT;
 
 /** @} */
 
@@ -592,7 +592,7 @@ ZIS_API int zis_make_function(
 ZIS_API int zis_make_type(
     zis_t z, unsigned int reg,
     const struct zis_native_type_def *def
-);
+) ZIS_NOEXCEPT;
 
 /**
  * Create a module.
@@ -841,7 +841,7 @@ ZIS_API int zis_remove_element(zis_t z, unsigned int reg_obj, unsigned int reg_k
 #if __STDC__ && __STDC_VERSION__ >= 201112L
 #    define ZIS_API__EXPR_WITH_TYPE_CHECKED(EXPR, TYPE) (_Generic((EXPR), TYPE : (EXPR)))
 #else
-#define ZIS_API__EXPR_WITH_TYPE_CHECKED(EXPR, TYPE) (EXPR)
+#    define ZIS_API__EXPR_WITH_TYPE_CHECKED(EXPR, TYPE) (EXPR)
 #endif
 
 /**
