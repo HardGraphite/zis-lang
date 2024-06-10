@@ -55,14 +55,14 @@ extern "C" {
 /** @name Status code */
 /** @{ */
 
-#define ZIS_OK          0      ///< Succeeded.
+#define ZIS_OK          0      /**< Succeeded. */
 
-#define ZIS_THR         (-1)   ///< An object (maybe an exception) was thrown.
+#define ZIS_THR         (-1)   /**< An object (maybe an exception) was thrown. */
 
-#define ZIS_E_ARG       (-11)  ///< Illegal argument.
-#define ZIS_E_IDX       (-12)  ///< Index out of range.
-#define ZIS_E_TYPE      (-13)  ///< Type mismatched.
-#define ZIS_E_BUF       (-14)  ///< Buffer is not big enough.
+#define ZIS_E_ARG       (-11)  /**< Illegal argument. */
+#define ZIS_E_IDX       (-12)  /**< Index out of range. */
+#define ZIS_E_TYPE      (-13)  /**< Type mismatched. */
+#define ZIS_E_BUF       (-14)  /**< Buffer is not big enough. */
 
 /** @} */
 
@@ -70,12 +70,12 @@ extern "C" {
  * Build information structure. @see `zis_build_info`.
  */
 struct zis_build_info {
-    const char *system;     ///< Operating system name.
-    const char *machine;    ///< Hardware (architecture) name.
-    const char *compiler;   ///< Compiler name and version.
-    const char *extra;      ///< Extra information. Optional.
-    uint32_t    timestamp;  ///< UNIX timestamp (UTC), divided by 60.
-    uint8_t     version[3]; ///< Version number (major, minor, patch).
+    const char *system;     /**< Operating system name. */
+    const char *machine;    /**< Hardware (architecture) name. */
+    const char *compiler;   /**< Compiler name and version. */
+    const char *extra;      /**< Extra information. Optional. */
+    uint32_t    timestamp;  /**< UNIX timestamp (UTC), divided by 60. */
+    uint8_t     version[3]; /**< Version number (major, minor, patch). */
 };
 
 /**
@@ -111,9 +111,9 @@ ZIS_API void zis_destroy(zis_t z) ZIS_NOEXCEPT;
 
 /** @name Panic cause */
 /** @{ */
-#define ZIS_PANIC_OOM   1  ///< Panic cause: out of memory (object memory)
-#define ZIS_PANIC_SOV   2  ///< Panic cause: stack overflow (runtime callstack)
-#define ZIS_PANIC_ILL   3  ///< Panic cause: illegal bytecode
+#define ZIS_PANIC_OOM   1  /**< Panic cause: out of memory (object memory) */
+#define ZIS_PANIC_SOV   2  /**< Panic cause: stack overflow (runtime callstack) */
+#define ZIS_PANIC_ILL   3  /**< Panic cause: illegal bytecode */
 /** @} */
 
 /**
@@ -147,13 +147,27 @@ typedef int (*zis_native_func_t)(zis_t) ZIS_NOEXCEPT;
  * Metadata of a native function.
  */
 struct zis_native_func_meta {
-    /// Number of arguments (excluding optional ones).
-    uint8_t  na;
-    /// Number of optional arguments. Or `-1` to accept a `Tuple` holding
-    /// the rest arguments (variadic).
-    uint8_t  no;
-    /// Number of local variables (excluding REG-0 but including arguments,
-    /// that is, the maximum of the indices of used registers).
+    /**
+     * Number of arguments.
+     *
+     * Number of required arguments in a function, excluding optional ones.
+     */
+    uint8_t na;
+
+    /**
+     * Number of optional arguments.
+     *
+     * Number of optional arguments in a function, passed after required ones.
+     * Or `-1` to accept a `Tuple` holding the rest arguments (variadic).
+     */
+    uint8_t no;
+
+    /**
+     * Number of local variables.
+     *
+     * Number of local variables in a function, excluding REG-0 (the first register)
+     * but including arguments. That is, the maximum of the indices of used registers.
+     */
     uint16_t nl;
 };
 
@@ -170,12 +184,43 @@ struct zis_native_func_def {
  * Definition of a native type (struct).
  */
 struct zis_native_type_def {
-    const char                       *name;      ///< Type name.
-    size_t                            slots_num; ///< Number of slots in object SLOTS part.
-    size_t                            bytes_size;///< Size of object BYTES part.
-    const char *const                *fields;    ///< An array of field names (or NULL), the length of which must be `slots_num`. Optional.
-    const struct zis_native_func_def *methods;   ///< A zero-terminated array of functions that define methods. Optional.
-    const struct zis_native_func_def *statics;   ///< Static methods definitions like `methods`, but those without a name are ignored. Optional.
+    /**
+     * Type name.
+     */
+    const char *name;
+
+    /**
+     * Number of slots in object SLOTS part.
+     */
+    size_t slots_num;
+
+    /**
+     * Size of object BYTES part.
+     */
+    size_t bytes_size;
+
+    /**
+     * List of field names (optional).
+     *
+     * An array of strings (or NULLs) indicating field names. The length of
+     * the array must be the same with member variable `slots_num`.
+     */
+    const char *const *fields;
+
+    /**
+     * List of method definitions (optional).
+     *
+     * A zero-terminated array of function definitions that defines the methods.
+     */
+    const struct zis_native_func_def *methods;
+
+    /**
+     * List of static function definitions (optional).
+     *
+     * A zero-terminated array of function definitions that defines the type's
+     * static functions. The definitions whose `name` s are NULL are ignored.
+     */
+    const struct zis_native_func_def *statics;
 };
 
 /**
@@ -184,13 +229,30 @@ struct zis_native_type_def {
  * When a module is created based on such a definition, the functions and types
  * are created and stored as module variables (global variables), excepting
  * those without names (`.name = NULL`).
- * If the first function definition does not have a name, it is the module initializer
- * and will be called automatically after the module created.
  */
 struct zis_native_module_def {
-    const char                       *name;      ///< Module name.
-    const struct zis_native_func_def *functions; ///< A zero-terminated array of functions. Optional.
-    const struct zis_native_type_def *types;     ///< A zero-terminated array of types. Optional.
+    /**
+     * Module name.
+     */
+    const char *name;
+
+    /**
+     * List of function definitions (optional).
+     *
+     * A zero-terminated array of function definitions that defines the
+     * global functions in the module.
+     * If the first function definition does not have a name, it is the module
+     * initializer and will be called automatically after the module created.
+     */
+    const struct zis_native_func_def *functions;
+
+    /**
+     * List of type definitions (optional).
+     *
+     * A zero-terminated array of type definitions that defines the
+     * global types in the module.
+     */
+    const struct zis_native_type_def *types;
 };
 
 /**
@@ -493,11 +555,11 @@ ZIS_API int zis_make_exception(
     const char *type, unsigned int reg_data, const char *msg_fmt, ...
 ) ZIS_NOEXCEPT;
 
-#define ZIS_RDE_TEST     0x00 ///< `zis_read_exception()`: do nothing.
-#define ZIS_RDE_TYPE     0x01 ///< `zis_read_exception()`: get the `type` field.
-#define ZIS_RDE_DATA     0x02 ///< `zis_read_exception()`: get the `data` field.
-#define ZIS_RDE_WHAT     0x03 ///< `zis_read_exception()`: get the `what` field.
-#define ZIS_RDE_DUMP     0x04 ///< `zis_read_exception()`: print this exception.
+#define ZIS_RDE_TEST     0x00 /**< `zis_read_exception()`: do nothing. */
+#define ZIS_RDE_TYPE     0x01 /**< `zis_read_exception()`: get the `type` field. */
+#define ZIS_RDE_DATA     0x02 /**< `zis_read_exception()`: get the `data` field. */
+#define ZIS_RDE_WHAT     0x03 /**< `zis_read_exception()`: get the `what` field. */
+#define ZIS_RDE_DUMP     0x04 /**< `zis_read_exception()`: print this exception. */
 
 /**
  * Read contents of an `Exception` object.
@@ -514,15 +576,15 @@ ZIS_API int zis_read_exception(zis_t z, unsigned int reg, int flag, unsigned int
 /** @name zis_make_stream() flags */
 /** @{ */
 
-#define ZIS_IOS_FILE    0x01 ///< `zis_make_stream()` type: file stream.
-#define ZIS_IOS_STDX    0x02 ///< `zis_make_stream()` type: standard I/O stream (0=stdin, 1=stdout, 2=stderr).
-#define ZIS_IOS_TEXT    0x03 ///< `zis_make_stream()` type: read-only string stream.
+#define ZIS_IOS_FILE    0x01 /**< `zis_make_stream()` type: file stream. */
+#define ZIS_IOS_STDX    0x02 /**< `zis_make_stream()` type: standard I/O stream (0=stdin, 1=stdout, 2=stderr). */
+#define ZIS_IOS_TEXT    0x03 /**< `zis_make_stream()` type: read-only string stream. */
 
-#define ZIS_IOS_RDONLY  0x10 ///< `zis_make_stream()` `ZIS_IOS_FILE` mode: read-only.
-#define ZIS_IOS_WRONLY  0x20 ///< `zis_make_stream()` `ZIS_IOS_FILE` mode: write-only.
-#define ZIS_IOS_WINEOL  0x40 ///< `zis_make_stream()` `ZIS_IOS_FILE` mode: use Windows style of end-of-line (CRLF).
+#define ZIS_IOS_RDONLY  0x10 /**< `zis_make_stream()` `ZIS_IOS_FILE` mode: read-only. */
+#define ZIS_IOS_WRONLY  0x20 /**< `zis_make_stream()` `ZIS_IOS_FILE` mode: write-only. */
+#define ZIS_IOS_WINEOL  0x40 /**< `zis_make_stream()` `ZIS_IOS_FILE` mode: use Windows style of end-of-line (CRLF). */
 
-#define ZIS_IOS_STATIC  0x80 ///< `zis_make_stream()` `ZIS_IOS_TEXT` mode: string is static (infinite lifetime).
+#define ZIS_IOS_STATIC  0x80 /**< `zis_make_stream()` `ZIS_IOS_TEXT` mode: string is static (infinite lifetime). */
 
 /** @} */
 
@@ -653,12 +715,12 @@ ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) ZIS_NOEX
 /** @name zis_import() flags */
 /** @{ */
 
-#define ZIS_IMP_NAME     0x01 ///< `zis_import()` type: import by name.
-#define ZIS_IMP_PATH     0x02 ///< `zis_import()` type: import by file path.
-#define ZIS_IMP_CODE     0x03 ///< `zis_import()` type: compile source code.
-#define ZIS_IMP_ADDP     0x0f ///< `zis_import()` type: add to search path.
+#define ZIS_IMP_NAME     0x01 /**< `zis_import()` type: import by name. */
+#define ZIS_IMP_PATH     0x02 /**< `zis_import()` type: import by file path. */
+#define ZIS_IMP_CODE     0x03 /**< `zis_import()` type: compile source code. */
+#define ZIS_IMP_ADDP     0x0f /**< `zis_import()` type: add to search path. */
 
-#define ZIS_IMP_MAIN     0xf0 ///< `zis_import()` extra: call the `main` function (REG-1 = `(int)argc`, REG-2 = `(char**)argv`).
+#define ZIS_IMP_MAIN     0xf0 /**< `zis_import()` extra: call the `main` function (REG-1 = `(int)argc`, REG-2 = `(char**)argv`). */
 
 /** @} */
 
