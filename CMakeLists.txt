@@ -78,6 +78,7 @@ endif()
 if(MSVC)
     add_compile_options(
         /W4 /utf-8 /Zc:inline,preprocessor
+        $<$<COMPILE_LANGUAGE:C>:/Zc:__STDC__>
         $<$<COMPILE_LANGUAGE:C>:/wd4200> # warning C4200: nonstandard extension used : zero-sized array in struct/union
         /wd4706 # warning C4706: assignment within conditional expression
     )

@@ -166,7 +166,7 @@ struct zis_native_value_def {
         const struct zis_native_value_def *M; /**< Type `Map` (`.type`=`{`). */
         const struct zis_native_func_def  *F; /**< Type `Function` (`.type`=`^`). */
     }
-#if !defined(__cplusplus) && (!defined(__STDC__) || __STDC_VERSION__ < 201112L)
+#if !defined(__cplusplus) && (!__STDC__ || __STDC_VERSION__ < 201112L)
     value
     /* Anonymous union is not supported before C11. */
 #endif
@@ -1072,7 +1072,7 @@ ZIS_API int zis_remove_element(zis_t z, unsigned int reg_obj, unsigned int reg_k
 #define zis_if_err(__expr) \
     ZIS_API__IF_UNLIKELY( ZIS_API__EXPR_WITH_TYPE_CHECKED(__expr, int) != ZIS_OK )
 
-#if (defined(__STDC__) && __STDC_VERSION__ >= 199901L) || (defined(__cplusplus) && __cplusplus >= 201103L)
+#if (__STDC__ && __STDC_VERSION__ >= 199901L) || (defined(__cplusplus) && __cplusplus >= 201103L)
 /* C99, C++11: supports variable number of arguments in function-like macros. */
 
 /**
