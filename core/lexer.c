@@ -267,7 +267,7 @@ static void scan_number(
             has_temp_result = true;
         }
         *temp_result_ref = int_obj;
-        if (consumed_size < buf_sz || zis_char_digit((zis_wchar_t)stream_peek(input)) < digit_base)
+        if (consumed_size < buf_sz || zis_char_digit((zis_wchar_t)stream_peek(input)) >= digit_base)
             break;
     }
     tok->value = *temp_result_ref;
