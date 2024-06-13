@@ -491,29 +491,6 @@ ZIS_NATIVE_FUNC_DEF(T_Array_M_length, z, {1, 0, 1}) {
     return ZIS_OK;
 }
 
-ZIS_NATIVE_FUNC_DEF(T_Array_M_hash, z, {1, 0, 1}) {
-    /*#DOCSTR# func Array:hash() :: Int
-    Generates a hash code for this array. */
-    assert_arg1_Array(z);
-    struct zis_object **frame = z->callstack->frame;
-
-    size_t hash_code = 1;
-    for (size_t i = 0; ; i++) {
-        struct zis_array_obj *array = zis_object_cast(frame[1], struct zis_array_obj);
-        struct zis_object *element = zis_array_obj_get_checked(array, i);
-        if (!element)
-            break;
-        size_t element_hash_code;
-        if (zis_unlikely(!zis_object_hash(&element_hash_code, z, element)))
-            return ZIS_THR;
-        zis_hash_combine(&hash_code, element_hash_code);
-    }
-
-    const zis_smallint_t result = (zis_smallint_t)zis_hash_truncate(hash_code);
-    frame[0] = zis_smallint_to_ptr(result);
-    return ZIS_OK;
-}
-
 ZIS_NATIVE_FUNC_DEF(T_Array_M_to_string, z, {1, 1, 2}) {
     /*#DOCSTR# func Array:to_string(?fmt) :: String
     Returns string representation for this array. */
@@ -658,7 +635,6 @@ ZIS_NATIVE_FUNC_DEF_LIST(
     { "=="          , &T_Array_M_operator_equ      },
     { "<=>"         , &T_Array_M_operator_cmp      },
     { "length"      , &T_Array_M_length            },
-    { "hash"        , &T_Array_M_hash              },
     { "to_string"   , &T_Array_M_to_string         },
     { "append"      , &T_Array_M_append            },
     { "pop"         , &T_Array_M_pop               },
