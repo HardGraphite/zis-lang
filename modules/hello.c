@@ -7,9 +7,9 @@
 
 #include <zis.h>
 
-// hello(who :: String)
-// # Prints "Hello, {who}!\n" to stdout.
-static int F_hello(zis_t z) {
+ZIS_NATIVE_FUNC_DEF(F_hello, z, {1, 0, 1}) {
+    /*#DOCSTR# func hello(who :: String)
+    Prints "Hello, {who}!\n" to stdout. */
     size_t who_sz;
     char *who;
     zis_if_err (zis_read_string(z, 1, NULL, &who_sz)) {
@@ -24,8 +24,9 @@ static int F_hello(zis_t z) {
     return ZIS_OK;
 }
 
-// main(args).
-static int F_main(zis_t z) {
+ZIS_NATIVE_FUNC_DEF(F_main, z, {1, 0, 3}) {
+    /*#DOCSTR# func main(args :: Array[String])
+    The main function. */
     zis_if_err (zis_load_global(z, 2, "hello", (size_t)-1)) {
         zis_make_exception(z, 0, NULL, (unsigned)-1, "cannot say hello");
         return ZIS_THR;
@@ -42,9 +43,9 @@ static int F_main(zis_t z) {
     return ZIS_OK;
 }
 
-// <module_init>()
-// # Prints "Hello, World!\n".
-static int F_init(zis_t z) {
+ZIS_NATIVE_FUNC_DEF(F_init, z, {0, 0, 1}) {
+    /*#DOCSTR# func <module_init>()
+    Prints "Hello, World!\n". */
     zis_if_err (zis_load_global(z, 0, "hello", (size_t)-1)) {
         zis_make_exception(z, 0, NULL, (unsigned)-1, "cannot say hello");
         return ZIS_THR;
@@ -53,15 +54,15 @@ static int F_init(zis_t z) {
     return zis_invoke(z, (unsigned[]){0, 0, 1}, 1);
 }
 
-static const struct zis_native_func_def funcs[] = {
-    { NULL   , {0, 0, 1}, F_init  },
-    { "main" , {1, 0, 3}, F_main  },
-    { "hello", {1, 0, 1}, F_hello },
-    { NULL   , {0, 0, 0}, NULL    },
-};
+ZIS_NATIVE_FUNC_DEF_LIST(
+    D_functions,
+    { NULL   , &F_init  },
+    { "main" , &F_main  },
+    { "hello", &F_hello },
+);
 
 ZIS_NATIVE_MODULE(hello) = {
-    .name = "hello",
-    .functions = funcs,
-    .types = NULL,
+    .functions = D_functions,
+    .types     = NULL,
+    .variables = NULL,
 };

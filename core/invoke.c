@@ -1051,6 +1051,14 @@ _interp_loop:
                 THROW_REG0;
             }
             *fld_p = val;
+        } else if (obj_type == g->type_Type) {
+            struct zis_type_obj *const tp = zis_object_cast(obj, struct zis_type_obj);
+            struct zis_object *const val = zis_type_obj_get_static(tp, name_sym);
+            if (zis_unlikely(!val)){
+                format_error_field_not_exists(z, this_func, name);
+                THROW_REG0;
+            }
+            *fld_p = val;
         } else {
             const size_t index = zis_type_obj_find_field(obj_type, name_sym);
             if (zis_unlikely(index == (size_t)-1)) {

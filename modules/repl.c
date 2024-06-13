@@ -87,8 +87,7 @@ static bool read_need_next_line(zis_t z, struct zis_object *syntax_err) {
 // input(line_num :: Int) -> line :: String | Nil
 //# Reads a line of string from stdin. On success, returns the String;
 //# on failure (like stdin is closed), returns nil.
-static int F_input(zis_t z) {
-#define Fm_input { 1, 0, 2 }
+ZIS_NATIVE_FUNC_DEF(F_input, z, {1, 0, 2}) {
     int64_t line_num;
     zis_read_int(z, 1, &line_num);
     //> if line_num > 1; %1 = prompt[2]; else; %1 = prompt[1]; end
@@ -108,8 +107,7 @@ static int F_input(zis_t z) {
 // read() -> ast :: AstNode | Nil
 //# Reads a block of code with function `input()` and parses it to AST.
 //# Or returns nil to stop the loop.
-static int F_read(zis_t z) {
-#define Fm_read { 0, 0, 2 }
+ZIS_NATIVE_FUNC_DEF(F_read, z, {0, 0, 2}) {
     struct zis_object **const frame = z->callstack->frame;
     for (int64_t line_num = 1; ; line_num++) {
         //> %1 = input(line_num)
@@ -251,8 +249,7 @@ static bool ast_make_last_expr_assignment(
 // eval(ast :: AstNode) -> result
 //# Execute the given code. Returns the result if the code is a non-assignment expression.
 //# If an uncaught object is throw, it is printed and nil is returned.
-static int F_eval(zis_t z) {
-#define Fm_eval { 1, 0, 1 }
+ZIS_NATIVE_FUNC_DEF(F_eval, z, {1, 0, 1}) {
     struct zis_object **const frame = z->callstack->frame;
     if (!zis_object_type_is(frame[1], z->globals->type_AstNode)) {
         zis_move_local(z, 0, 1); // Returns the value it self if it is not an AST node.
@@ -287,8 +284,7 @@ static int F_eval(zis_t z) {
 
 // print(result)
 //# Print the result if it is not nil.
-static int F_print(zis_t z) {
-#define Fm_print { 1, 0, 1 }
+ZIS_NATIVE_FUNC_DEF(F_print, z, {1, 0, 1}) {
     //> if %1 == nil; return; end
     if (zis_read_nil(z, 1) == ZIS_OK) {
         zis_load_nil(z, 0, 1);
@@ -304,8 +300,7 @@ static int F_print(zis_t z) {
 
 // loop()
 //# Run the REPL.
-static int F_loop(zis_t z) {
-#define Fm_loop { 0, 0, 1 }
+ZIS_NATIVE_FUNC_DEF(F_loop, z, {0, 0, 1}) {
     ensure_var_module(z);
     ensure_var_prompt(z);
     while (true) {
@@ -335,8 +330,7 @@ static int F_loop(zis_t z) {
 }
 
 // main()
-static int F_main(zis_t z) {
-#define Fm_main { 0, 0, 0 }
+ZIS_NATIVE_FUNC_DEF(F_main, z, {0, 0, 0}) {
     ensure_var_module(z);
     ensure_var_prompt(z);
     // print the banner
@@ -371,8 +365,7 @@ static int F_main(zis_t z) {
 }
 
 // <module_init>()
-static int F_init(zis_t z) {
-#define Fm_init { 0, 0, 0 }
+ZIS_NATIVE_FUNC_DEF(F_init, z, {0, 0, 0}) {
     //> import prelude
     if (zis_import(z, 0, "prelude", ZIS_IMP_NAME) == ZIS_THR)
         return ZIS_THR;
@@ -381,19 +374,19 @@ static int F_init(zis_t z) {
     return ZIS_OK;
 }
 
-static const struct zis_native_func_def funcs[] = {
-    { NULL   , Fm_init  , F_init  },
-    { "input", Fm_input , F_input },
-    { "read" , Fm_read  , F_read  },
-    { "eval" , Fm_eval  , F_eval  },
-    { "print", Fm_print , F_print },
-    { "loop" , Fm_loop  , F_loop  },
-    { "main" , Fm_main  , F_main  },
-    { NULL   , {0, 0, 0}, NULL    },
-};
+ZIS_NATIVE_FUNC_DEF_LIST(
+    D_functions,
+    { NULL   , &F_init  },
+    { "input", &F_input },
+    { "read" , &F_read  },
+    { "eval" , &F_eval  },
+    { "print", &F_print },
+    { "loop" , &F_loop  },
+    { "main" , &F_main  },
+);
 
 ZIS_NATIVE_MODULE(repl) = {
-    .name = "repl",
-    .functions = funcs,
-    .types = NULL,
+    .functions = D_functions,
+    .types     = NULL,
+    .variables = NULL,
 };

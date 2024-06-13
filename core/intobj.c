@@ -334,18 +334,10 @@ struct zis_object *zis_int_obj_mul_x(struct zis_context *z, struct zis_object *l
     zis_unused_var(lhs), zis_unused_var(rhs);
 }
 
-ZIS_NATIVE_FUNC_LIST_DEF(
-    int_methods,
-);
-
-ZIS_NATIVE_FUNC_LIST_DEF(
-    int_statics,
-);
-
 ZIS_NATIVE_TYPE_DEF_XB(
     Int,
     struct zis_int_obj, _bytes_size,
     NULL,
-    ZIS_NATIVE_FUNC_LIST_VAR(int_methods),
-    ZIS_NATIVE_FUNC_LIST_VAR(int_statics)
+    NULL,
+    NULL
 );

@@ -161,6 +161,11 @@ ZIS_API zis_panic_handler_t zis_at_panic(zis_t z, zis_panic_handler_t h) {
 
 /* ----- zis-api-natives ---------------------------------------------------- */
 
+static_assert(sizeof(struct zis_native_func_def) < sizeof(struct zis_native_func_def_ex), "");
+static_assert(offsetof(struct zis_native_func_def, meta) == offsetof(struct zis_native_func_def_ex, meta), "");
+static_assert(offsetof(struct zis_native_func_def, code) == offsetof(struct zis_native_func_def_ex, code_type), "");
+static_assert(sizeof(struct zis_native_func_def) == offsetof(struct zis_native_func_def_ex, code), "");
+
 ZIS_API int zis_native_block(zis_t z, size_t reg_max, int(*fn)(zis_t, void *), void *arg) {
     { // enter a new frame
         const size_t frame_size = reg_max + 1U;
@@ -384,6 +389,102 @@ ZIS_API int zis_read_bytes(zis_t z, unsigned int reg, void *buf, size_t *sz) {
     }
     *sz = bytes_sz;
     return ZIS_OK;
+}
+
+zis_noinline static int _api_make_value_collection(
+    zis_t z, unsigned int result_reg, char type,
+    const struct zis_native_value_def *restrict elements
+) {
+    assert(type == '(' || type == '[' || type == '{');
+
+    struct zis_object **result_ref = api_ref_local(z, result_reg);
+    if (zis_unlikely(!result_ref))
+        return ZIS_E_IDX;
+
+    size_t elem_count;
+    for (elem_count = 0; elements[elem_count].type; elem_count++);
+
+    zis_locals_decl(
+        z, var,
+        union {
+            struct zis_object    *result;
+            struct zis_tuple_obj *tuple;
+            struct zis_array_obj *array;
+            struct zis_map_obj   *map;
+        };
+        struct zis_object *value1;
+    );
+    int status = ZIS_OK;
+
+    switch (type) {
+    case '(':
+        var.tuple = zis_tuple_obj_new(z, NULL, elem_count);
+        for (size_t i = 0; i < elem_count; i++) {
+            status = zis_make_value(z, result_reg, &elements[i]);
+            if (zis_unlikely(status != ZIS_OK))
+                break;
+            var.tuple->_data[i] = *result_ref;
+        }
+        if (status == ZIS_OK)
+            zis_object_write_barrier_n(var.tuple, var.tuple->_data, elem_count);
+        break;
+    case '[':
+        var.array = zis_array_obj_new2(z, elem_count, NULL, 0);
+        for (size_t i = 0; i < elem_count; i++) {
+            status = zis_make_value(z, result_reg, &elements[i]);
+            if (zis_unlikely(status != ZIS_OK))
+                break;
+            zis_array_obj_append(z, var.array, *result_ref);
+        }
+        break;
+    case '{':
+        var.map = zis_map_obj_new(z, 0.0F, elem_count / 2);
+        for (size_t i = 0; i < elem_count; i += 2) {
+            status = zis_make_value(z, result_reg, &elements[i]);
+            if (zis_unlikely(status != ZIS_OK))
+                break;
+            var.value1 = *result_ref;
+            status = zis_make_value(z, result_reg, &elements[i + 1]);
+            if (zis_unlikely(status != ZIS_OK))
+                break;
+            status = zis_map_obj_set(z, var.map, var.value1, *result_ref);
+            if (zis_unlikely(status != ZIS_OK))
+                break;
+        }
+        break;
+    default:
+        zis_unreachable();
+    }
+
+    zis_locals_drop(z, var);
+    *result_ref = status == ZIS_OK ? var.result : zis_object_from(z->globals->val_nil);
+    return ZIS_OK;
+}
+
+ZIS_API int zis_make_value(zis_t z, unsigned int reg, const struct zis_native_value_def *def) {
+    switch (def->type) {
+    case 'b':
+        return zis_load_bool(z, reg, def->x);
+    case 'i':
+        return zis_make_int(z, reg, def->i);
+    case 'f':
+        return zis_make_float(z, reg, def->f);
+    case 's':
+        return zis_make_string(z, reg, def->s, (size_t)-1);
+    case 'y':
+        return zis_make_symbol(z, reg, def->y, (size_t)-1);
+    case '(':
+        return _api_make_value_collection(z, reg, '(', def->T);
+    case '[':
+        return _api_make_value_collection(z, reg, '[', def->A);
+    case '{':
+        return _api_make_value_collection(z, reg, '{', def->M);
+    case '^':
+        return zis_make_function(z, reg, def->F, (unsigned int)-1);
+    case 'n':
+    default:
+        return zis_load_nil(z, reg, 1);
+    }
 }
 
 struct api_make_values_state {
@@ -1120,7 +1221,52 @@ ZIS_API int zis_make_function(
     struct zis_func_obj_meta func_obj_meta;
     if (zis_unlikely(!zis_func_obj_meta_conv(&func_obj_meta, def->meta)))
         return ZIS_E_ARG;
-    struct zis_func_obj *const func_obj = zis_func_obj_new_native(z, func_obj_meta, def->code);
+    struct zis_func_obj *func_obj;
+    const struct zis_native_func_def_ex *const restrict def_ex = (const struct zis_native_func_def_ex *)def;
+    if (def_ex->code_type >> 1) {
+        // struct zis_native_func_def
+        func_obj = zis_func_obj_new_native(z, func_obj_meta, def->code);
+    } else {
+        // struct zis_native_func_def_ex
+        assert(def_ex->code_type == 0 || def_ex->code_type == 1);
+        zis_locals_decl(
+            z, var,
+            struct zis_func_obj *func_obj;
+            struct zis_array_slots_obj *table;
+            struct zis_object *orig_reg0;
+        );
+        zis_locals_zero(var);
+        if (def_ex->code_type == 0) {
+            size_t bytecode_len;
+            for (bytecode_len = 0; def_ex->code.bytecode[bytecode_len] != UINT32_MAX; bytecode_len++);
+            var.func_obj = zis_func_obj_new_bytecode(z, func_obj_meta, def_ex->code.bytecode, bytecode_len);
+        } else {
+            var.func_obj = zis_func_obj_new_native(z, func_obj_meta, def_ex->code.native);
+        }
+        if (def_ex->symbols) {
+            size_t len;
+            for (len = 0; def_ex->symbols[len]; len++);
+            var.table = zis_array_slots_obj_new(z, NULL, len);
+            for (size_t i = 0; i < len; i++) {
+                struct zis_symbol_obj *sym = zis_symbol_registry_get(z, def_ex->symbols[i], (size_t)-1);
+                zis_array_slots_obj_set(var.table, i, zis_object_from(sym));
+            }
+            zis_func_obj_set_resources(var.func_obj, var.table, NULL);
+        }
+        if (def_ex->constants) {
+            const struct zis_native_value_def vd = { .type = '[', .A = def_ex->constants };
+            var.orig_reg0 = zis_context_get_reg0(z);
+            if (zis_make_value(z, 0, &vd) == ZIS_OK) {
+                struct zis_object *x = zis_context_get_reg0(z);
+                assert(zis_object_type_is(x, z->globals->type_Array));
+                var.table = zis_object_cast(x, struct zis_array_obj)->_data;
+                zis_func_obj_set_resources(var.func_obj, NULL, var.table);
+            }
+            zis_context_set_reg0(z, var.orig_reg0);
+        }
+        func_obj = var.func_obj;
+        zis_locals_drop(z, var);
+    }
     *obj_ref = zis_object_from(func_obj);
     struct zis_object *maybe_mod_obj = api_get_local(z, reg_module);
     if (maybe_mod_obj && zis_object_type_is(maybe_mod_obj, z->globals->type_Module))

@@ -91,8 +91,10 @@ static void F_print__print_1(zis_t z, struct zis_object *value, struct zis_strea
     zis_stream_obj_write_chars(stream, buffer, strlen(buffer));
 }
 
-// print(*value)
-static int F_print(zis_t z) {
+ZIS_NATIVE_FUNC_DEF(F_print, z, {0, (unsigned char)-1, 1}) {
+    /*#DOCSTR# func print(values :: Array)
+    Prints values. */
+
     // TODO: re-write this function.
 
     struct zis_stream_obj *stream = z->globals->val_stream_stdout;
@@ -110,8 +112,10 @@ static int F_print(zis_t z) {
     return ZIS_OK;
 }
 
-// input(?prompt :: String) -> line :: String
-static int F_input(zis_t z) {
+ZIS_NATIVE_FUNC_DEF(F_input, z, {0, 1, 1}) {
+    /*#DOCSTR# input(?prompt :: String) -> line :: String
+    The main function. */
+
     // TODO: re-write this function.
 
     struct zis_object **reg1 = &z->callstack->frame[1];
@@ -188,20 +192,20 @@ zis_cold_fn static void prelude_load_types(struct zis_context *z) {
 
 /* ----- define the module -------------------------------------------------- */
 
-zis_cold_fn static int F_init(zis_t z) {
+ZIS_NATIVE_FUNC_DEF(F_init, z, {0, 0, 1}) {
     prelude_load_types(z);
     return ZIS_OK;
 }
 
-static const struct zis_native_func_def M_funcs[] = {
-    { NULL    , {0, 0, 1}, F_init     },
-    { "print" , {0, (unsigned char)-1, 1}, F_print    },
-    { "input" , {0, 1, 1}, F_input    },
-    { NULL    , {0, 0, 0}, NULL       },
-};
+ZIS_NATIVE_FUNC_DEF_LIST(
+    D_functions,
+    { NULL   , &F_init  },
+    { "print", &F_print },
+    { "input", &F_input },
+);
 
 ZIS_NATIVE_MODULE(prelude) = {
-    .name = "prelude",
-    .functions = M_funcs,
-    .types = NULL,
+    .functions = D_functions,
+    .types     = NULL,
+    .variables = NULL,
 };

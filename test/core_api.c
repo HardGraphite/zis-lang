@@ -587,7 +587,7 @@ zis_test_define(test_read_values, z) {
 
 // zis-api-code //
 
-static int F_add_int(zis_t z) {
+ZIS_NATIVE_FUNC_DEF(F_add_int, z, { 2, 0, 3 }) {
     int64_t lhs, rhs;
     if (zis_read_values(z, 1, "ii", &lhs, &rhs) != 2) {
         zis_make_exception(z, 0, "type", (unsigned int)-1, "wrong argument types");
@@ -624,13 +624,9 @@ static void do_test_function__check_exception(zis_t z, unsigned reg, const char 
 static void do_test_function__F_add_int(zis_t z) {
     int status;
     int64_t v_i64;
-    struct zis_native_func_def func_def;
 
     // make function
-    func_def.name = NULL;
-    func_def.meta = (struct zis_native_func_meta){ 2, 0, 2 };
-    func_def.code = F_add_int;
-    status = zis_make_function(z, 1, &func_def, (unsigned int)-1);
+    status = zis_make_function(z, 1, &F_add_int, (unsigned int)-1);
     zis_test_assert_eq(status, ZIS_OK);
 
     // call
@@ -691,16 +687,15 @@ zis_test_define(test_type, z) {
     const char *const type_fields[] = {
         "foo",
     };
-    const struct zis_native_func_def type_methods[] = {
-        { "add_int", { 2, 0, 3 }, F_add_int },
-        { NULL, {0}, NULL },
+    const struct zis_native_func_def__named_ref type_methods[] = {
+        { "add_int", &F_add_int },
+        { NULL, NULL },
     };
-    const struct zis_native_func_def type_statics[] = {
-        { "add_int", { 2, 0, 3 }, F_add_int },
-        { NULL, {0}, NULL },
+    const struct zis_native_value_def__named type_statics[] = {
+        { "add_int", { .type ='^', .F = &F_add_int } },
+        { NULL, { .type = 0, .n = NULL } },
     };
     const struct zis_native_type_def type_def = {
-        NULL,
         1,
         0,
         type_fields,
@@ -718,18 +713,19 @@ zis_test_define(test_module, z) {
     int status;
 
     // Create a module.
-    const struct zis_native_func_def mod_funcs[] = {
-        { "add_int", { 2, 0, 3 }, F_add_int },
-        { NULL, {0}, NULL },
+    const struct zis_native_func_def__named_ref mod_funcs[] = {
+        { "add_int", &F_add_int },
+        { NULL, NULL },
     };
-    const struct zis_native_type_def mod_types[] = {
-        { "some_type", 0, 0, NULL, NULL, NULL },
-        { NULL, 0, 0, NULL, NULL, NULL },
+    const struct zis_native_type_def some_type = { 0, 0, NULL, NULL, NULL };
+    const struct zis_native_type_def__named_ref mod_types[] = {
+        { "some_type", &some_type },
+        { NULL, NULL },
     };
     const struct zis_native_module_def mod_def = {
-        .name = NULL,
         .functions = mod_funcs,
         .types = mod_types,
+        .variables = NULL,
     };
     status = zis_make_module(z, 1, &mod_def);
     zis_test_assert_eq(status, ZIS_OK);
@@ -758,7 +754,7 @@ zis_test_define(test_module, z) {
 
 // zis-api-variables //
 
-static int F_test_load_store_global(zis_t z) {
+ZIS_NATIVE_FUNC_DEF(F_test_load_store_global, z, {0, 0, 10}) {
     int status;
     int64_t v_i64;
     const char *var_name = "__test_load_store_global__var";
@@ -785,7 +781,7 @@ static int F_test_load_store_global(zis_t z) {
 zis_test_define(test_load_store_global, z) {
     zis_make_function(
         z, 0,
-        &(struct zis_native_func_def){NULL, {0, 0, 10}, F_test_load_store_global},
+        &F_test_load_store_global,
         (unsigned int)-1
     );
     zis_invoke(z, (unsigned[]){0, 0}, 0);

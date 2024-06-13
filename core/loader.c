@@ -37,8 +37,13 @@
 ZIS_EMBEDDED_MODULE_LIST
 #undef E
 
-static const struct zis_native_module_def *const embedded_module_list[] = {
-#define E(NAME)  & ZIS_NATIVE_MODULE_VARNAME(NAME) ,
+struct zis_native_module_def__named_ref {
+    const char *name;
+    const struct zis_native_module_def *def;
+};
+
+static const struct zis_native_module_def__named_ref embedded_module_list[] = {
+#define E(NAME) { #NAME, & ZIS_NATIVE_MODULE_VARNAME(NAME) } ,
     ZIS_EMBEDDED_MODULE_LIST
 #undef E
 };
@@ -60,15 +65,7 @@ static const struct zis_native_module_def *find_embedded_module(const char *name
 
     // List sorted. Use the binary search algorithm.
 
-    typedef
-#if ZIS_WORDSIZE == 64
-    int64_t
-#elif ZIS_WORDSIZE == 32
-    int32_t
-#else
-    int
-#endif
-    _ssize_t;
+    typedef intptr_t _ssize_t;
     static_assert(sizeof(size_t) == sizeof(_ssize_t), "");
 
     assert(embedded_module_count && embedded_module_count < SIZE_MAX / 2);
@@ -76,10 +73,10 @@ static const struct zis_native_module_def *find_embedded_module(const char *name
 
     do {
         const size_t index_m = index_l + (index_r - index_l) / 2;
-        const struct zis_native_module_def *const def = embedded_module_list[index_m];
+        const struct zis_native_module_def__named_ref *const def = &embedded_module_list[index_m];
         const int diff = strcmp(def->name, name);
         if (diff == 0)
-            return def;
+            return def->def;
         if (diff < 0)
             index_l = index_m + 1;
         else

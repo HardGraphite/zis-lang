@@ -11,8 +11,7 @@
 
 #define FAIL_EXC_TYPE "testing_failure"
 
-static int F_check_equal(zis_t z) {
-#define Fd_check_equal { "check_equal", {2, 1, 5}, F_check_equal }
+ZIS_NATIVE_FUNC_DEF(F_check_equal, z, {2, 1, 5}) {
     /*#DOCSTR# func check_equal(actual, expected, ?message) */
     union {
         bool b[2];
@@ -76,8 +75,7 @@ static int F_check_equal(zis_t z) {
     return ZIS_OK;
 }
 
-static int F_call_test_func(zis_t z) {
-#define Fd_call_test_func { "call_test_func", {2, 0, 4}, F_call_test_func }
+ZIS_NATIVE_FUNC_DEF(F_call_test_func, z, {2, 0, 4}) {
     /*#DOCSTR# func call_test_func(f, name) :: Bool */
     zis_load_global(z, 0, "print", (size_t)-1);
     zis_make_string(z, 4, "-- TEST", (size_t)-1);
@@ -100,8 +98,7 @@ static int F_call_test_func(zis_t z) {
     return ZIS_OK;
 }
 
-static int F_main(zis_t z) {
-#define Fd_main { "main", {1, 0, 4}, F_main }
+ZIS_NATIVE_FUNC_DEF(F_main, z, {1, 0, 4}) {
     /*#DOCSTR# func main(args :: Array[String])
     The main function. The arguments should be paths to test script files, where
     the global functions named `test_*` will be called in order. */
@@ -160,15 +157,15 @@ static int F_main(zis_t z) {
     return ZIS_OK;
 }
 
-static const struct zis_native_func_def funcs[] = {
-    Fd_check_equal,
-    Fd_call_test_func,
-    Fd_main,
-    { NULL, {0, 0, 0}, NULL },
-};
+ZIS_NATIVE_FUNC_DEF_LIST(
+    D_functions,
+    { "check_equal", &F_check_equal },
+    { "call_test_func", &F_call_test_func },
+    { "main", &F_main },
+);
 
 ZIS_NATIVE_MODULE(testing) = {
-    .name = "testing",
-    .functions = funcs,
-    .types = NULL,
+    .functions = D_functions,
+    .types     = NULL,
+    .variables = NULL,
 };

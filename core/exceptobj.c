@@ -331,17 +331,14 @@ int zis_exception_obj_print(
     return 0;
 }
 
-ZIS_NATIVE_NAME_LIST_DEF(
-    Exception_slots,
+static const char *const T_Exception_D_fields[] = {
     "type",
     "what",
     "data",
-    NULL,
-);
+    NULL, // _stack_trace
+};
 
 ZIS_NATIVE_TYPE_DEF_NB(
     Exception, struct zis_exception_obj,
-    ZIS_NATIVE_NAME_LIST_VAR(Exception_slots),
-    NULL,
-    NULL
+    T_Exception_D_fields, NULL, NULL
 );

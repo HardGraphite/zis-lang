@@ -24,8 +24,7 @@ struct zis_nil_obj *_zis_nil_obj_new(struct zis_context *z) {
 #define assert_arg1_Nil(__z) \
     (assert(zis_object_type_is((__z)->callstack->frame[1], (__z)->globals->type_Nil)))
 
-static int T_Nil_M_operator_equ(struct zis_context *z) {
-#define T_Nil_Md_operator_equ { "==", {2, 0, 2}, T_Nil_M_operator_equ }
+ZIS_NATIVE_FUNC_DEF(T_Nil_M_operator_equ, z, {2, 0, 2}) {
     /*#DOCSTR# func Nil:\'=='(other :: Nil) :: Bool
     Operator ==. */
     assert_arg1_Nil(z);
@@ -36,8 +35,7 @@ static int T_Nil_M_operator_equ(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Nil_M_operator_cmp(struct zis_context *z) {
-#define T_Nil_Md_operator_cmp { "<=>", {2, 0, 2}, T_Nil_M_operator_cmp }
+ZIS_NATIVE_FUNC_DEF(T_Nil_M_operator_cmp, z, {2, 0, 2}) {
     /*#DOCSTR# func Nil:\'<=>'(other :: Nil) :: Int
     Operator <=>. */
     assert_arg1_Nil(z);
@@ -53,8 +51,7 @@ static int T_Nil_M_operator_cmp(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Nil_M_hash(struct zis_context *z) {
-#define T_Nil_Md_hash { "hash", {1, 0, 1}, T_Nil_M_hash }
+ZIS_NATIVE_FUNC_DEF(T_Nil_M_hash, z, {1, 0, 1}) {
     /*#DOCSTR# func Nil:hash() :: Int
     Returns -1. */
     assert_arg1_Nil(z);
@@ -62,8 +59,7 @@ static int T_Nil_M_hash(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Nil_M_to_string(struct zis_context *z) {
-#define T_Nil_Md_to_string { "to_string", {1, 1, 2}, T_Nil_M_to_string }
+ZIS_NATIVE_FUNC_DEF(T_Nil_M_to_string, z, {1, 1, 2}) {
     /*#DOCSTR# func Nil:to_string(?fmt) :: String
     Returns "nil". */
     assert_arg1_Nil(z);
@@ -71,18 +67,16 @@ static int T_Nil_M_to_string(struct zis_context *z) {
     return ZIS_OK;
 }
 
-ZIS_NATIVE_FUNC_LIST_DEF(
-    nil_methods,
-    T_Nil_Md_operator_equ,
-    T_Nil_Md_operator_cmp,
-    T_Nil_Md_hash,
-    T_Nil_Md_to_string,
+ZIS_NATIVE_FUNC_DEF_LIST(
+    T_Nil_D_methods,
+    { "=="          , &T_Nil_M_operator_equ   },
+    { "<=>"         , &T_Nil_M_operator_cmp   },
+    { "hash"        , &T_Nil_M_hash           },
+    { "to_string"   , &T_Nil_M_to_string      },
 );
 
 ZIS_NATIVE_TYPE_DEF_NB(
     Nil,
     struct zis_nil_obj,
-    NULL,
-    ZIS_NATIVE_FUNC_LIST_VAR(nil_methods),
-    NULL
+    NULL, T_Nil_D_methods, NULL
 );

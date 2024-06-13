@@ -1,7 +1,7 @@
 #include "floatobj.h"
 
-#include <math.h>
 #include <fenv.h>
+#include <math.h>
 #include <stdio.h>
 
 #include "algorithm.h"
@@ -28,8 +28,7 @@ struct zis_float_obj *zis_float_obj_new(struct zis_context *z, double val) {
 #define assert_arg1_Float(__z) \
     (assert(zis_object_type_is((__z)->callstack->frame[1], (__z)->globals->type_Float)))
 
-static int T_Float_M_operator_pos(struct zis_context *z) {
-#define T_Float_Md_operator_pos { "+#", {1, 0, 1}, T_Float_M_operator_pos }
+ZIS_NATIVE_FUNC_DEF(T_Float_M_operator_pos, z, {1, 0, 1}) {
     /*#DOCSTR# func Float:\'+#'() :: Float
     Returns `+ self`. */
     assert_arg1_Float(z);
@@ -38,8 +37,7 @@ static int T_Float_M_operator_pos(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Float_M_operator_neg(struct zis_context *z) {
-#define T_Float_Md_operator_neg { "-#", {1, 0, 1}, T_Float_M_operator_neg }
+ZIS_NATIVE_FUNC_DEF(T_Float_M_operator_neg, z, {1, 0, 1}) {
     /*#DOCSTR# func Float:\'-#'() :: Float
     Returns `- self`. */
     assert_arg1_Float(z);
@@ -82,8 +80,7 @@ static int float_obj_bin_op_unsupported_error(struct zis_context *z, const char 
     return ZIS_THR;
 }
 
-static int T_Float_M_operator_add(struct zis_context *z) {
-#define T_Float_Md_operator_add { "+", {2, 0, 2}, T_Float_M_operator_add }
+ZIS_NATIVE_FUNC_DEF(T_Float_M_operator_add, z, {2, 0, 2}) {
     /*#DOCSTR# func Float:\'+'(other :: Float|Int) :: Float
     Returns `self + other`. */
     assert_arg1_Float(z);
@@ -98,8 +95,7 @@ static int T_Float_M_operator_add(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Float_M_operator_sub(struct zis_context *z) {
-#define T_Float_Md_operator_sub { "-", {2, 0, 2}, T_Float_M_operator_sub }
+ZIS_NATIVE_FUNC_DEF(T_Float_M_operator_sub, z, {2, 0, 2}) {
     /*#DOCSTR# func Float:\'-'(other :: Float|Int) :: Float
     Returns `self - other`. */
     assert_arg1_Float(z);
@@ -114,8 +110,7 @@ static int T_Float_M_operator_sub(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Float_M_operator_mul(struct zis_context *z) {
-#define T_Float_Md_operator_mul { "*", {2, 0, 2}, T_Float_M_operator_mul }
+ZIS_NATIVE_FUNC_DEF(T_Float_M_operator_mul, z, {2, 0, 2}) {
     /*#DOCSTR# func Float:\'*'(other :: Float|Int) :: Float
     Returns `self * other`. */
     assert_arg1_Float(z);
@@ -130,8 +125,7 @@ static int T_Float_M_operator_mul(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Float_M_operator_div(struct zis_context *z) {
-#define T_Float_Md_operator_div { "/", {2, 0, 2}, T_Float_M_operator_div }
+ZIS_NATIVE_FUNC_DEF(T_Float_M_operator_div, z, {2, 0, 2}) {
     /*#DOCSTR# func Float:\'/'(other :: Float|Int) :: Float
     Returns `self / other`. */
     assert_arg1_Float(z);
@@ -146,8 +140,7 @@ static int T_Float_M_operator_div(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Float_M_operator_rem(struct zis_context *z) {
-#define T_Float_Md_operator_rem { "%", {2, 0, 2}, T_Float_M_operator_rem }
+ZIS_NATIVE_FUNC_DEF(T_Float_M_operator_rem, z, {2, 0, 2}) {
     /*#DOCSTR# func Float:\'%'(other :: Float|Int) :: Float
     Returns `self % other`. */
     assert_arg1_Float(z);
@@ -162,8 +155,7 @@ static int T_Float_M_operator_rem(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Float_M_operator_pow(struct zis_context *z) {
-#define T_Float_Md_operator_pow { "**", {2, 0, 2}, T_Float_M_operator_pow }
+ZIS_NATIVE_FUNC_DEF(T_Float_M_operator_pow, z, {2, 0, 2}) {
     /*#DOCSTR# func Float:\'**'(other :: Float|Int) :: Float
     Returns `self ** other`. */
     assert_arg1_Float(z);
@@ -178,8 +170,7 @@ static int T_Float_M_operator_pow(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Float_M_operator_equ(struct zis_context *z) {
-#define T_Float_Md_operator_equ { "==", {2, 0, 2}, T_Float_M_operator_equ }
+ZIS_NATIVE_FUNC_DEF(T_Float_M_operator_equ, z, {2, 0, 2}) {
     /*#DOCSTR# func Float:\'=='(other :: Float|Int) :: Bool
     Operator ==. */
     assert_arg1_Float(z);
@@ -204,8 +195,7 @@ static int T_Float_M_operator_equ(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Float_M_operator_cmp(struct zis_context *z) {
-#define T_Float_Md_operator_cmp { "<=>", {2, 0, 2}, T_Float_M_operator_cmp }
+ZIS_NATIVE_FUNC_DEF(T_Float_M_operator_cmp, z, {2, 0, 2}) {
     /*#DOCSTR# func Float:\'<=>'(other :: Float|Int) :: Int
     Operator <=>. */
     assert_arg1_Float(z);
@@ -221,8 +211,7 @@ static int T_Float_M_operator_cmp(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Float_M_hash(struct zis_context *z) {
-#define T_Float_Md_hash { "hash", {1, 0, 1}, T_Float_M_hash }
+ZIS_NATIVE_FUNC_DEF(T_Float_M_hash, z, {1, 0, 1}) {
     /*#DOCSTR# func Float:hash() :: Int
     Generates a hash code for the floating-point number. */
     assert_arg1_Float(z);
@@ -236,8 +225,7 @@ static int T_Float_M_hash(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Float_M_to_string(struct zis_context *z) {
-#define T_Float_Md_to_string { "to_string", {1, 1, 2}, T_Float_M_to_string }
+ZIS_NATIVE_FUNC_DEF(T_Float_M_to_string, z, {1, 1, 2}) {
     /*#DOCSTR# func Float:to_string(?fmt) :: String
     Generates a string representation of the floating-point number. */
     assert_arg1_Float(z);
@@ -253,8 +241,7 @@ static int T_Float_M_to_string(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Float_M_is_nan(struct zis_context *z) {
-#define T_Float_Md_is_nan { "is_nan", {1, 0, 1}, T_Float_M_is_nan }
+ZIS_NATIVE_FUNC_DEF(T_Float_M_is_nan, z, {1, 0, 1}) {
     /*#DOCSTR# func Float:is_nan() :: Bool
     Determines whether this is a NaN value. */
     assert_arg1_Float(z);
@@ -267,8 +254,7 @@ static int T_Float_M_is_nan(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Float_M_is_inf(struct zis_context *z) {
-#define T_Float_Md_is_inf { "is_inf", {1, 0, 1}, T_Float_M_is_inf }
+ZIS_NATIVE_FUNC_DEF(T_Float_M_is_inf, z, {1, 0, 1}) {
     /*#DOCSTR# func Float:is_inf() :: Bool
     Determines whether this is an infinity value. */
     assert_arg1_Float(z);
@@ -281,8 +267,7 @@ static int T_Float_M_is_inf(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Float_M_is_neg(struct zis_context *z) {
-#define T_Float_Md_is_neg { "is_neg", {1, 0, 1}, T_Float_M_is_neg }
+ZIS_NATIVE_FUNC_DEF(T_Float_M_is_neg, z, {1, 0, 1}) {
     /*#DOCSTR# func Float:is_neg() :: Bool
     Determines whether this is a negative value. */
     assert_arg1_Float(z);
@@ -295,8 +280,7 @@ static int T_Float_M_is_neg(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Float_M_abs(struct zis_context *z) {
-#define T_Float_Md_abs { "abs", {1, 0, 1}, T_Float_M_abs }
+ZIS_NATIVE_FUNC_DEF(T_Float_M_abs, z, {1, 0, 1}) {
     /*#DOCSTR# func Float:abs() :: Float
     Computes the absolute value. */
     assert_arg1_Float(z);
@@ -308,8 +292,7 @@ static int T_Float_M_abs(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Float_M_div(struct zis_context *z) {
-#define T_Float_Md_div { "div", {2, 0, 2}, T_Float_M_div }
+ZIS_NATIVE_FUNC_DEF(T_Float_M_div, z, {2, 0, 2}) {
     /*#DOCSTR# func Float:div(other :: Float|Int) :: Tuple[Float, Float]
     Returns `(self / other, self % other)`. */
     assert_arg1_Float(z);
@@ -336,8 +319,7 @@ static double _round(double x) {
     return result;
 }
 
-static int T_Float_M_round(struct zis_context *z) {
-#define T_Float_Md_round { "round", {1, 1, 2}, T_Float_M_round }
+ZIS_NATIVE_FUNC_DEF(T_Float_M_round, z, {1, 1, 2}) {
     /*#DOCSTR# func Float:round(?a :: Float|Int) :: Float
     Rounds to the nearest integer or the nearest multiple of argument `a`.
     A number of the form ?.??5 will be rounded to the nearest even integer,
@@ -355,8 +337,7 @@ static int T_Float_M_round(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Float_M_floor(struct zis_context *z) {
-#define T_Float_Md_floor { "floor", {1, 1, 2}, T_Float_M_floor }
+ZIS_NATIVE_FUNC_DEF(T_Float_M_floor, z, {1, 1, 2}) {
     /*#DOCSTR# func Float:floor(?a :: Float|Int) :: Float
     Finds the largest integer not greater than this value.
     Argument `a` is similar to that in `Float:round()`. */
@@ -373,8 +354,7 @@ static int T_Float_M_floor(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Float_M_ceil(struct zis_context *z) {
-#define T_Float_Md_ceil { "ceil", {1, 1, 2}, T_Float_M_ceil }
+ZIS_NATIVE_FUNC_DEF(T_Float_M_ceil, z, {1, 1, 2}) {
     /*#DOCSTR# func Float:ceil(?a :: Float|Int) :: Float
     Finds the smallest integer not less than this value.
     Argument `a` is similar to that in `Float:round()`. */
@@ -391,34 +371,37 @@ static int T_Float_M_ceil(struct zis_context *z) {
     return ZIS_OK;
 }
 
-ZIS_NATIVE_FUNC_LIST_DEF(
-    float_methods,
-    T_Float_Md_operator_pos,
-    T_Float_Md_operator_neg,
-    T_Float_Md_operator_add,
-    T_Float_Md_operator_sub,
-    T_Float_Md_operator_mul,
-    T_Float_Md_operator_div,
-    T_Float_Md_operator_rem,
-    T_Float_Md_operator_pow,
-    T_Float_Md_operator_equ,
-    T_Float_Md_operator_cmp,
-    T_Float_Md_hash,
-    T_Float_Md_to_string,
-    T_Float_Md_is_nan,
-    T_Float_Md_is_inf,
-    T_Float_Md_is_neg,
-    T_Float_Md_abs,
-    T_Float_Md_div,
-    T_Float_Md_round,
-    T_Float_Md_floor,
-    T_Float_Md_ceil,
+ZIS_NATIVE_FUNC_DEF_LIST(
+    T_float_D_methods,
+    { "+#"         , &T_Float_M_operator_pos  },
+    { "-#"         , &T_Float_M_operator_neg  },
+    { "+"          , &T_Float_M_operator_add  },
+    { "-"          , &T_Float_M_operator_sub  },
+    { "*"          , &T_Float_M_operator_mul  },
+    { "/"          , &T_Float_M_operator_div  },
+    { "%"          , &T_Float_M_operator_rem  },
+    { "**"         , &T_Float_M_operator_pow  },
+    { "=="         , &T_Float_M_operator_equ  },
+    { "<=>"        , &T_Float_M_operator_cmp  },
+    { "hash"       , &T_Float_M_hash          },
+    { "to_string"  , &T_Float_M_to_string     },
+    { "is_nan"     , &T_Float_M_is_nan        },
+    { "is_inf"     , &T_Float_M_is_inf        },
+    { "is_neg"     , &T_Float_M_is_neg        },
+    { "abs"        , &T_Float_M_abs           },
+    { "div"        , &T_Float_M_div           },
+    { "round"      , &T_Float_M_round         },
+    { "floor"      , &T_Float_M_floor         },
+    { "ceil"       , &T_Float_M_ceil          },
+);
+
+ZIS_NATIVE_VAR_DEF_LIST(
+    T_float_D_statics,
+    { "NAN"       , { 'f', .f = NAN         } },
 );
 
 ZIS_NATIVE_TYPE_DEF(
     Float,
     struct zis_float_obj, _value,
-    NULL,
-    ZIS_NATIVE_FUNC_LIST_VAR(float_methods),
-    NULL
+    NULL, T_float_D_methods, T_float_D_statics
 );

@@ -336,18 +336,8 @@ struct zis_string_obj *zis_string_obj_concat(
 
 /* ----- type definition ---------------------------------------------------- */
 
-ZIS_NATIVE_FUNC_LIST_DEF(
-    string_methods,
-);
-
-ZIS_NATIVE_FUNC_LIST_DEF(
-    string_statics,
-);
-
 ZIS_NATIVE_TYPE_DEF_XB(
     String,
     struct zis_string_obj, _bytes_size,
-    NULL,
-    ZIS_NATIVE_FUNC_LIST_VAR(string_methods),
-    ZIS_NATIVE_FUNC_LIST_VAR(string_statics)
+    NULL, NULL, NULL
 );

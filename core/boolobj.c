@@ -21,8 +21,7 @@ struct zis_bool_obj *_zis_bool_obj_new(struct zis_context *z, bool v) {
 #define assert_arg1_Bool(__z) \
     (assert(zis_object_type_is((__z)->callstack->frame[1], (__z)->globals->type_Bool)))
 
-static int T_Bool_M_operator_equ(struct zis_context *z) {
-#define T_Bool_Md_operator_equ { "==", {2, 0, 2}, T_Bool_M_operator_equ }
+ZIS_NATIVE_FUNC_DEF(T_Bool_M_operator_equ, z, {2, 0, 2}) {
     /*#DOCSTR# func Bool:\'=='(other :: Bool) :: Bool
     Operator ==. */
     assert_arg1_Bool(z);
@@ -33,8 +32,7 @@ static int T_Bool_M_operator_equ(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Bool_M_operator_cmp(struct zis_context *z) {
-#define T_Bool_Md_operator_cmp { "<=>", {2, 0, 2}, T_Bool_M_operator_cmp }
+ZIS_NATIVE_FUNC_DEF(T_Bool_M_operator_cmp, z, {2, 0, 2}) {
     /*#DOCSTR# func Bool:\'<=>'(other :: Bool) :: Int
     Operator <=>. */
     assert_arg1_Bool(z);
@@ -55,8 +53,7 @@ static int T_Bool_M_operator_cmp(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Bool_M_hash(struct zis_context *z) {
-#define T_Bool_Md_hash { "hash", {1, 0, 1}, T_Bool_M_hash }
+ZIS_NATIVE_FUNC_DEF(T_Bool_M_hash, z, {1, 0, 1}) {
     /*#DOCSTR# func Bool:hash() :: Int
     Returns 0 for false and 1 for true. */
     assert_arg1_Bool(z);
@@ -66,8 +63,7 @@ static int T_Bool_M_hash(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Bool_M_to_string(struct zis_context *z) {
-#define T_Bool_Md_to_string { "to_string", {1, 1, 2}, T_Bool_M_to_string }
+ZIS_NATIVE_FUNC_DEF(T_Bool_M_to_string, z, {1, 1, 2}) {
     /*#DOCSTR# func Bool:to_string(?fmt) :: String
     Returns "false" for false and "true" for true. */
     assert_arg1_Bool(z);
@@ -81,18 +77,16 @@ static int T_Bool_M_to_string(struct zis_context *z) {
     return ZIS_OK;
 }
 
-ZIS_NATIVE_FUNC_LIST_DEF(
-    bool_methods,
-    T_Bool_Md_operator_equ,
-    T_Bool_Md_operator_cmp,
-    T_Bool_Md_hash,
-    T_Bool_Md_to_string,
+ZIS_NATIVE_FUNC_DEF_LIST(
+    T_bool_D_methods,
+    { "=="          , &T_Bool_M_operator_equ },
+    { "<=>"         , &T_Bool_M_operator_cmp },
+    { "hash"        , &T_Bool_M_hash         },
+    { "to_string"   , &T_Bool_M_to_string    },
 );
 
 ZIS_NATIVE_TYPE_DEF(
     Bool,
     struct zis_bool_obj, _value,
-    NULL,
-    ZIS_NATIVE_FUNC_LIST_VAR(bool_methods),
-    NULL
+    NULL, T_bool_D_methods, NULL
 );

@@ -44,13 +44,13 @@ struct zis_func_obj {
     zis_func_obj_bytecode_word_t bytecode[]; // Optional.
 };
 
-/// Create a `Function` from native function. `module` is optional.
+/// Create a `Function` from native function.
 struct zis_func_obj *zis_func_obj_new_native(
     struct zis_context *z,
     struct zis_func_obj_meta meta, zis_native_func_t code
 );
 
-/// Create a `Function` from bytecode. `module` is optional.
+/// Create a `Function` from bytecode.
 struct zis_func_obj *zis_func_obj_new_bytecode(
     struct zis_context *z,
     struct zis_func_obj_meta meta,

@@ -138,6 +138,47 @@ ZIS_API zis_panic_handler_t zis_at_panic(zis_t z, zis_panic_handler_t h) ZIS_NOE
 /** @defgroup zis-api-natives API: native functions, types, and modules */
 /** @{ */
 
+struct zis_native_func_def;
+struct zis_native_type_def;
+struct zis_native_module_def;
+
+/**
+ * Definition of a simple native value.
+ */
+struct zis_native_value_def {
+    /**
+     * Type of the value.
+     *
+     * The type is represented as a character. Read the comment on the corresponding
+     * member variable for the type character.
+     */
+    char type;
+
+    union {
+        const void *n; /**< Type `Nil` (`.type`=`n`). */
+        bool        x; /**< Type `Bool` (`.type`=`b`). */
+        int64_t     i; /**< Type `Int` (`.type`=`i`). */
+        double      f; /**< Type `Float` (`.type`=`f`). */
+        const char *s; /**< Type `String` (`.type`=`s`). */
+        const char *y; /**< Type `Symbol` (`.type`=`y`). */
+        const struct zis_native_value_def *T; /**< Type `Tuple` (`.type`=`(`). */
+        const struct zis_native_value_def *A; /**< Type `Array` (`.type`=`[`). */
+        const struct zis_native_value_def *M; /**< Type `Map` (`.type`=`{`). */
+        const struct zis_native_func_def  *F; /**< Type `Function` (`.type`=`^`). */
+    }
+#if !defined(__cplusplus) && (!defined(__STDC__) || __STDC_VERSION__ < 201112L)
+    value
+    /* Anonymous union is not supported before C11. */
+#endif
+    /* Designator initializer is not supported before C99 and C++20. */
+    ;
+};
+
+struct zis_native_value_def__named {
+    const char *name;
+    struct zis_native_value_def value;
+};
+
 /**
  * Implementation of a native function.
  */
@@ -175,20 +216,86 @@ struct zis_native_func_meta {
  * Definition of a native function.
  */
 struct zis_native_func_def {
-    const char                 *name;
+    /**
+     * Function metadata.
+     */
     struct zis_native_func_meta meta;
-    zis_native_func_t           code;
+
+    /**
+     * The C function that implements this function.
+     *
+     * @warning The value must not be `0` or `1`. Otherwise this structure would
+     * be interpreted as a `struct zis_native_func_def_ex` object.
+     */
+    zis_native_func_t code;
+};
+
+/**
+ * Definition of a native function with extra information.
+ *
+ * @note A pointer to an object of this structure can be cast to `struct zis_native_func_def *`,
+ * but make sure that the value of member `code_type` is `0` or `1`.
+ */
+struct zis_native_func_def_ex {
+    /**
+     * Function metadata.
+     */
+    struct zis_native_func_meta meta;
+
+    /**
+     * Function implementation type.
+     *
+     * Specifies which implementation is provided in member `code`.
+     * Value `0` means using `code.bytecode`; value `1` means using `code.native`.
+     * Other values are not allowed.
+     *
+     * @warning The value must be either `0` or `1`. Otherwise this structure
+     * would be interpreted as a `struct zis_native_func_def` object.
+     */
+    uintptr_t code_type;
+
+    union {
+        /**
+         * Function implementation in bytecode, valid when `code_type` is `0`.
+         *
+         * An array of bytecode instructions, ternimated with `-1`.
+         */
+        const uint32_t *bytecode;
+
+        /**
+         * Function implementation in native function, valid when `code_type` is `1`.
+         */
+        zis_native_func_t native;
+    } code; /**< Function implementation. See member `code_type`. */
+
+    /**
+     * Symbols (optional).
+     *
+     * A NULL-terminated array of strings that defines the symbols to be used
+     * in this function.
+     */
+    const char *const *symbols;
+
+    /**
+     * Constants (optional).
+     *
+     * A NULL-terminated array of value definitions that defines the constants
+     * to be used in this function.
+     *
+     * @see ZIS_NATIVE_VALUE_DEF_LIST()
+     */
+    const struct zis_native_value_def *constants;
+};
+
+struct zis_native_func_def__named_ref {
+    const char *name;
+    const struct zis_native_func_def *def;
 };
 
 /**
  * Definition of a native type (struct).
  */
 struct zis_native_type_def {
-    /**
-     * Type name.
-     */
-    const char *name;
-
     /**
      * Number of slots in object SLOTS part.
      */
@@ -210,17 +317,26 @@ struct zis_native_type_def {
     /**
      * List of method definitions (optional).
      *
-     * A zero-terminated array of function definitions that defines the methods.
+     * A zero-terminated array of named function definitions that defines the methods.
+     *
+     * @see ZIS_NATIVE_FUNC_DEF_LIST()
      */
-    const struct zis_native_func_def *methods;
+    const struct zis_native_func_def__named_ref *methods;
 
     /**
-     * List of static function definitions (optional).
+     * List of static variable definitions (optional).
      *
-     * A zero-terminated array of function definitions that defines the type's
-     * static functions. The definitions whose `name` s are NULL are ignored.
+     * A zero-terminated array of named variable definitions that defines
+     * the type's static variables.
+     *
+     * @see ZIS_NATIVE_VAR_DEF_LIST()
      */
-    const struct zis_native_func_def *statics;
+    const struct zis_native_value_def__named *statics;
+};
+
+struct zis_native_type_def__named_ref {
+    const char *name;
+    const struct zis_native_type_def *def;
 };
 
 /**
@@ -232,35 +348,44 @@ struct zis_native_type_def {
  */
 struct zis_native_module_def {
     /**
-     * Module name.
-     */
-    const char *name;
-
-    /**
      * List of function definitions (optional).
      *
-     * A zero-terminated array of function definitions that defines the
-     * global functions in the module.
+     * A zero-terminated array of named function definitions that defines
+     * the global functions in the module.
      * If the first function definition does not have a name, it is the module
      * initializer and will be called automatically after the module created.
+     *
+     * @see ZIS_NATIVE_FUNC_DEF_LIST()
      */
-    const struct zis_native_func_def *functions;
+    const struct zis_native_func_def__named_ref *functions;
 
     /**
      * List of type definitions (optional).
      *
-     * A zero-terminated array of type definitions that defines the
-     * global types in the module.
+     * A zero-terminated array of named type definitions that defines
+     * the global types in the module.
+     *
+     * @see ZIS_NATIVE_TYPE_DEF_LIST()
      */
-    const struct zis_native_type_def *types;
+    const struct zis_native_type_def__named_ref *types;
+
+    /**
+     * List of variable definitions (optional).
+     *
+     * A zero-terminated array of named variable definitions that defines
+     * the global variables in the module.
+     *
+     * @see ZIS_NATIVE_VAR_DEF_LIST()
+     */
+    const struct zis_native_value_def__named *variables;
 };
 
 /**
- * A macro to define a global variable that exports a native module from C code.
+ * A macro to define a global variable that exports a native module from C source code.
  *
  * @see ZIS_NATIVE_MODULE__VAR
  */
-#define ZIS_NATIVE_MODULE(MODULE_NAME)  \
+#define ZIS_NATIVE_MODULE(MODULE_NAME) \
     ZIS_NATIVE_MODULE__EXTERN_C ZIS_NATIVE_MODULE__EXPORT \
     const struct zis_native_module_def ZIS_NATIVE_MODULE__VAR(MODULE_NAME)
 
@@ -469,6 +594,16 @@ ZIS_API int zis_make_bytes(zis_t z, unsigned int reg, const void *data, size_t s
 ZIS_API int zis_read_bytes(zis_t z, unsigned int reg, void *buf, size_t *sz) ZIS_NOEXCEPT;
 
 /**
+ * Create a value from `struct zis_native_value_def`.
+ *
+ * @param z zis instance
+ * @param reg register to store the value to
+ * @param def pointer to the definition
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`).
+ */
+ZIS_API int zis_make_value(zis_t z, unsigned int reg, const struct zis_native_value_def *def);
+
+/**
  * Create values and store them to `REG[reg_begin ...]`.
  *
  * @param z zis instance
@@ -634,7 +769,8 @@ ZIS_API int zis_make_stream(zis_t z, unsigned int reg, int flags, ...) ZIS_NOEXC
  *
  * @param z zis instance
  * @param reg register index
- * @param def native function definition; field `name` is ignored
+ * @param def native function definition, pointer to either a `struct zis_native_func_def`
+ * object or a `struct zis_native_func_def_ex` object
  * @param reg_module index of the register where the module is; or `-1` to ignore.
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg` or `reg_module`), `ZIS_E_ARG` (illegal `def`).
  */
@@ -648,7 +784,7 @@ ZIS_API int zis_make_function(
  *
  * @param z zis instance
  * @param reg register index
- * @param def native function definition; field `name` is ignored
+ * @param def native function definition
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`).
  */
 ZIS_API int zis_make_type(
@@ -661,7 +797,7 @@ ZIS_API int zis_make_type(
  *
  * @param z zis instance
  * @param reg register index
- * @param def native module definition; field `name` is ignored
+ * @param def native module definition
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`).
  */
 ZIS_API int zis_make_module(zis_t z, unsigned int reg, const struct zis_native_module_def *def) ZIS_NOEXCEPT;
@@ -935,6 +1071,94 @@ ZIS_API int zis_remove_element(zis_t z, unsigned int reg_obj, unsigned int reg_k
  */
 #define zis_if_err(__expr) \
     ZIS_API__IF_UNLIKELY( ZIS_API__EXPR_WITH_TYPE_CHECKED(__expr, int) != ZIS_OK )
+
+#if (defined(__STDC__) && __STDC_VERSION__ >= 199901L) || (defined(__cplusplus) && __cplusplus >= 201103L)
+/* C99, C++11: supports variable number of arguments in function-like macros. */
+
+/**
+ * Generates a static const variable that defines a function.
+ *
+ * `ZIS_NATIVE_FUNC_DEF(func_def_var, context_var, func_meta)`.
+ * Parameter `func_def_var` is the variable name of the definition; `context_var`
+ * is the argument (of type `zis_t`) name in the function implementation;
+ * `func_meta` is the function metadata initializer.
+ *
+ * @details Example:
+ * ```c
+ * ZIS_NATIVE_FUNC_DEF(F_add_int, z, {2, 0, 2}) {
+ *     int64_t lhs, rhs;
+ *     zis_read_int(z, 1, &lhs), zis_read_int(z, 2, &rhs);
+ *     zis_make_int(z, 0, lhs + rhs);
+ *     return ZIS_OK;
+ * }
+ * ```
+ *
+ * @see struct zis_native_func_def
+ */
+#define ZIS_NATIVE_FUNC_DEF(__func_def_var, __context_var, ...) \
+    static int __func_def_var##__impl (zis_t);                  \
+    static const struct zis_native_func_def __func_def_var = {  \
+        .meta = __VA_ARGS__ ,                                   \
+        .code = __func_def_var##__impl ,                        \
+    };                                                          \
+    static int __func_def_var##__impl ( zis_t __context_var )
+
+/**
+ * Generates a static const variable that defines an array of named function definitions.
+ *
+ * @details Example:
+ * ```c
+ * ZIS_NATIVE_FUNC_DEF(F_f1, z, {2, 0, 2}) { ... }
+ * ZIS_NATIVE_FUNC_DEF(F_f2, z, {1, 0, 3}) { ... }
+ * ZIS_NATIVE_FUNC_DEF_LIST(
+ *     func_list,
+ *     { "f1", &F_f1 },
+ *     { "f2", &F_f2 },
+ * );
+ * ```
+ *
+ * @see struct zis_native_func_def__named_ref
+ */
+#define ZIS_NATIVE_FUNC_DEF_LIST(__list_var, ...) \
+    static const struct zis_native_func_def__named_ref __list_var [] = { \
+        __VA_ARGS__                               \
+        { NULL, NULL }                            \
+    }
+
+/**
+ * Generates a static const variable that defines an array of named type definitions.
+ *
+ * @see struct zis_native_type_def__named_ref
+ */
+#define ZIS_NATIVE_TYPE_DEF_LIST(__list_var, ...) \
+    static const struct zis_native_type_def__named_ref __list_var [] = { \
+        __VA_ARGS__                               \
+        { NULL, NULL }                            \
+    }
+
+/**
+ * Generates a static const variable that defines an array of named variable definitions.
+ *
+ * @see struct zis_native_value_def__named
+ */
+#define ZIS_NATIVE_VAR_DEF_LIST(__list_var, ...) \
+    static const struct zis_native_value_def__named __list_var [] = { \
+        __VA_ARGS__                              \
+        { NULL, { .type = 0, .n = NULL } }       \
+    }
+
+/**
+ * Generates a static const variable that defines an array of value definitions.
+ *
+ * @see struct zis_native_value_def
+ */
+#define ZIS_NATIVE_VALUE_DEF_LIST(__list_var, ...) \
+    static const struct zis_native_value_def __list_var [] = { \
+        __VA_ARGS__                                \
+        { .type = 0, .n = NULL }                   \
+    }
+
+#endif /* C99, C++11 */
 
 /** @} */
 

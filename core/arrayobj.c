@@ -309,8 +309,7 @@ bool zis_array_obj_remove(
 #define assert_arg1_Array(__z) \
     (assert(zis_object_type_is((__z)->callstack->frame[1], (__z)->globals->type_Array)))
 
-static int T_Array_M_operator_add(struct zis_context *z) {
-#define T_Array_Md_operator_add { "+", {2, 0, 2}, T_Array_M_operator_add }
+ZIS_NATIVE_FUNC_DEF(T_Array_M_operator_add, z, {2, 0, 2}) {
     /*#DOCSTR# func Array:\'+'(other :: Array) :: Array
     Concatenates two arrays. */
     assert_arg1_Array(z);
@@ -329,8 +328,7 @@ static int T_Array_M_operator_add(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Array_M_operator_get_elem(struct zis_context *z) {
-#define T_Array_Md_operator_get_elem { "[]", {2, 0, 2}, T_Array_M_operator_get_elem }
+ZIS_NATIVE_FUNC_DEF(T_Array_M_operator_get_elem, z, {2, 0, 2}) {
     /*#DOCSTR# func Array:\'[]'(index :: Int) :: Any
     Gets an element by index. */
     assert_arg1_Array(z);
@@ -365,8 +363,7 @@ static int T_Array_M_operator_get_elem(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Array_M_operator_set_elem(struct zis_context *z) {
-#define T_Array_Md_operator_set_elem { "[]=", {3, 0, 3}, T_Array_M_operator_set_elem }
+ZIS_NATIVE_FUNC_DEF(T_Array_M_operator_set_elem, z, {3, 0, 3}) {
     /*#DOCSTR# func Array:\'[]='(index :: Int, value :: Any)
     Sets an element by index. */
     assert_arg1_Array(z);
@@ -400,8 +397,7 @@ static int T_Array_M_operator_set_elem(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Array_M_operator_equ(struct zis_context *z) {
-#define T_Array_Md_operator_equ { "==", {2, 0, 2}, T_Array_M_operator_equ }
+ZIS_NATIVE_FUNC_DEF(T_Array_M_operator_equ, z, {2, 0, 2}) {
     /*#DOCSTR# func Array:\'=='(other :: Array) :: Bool
     Operator ==. */
     assert_arg1_Array(z);
@@ -439,8 +435,7 @@ static int T_Array_M_operator_equ(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Array_M_operator_cmp(struct zis_context *z) {
-#define T_Array_Md_operator_cmp { "<=>", {2, 0, 2}, T_Array_M_operator_cmp }
+ZIS_NATIVE_FUNC_DEF(T_Array_M_operator_cmp, z, {2, 0, 2}) {
     /*#DOCSTR# func Array:\'<=>'(other :: Array) :: Int
     Operator <=>. */
     assert_arg1_Array(z);
@@ -484,8 +479,7 @@ static int T_Array_M_operator_cmp(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Array_M_length(struct zis_context *z) {
-#define T_Array_Md_length { "length", {1, 0, 1}, T_Array_M_length }
+ZIS_NATIVE_FUNC_DEF(T_Array_M_length, z, {1, 0, 1}) {
     /*#DOCSTR# func Array:length() :: Int
     Returns the total number of elements. */
     assert_arg1_Array(z);
@@ -497,8 +491,7 @@ static int T_Array_M_length(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Array_M_hash(struct zis_context *z) {
-#define T_Array_Md_hash { "hash", {1, 0, 1}, T_Array_M_hash }
+ZIS_NATIVE_FUNC_DEF(T_Array_M_hash, z, {1, 0, 1}) {
     /*#DOCSTR# func Array:hash() :: Int
     Generates a hash code for this array. */
     assert_arg1_Array(z);
@@ -521,8 +514,7 @@ static int T_Array_M_hash(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Array_M_to_string(struct zis_context *z) {
-#define T_Array_Md_to_string { "to_string", {1, 1, 2}, T_Array_M_to_string }
+ZIS_NATIVE_FUNC_DEF(T_Array_M_to_string, z, {1, 1, 2}) {
     /*#DOCSTR# func Array:to_string(?fmt) :: String
     Returns string representation for this array. */
     assert_arg1_Array(z);
@@ -548,8 +540,7 @@ static int T_Array_M_to_string(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Array_M_append(struct zis_context *z) {
-#define T_Array_Md_append { "append", {2, 0, 2}, T_Array_M_append }
+ZIS_NATIVE_FUNC_DEF(T_Array_M_append, z, {2, 0, 2}) {
     /*#DOCSTR# func Array:append(value :: Any)
     Inserts an element to the end. */
     assert_arg1_Array(z);
@@ -562,8 +553,7 @@ static int T_Array_M_append(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Array_M_pop(struct zis_context *z) {
-#define T_Array_Md_pop { "pop", {1, 0, 1}, T_Array_M_pop }
+ZIS_NATIVE_FUNC_DEF(T_Array_M_pop, z, {1, 0, 1}) {
     /*#DOCSTR# func Array:pop() :: Any
     Deletes and returns the last element. */
     assert_arg1_Array(z);
@@ -581,8 +571,7 @@ static int T_Array_M_pop(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Array_M_insert(struct zis_context *z) {
-#define T_Array_Md_insert { "insert", {3, 0, 3}, T_Array_M_insert }
+ZIS_NATIVE_FUNC_DEF(T_Array_M_insert, z, {3, 0, 3}) {
     /*#DOCSTR# func Array:insert(position :: Int, value :: Any)
     Inserts an element. */
     assert_arg1_Array(z);
@@ -627,8 +616,7 @@ static int T_Array_M_insert(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Array_M_remove(struct zis_context *z) {
-#define T_Array_Md_remove { "remove", {2, 0, 2}, T_Array_M_remove }
+ZIS_NATIVE_FUNC_DEF(T_Array_M_remove, z, {2, 0, 2}) {
     /*#DOCSTR# func Array:remove(position :: Int)
     Removes an element. */
     assert_arg1_Array(z);
@@ -662,26 +650,24 @@ static int T_Array_M_remove(struct zis_context *z) {
     return ZIS_OK;
 }
 
-ZIS_NATIVE_FUNC_LIST_DEF(
-    array_methods,
-    T_Array_Md_operator_add,
-    T_Array_Md_operator_get_elem,
-    T_Array_Md_operator_set_elem,
-    T_Array_Md_operator_equ,
-    T_Array_Md_operator_cmp,
-    T_Array_Md_length,
-    T_Array_Md_hash,
-    T_Array_Md_to_string,
-    T_Array_Md_append,
-    T_Array_Md_pop,
-    T_Array_Md_insert,
-    T_Array_Md_remove,
+ZIS_NATIVE_FUNC_DEF_LIST(
+    T_array_D_methods,
+    { "+"           , &T_Array_M_operator_add      },
+    { "[]"          , &T_Array_M_operator_get_elem },
+    { "[]="         , &T_Array_M_operator_set_elem },
+    { "=="          , &T_Array_M_operator_equ      },
+    { "<=>"         , &T_Array_M_operator_cmp      },
+    { "length"      , &T_Array_M_length            },
+    { "hash"        , &T_Array_M_hash              },
+    { "to_string"   , &T_Array_M_to_string         },
+    { "append"      , &T_Array_M_append            },
+    { "pop"         , &T_Array_M_pop               },
+    { "insert"      , &T_Array_M_insert            },
+    { "remove"      , &T_Array_M_remove            },
 );
 
 ZIS_NATIVE_TYPE_DEF(
     Array,
     struct zis_array_obj, length,
-    NULL,
-    ZIS_NATIVE_FUNC_LIST_VAR(array_methods),
-    NULL
+    NULL, T_array_D_methods, NULL
 );

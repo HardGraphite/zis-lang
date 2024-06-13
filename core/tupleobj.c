@@ -101,8 +101,7 @@ struct zis_tuple_obj *zis_tuple_obj_slice(
 #define assert_arg1_Tuple(__z) \
     (assert(zis_object_type_is((__z)->callstack->frame[1], (__z)->globals->type_Tuple)))
 
-static int T_Tuple_M_operator_add(struct zis_context *z) {
-#define T_Tuple_Md_operator_add { "+", {2, 0, 2}, T_Tuple_M_operator_add }
+ZIS_NATIVE_FUNC_DEF(T_Tuple_M_operator_add, z, {2, 0, 2}) {
     /*#DOCSTR# func Tuple:\'+'(other :: Tuple) :: Tuple
     Concatenates two tuples. */
     assert_arg1_Tuple(z);
@@ -121,8 +120,7 @@ static int T_Tuple_M_operator_add(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Tuple_M_operator_get_elem(struct zis_context *z) {
-#define T_Tuple_Md_operator_get_elem { "[]", {2, 0, 2}, T_Tuple_M_operator_get_elem }
+ZIS_NATIVE_FUNC_DEF(T_Tuple_M_operator_get_elem, z, {2, 0, 2}) {
     /*#DOCSTR# func Tuple:\'[]'(index :: Int) :: Any
     Gets an element by index. */
     assert_arg1_Tuple(z);
@@ -157,8 +155,7 @@ static int T_Tuple_M_operator_get_elem(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Tuple_M_operator_equ(struct zis_context *z) {
-#define T_Tuple_Md_operator_equ { "==", {2, 0, 2}, T_Tuple_M_operator_equ }
+ZIS_NATIVE_FUNC_DEF(T_Tuple_M_operator_equ, z, {2, 0, 2}) {
     /*#DOCSTR# func Tuple:\'=='(other :: Tuple) :: Bool
     Operator ==. */
     assert_arg1_Tuple(z);
@@ -191,8 +188,7 @@ static int T_Tuple_M_operator_equ(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Tuple_M_operator_cmp(struct zis_context *z) {
-#define T_Tuple_Md_operator_cmp { "<=>", {2, 0, 2}, T_Tuple_M_operator_cmp }
+ZIS_NATIVE_FUNC_DEF(T_Tuple_M_operator_cmp, z, {2, 0, 2}) {
     /*#DOCSTR# func Tuple:\'<=>'(other :: Tuple) :: Int
     Operator <=>. */
     assert_arg1_Tuple(z);
@@ -236,8 +232,7 @@ static int T_Tuple_M_operator_cmp(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Tuple_M_length(struct zis_context *z) {
-#define T_Tuple_Md_length { "length", {1, 0, 1}, T_Tuple_M_length }
+ZIS_NATIVE_FUNC_DEF(T_Tuple_M_length, z, {1, 0, 1}) {
     /*#DOCSTR# func Tuple:length() :: Int
     Returns the total number of elements. */
     assert_arg1_Tuple(z);
@@ -249,8 +244,7 @@ static int T_Tuple_M_length(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Tuple_M_hash(struct zis_context *z) {
-#define T_Tuple_Md_hash { "hash", {1, 0, 1}, T_Tuple_M_hash }
+ZIS_NATIVE_FUNC_DEF(T_Tuple_M_hash, z, {1, 0, 1}) {
     /*#DOCSTR# func Tuple:hash() :: Int
     Generates a hash code for this tuple. */
     assert_arg1_Tuple(z);
@@ -273,8 +267,7 @@ static int T_Tuple_M_hash(struct zis_context *z) {
     return ZIS_OK;
 }
 
-static int T_Tuple_M_to_string(struct zis_context *z) {
-#define T_Tuple_Md_to_string { "to_string", {1, 1, 2}, T_Tuple_M_to_string }
+ZIS_NATIVE_FUNC_DEF(T_Tuple_M_to_string, z, {1, 1, 2}) {
     /*#DOCSTR# func Tuple:to_string(?fmt) :: String
     Returns string representation for this tuple. */
     assert_arg1_Tuple(z);
@@ -305,20 +298,18 @@ static int T_Tuple_M_to_string(struct zis_context *z) {
     return ZIS_OK;
 }
 
-ZIS_NATIVE_FUNC_LIST_DEF(
-    tuple_methods,
-    T_Tuple_Md_operator_add,
-    T_Tuple_Md_operator_get_elem,
-    T_Tuple_Md_operator_equ,
-    T_Tuple_Md_operator_cmp,
-    T_Tuple_Md_length,
-    T_Tuple_Md_hash,
-    T_Tuple_Md_to_string,
+ZIS_NATIVE_FUNC_DEF_LIST(
+    T_tuple_D_methods,
+    { "+"           , &T_Tuple_M_operator_add      },
+    { "[]"          , &T_Tuple_M_operator_get_elem },
+    { "=="          , &T_Tuple_M_operator_equ      },
+    { "<=>"         , &T_Tuple_M_operator_cmp      },
+    { "length"      , &T_Tuple_M_length            },
+    { "hash"        , &T_Tuple_M_hash              },
+    { "to_string"   , &T_Tuple_M_to_string         },
 );
 
 ZIS_NATIVE_TYPE_DEF_XS_NB(
     Tuple, struct zis_tuple_obj,
-    NULL,
-    ZIS_NATIVE_FUNC_LIST_VAR(tuple_methods),
-    NULL
+    NULL, T_tuple_D_methods, NULL
 );
