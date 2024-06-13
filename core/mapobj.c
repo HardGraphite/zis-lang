@@ -90,11 +90,9 @@ zis_hashmap_buckets_get_bucket(const zis_hashmap_buckets_obj_t *mb, size_t key_h
 }
 
 struct hashmap_buckets_get_node_locals {
-    union {
-        zis_hashmap_buckets_obj_t *buckets;
-        struct zis_hashmap_bucket_node_obj *node;
-    };
+    zis_hashmap_buckets_obj_t *buckets;
     struct zis_object *key;
+    struct zis_hashmap_bucket_node_obj *node;
 };
 
 /// Find a bucket node by its key.
@@ -305,6 +303,7 @@ int zis_map_obj_get(
     var.self = _self;
     var.l_gn.buckets = _self->_buckets;
     var.l_gn.key = _key;
+    var.l_gn.node = (struct zis_hashmap_bucket_node_obj *)zis_smallint_to_ptr(0);
 
     size_t key_hash;
     if (zis_unlikely(!zis_object_hash(&key_hash, z, var.l_gn.key))) {
@@ -339,6 +338,7 @@ int zis_map_obj_set(
     var.self = _self;
     var.l_gn.buckets = _self->_buckets;
     var.l_gn.key = _key;
+    var.l_gn.node = (struct zis_hashmap_bucket_node_obj *)zis_smallint_to_ptr(0);
     var.l_nn.key = _key;
     var.l_nn.value = _value;
 
