@@ -165,6 +165,11 @@ ZIS_NATIVE_FUNC_DEF(T_Tuple_M_operator_equ, z, {2, 0, 2}) {
     bool equals;
     if (zis_unlikely(!zis_object_type_is(frame[2], g->type_Tuple))) {
         equals = false;
+    } else if (
+        zis_tuple_obj_length(zis_object_cast(frame[1], struct zis_tuple_obj)) !=
+        zis_tuple_obj_length(zis_object_cast(frame[2], struct zis_tuple_obj))
+    ) {
+        equals = false;
     } else {
         for (size_t i = 0; ; i++) {
             struct zis_tuple_obj *lhs = zis_object_cast(frame[1], struct zis_tuple_obj);

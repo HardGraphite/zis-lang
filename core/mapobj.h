@@ -82,6 +82,12 @@ struct zis_map_obj *zis_map_obj_new(
     float load_factor, size_t reserve
 );
 
+/// Combine a vector of maps. On failure, returns NULL (throw REG-0).
+struct zis_map_obj *zis_map_obj_combine(
+    struct zis_context *z,
+    struct zis_map_obj *v[], size_t n
+);
+
 /// Get number of elements.
 zis_static_force_inline size_t zis_map_obj_length(const struct zis_map_obj *self) {
     return self->node_count;

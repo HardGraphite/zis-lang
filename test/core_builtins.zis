@@ -277,3 +277,66 @@ func test_Array_remove()
     array:remove(-1)
     testing.check_equal(array, [2])
 end
+
+## Map
+
+func test_Map_operator_equ()
+    testing.check_equal({} == {}, true)
+    testing.check_equal({true->false,false->true} == {true->false,false->true}, true)
+    testing.check_equal({true->false,false->true} == {true->false,false->nil}, false)
+    testing.check_equal({true->false,false->true} == {true->false}, false)
+end
+
+func test_Map_operator_or()
+    testing.check_equal({true->false} | {false->true}, {true->false,false->true})
+    testing.check_equal({true->false,false->true} | {false->true}, {true->false,false->true})
+end
+
+func test_Map_operator_get_element()
+    map = {true->false,false->true,nil->nil}
+    testing.check_equal(map[nil], nil)
+    testing.check_equal(map[true], false)
+    testing.check_equal(map[false], true)
+end
+
+func test_Map_operator_set_element()
+    map = {}
+    map[nil] = nil
+    map[true] = false
+    map[false] = true
+    testing.check_equal(map, {true->false,false->true,nil->nil})
+    map[true] = true
+    map[false] = false
+    testing.check_equal(map, {true->true,false->false,nil->nil})
+end
+
+func test_Map_length()
+    testing.check_equal({}:length(), 0)
+    testing.check_equal({true->true,false->false,nil->nil}:length(), 3)
+end
+
+func test_Map_get()
+    map = {true->false,false->true}
+    testing.check_equal(map:get(true), false)
+    testing.check_equal(map:get(nil), nil)
+    testing.check_equal(map:get(nil, false), false)
+end
+
+func test_Map_contains()
+    map = {true->false,false->true}
+    testing.check_equal(map:contains(nil), false)
+    testing.check_equal(map:contains(true), true)
+end
+
+func test_Map_remove()
+    map = {true->false,false->true}
+    testing.check_equal(map:remove(nil), false)
+    testing.check_equal(map:remove(true), true)
+    testing.check_equal(map, {false->true})
+end
+
+func test_Map_clear()
+    map = {true->false,false->true}
+    map:clear()
+    testing.check_equal(map:length(), 0)
+end
