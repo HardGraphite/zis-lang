@@ -340,3 +340,15 @@ func test_Map_clear()
     map:clear()
     testing.check_equal(map:length(), 0)
 end
+
+## Type
+
+func test_Type_operator_equ()
+    testing.check_equal(Int == Int, true)
+    testing.check_equal(Int == Float, false)
+end
+
+func test_Type_of()
+    testing.check_equal(Type.of(1), Int)
+    testing.check_equal(Type.of(1.0), Float)
+end

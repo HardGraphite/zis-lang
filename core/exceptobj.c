@@ -192,6 +192,22 @@ struct zis_exception_obj *zis_exception_obj_format_common(
         var.result = zis_exception_obj_format(z, "key", var.args[0], "key not found");
         break;
 
+    case ZIS_EXC_FMT_NAME_NOT_FOUND: {
+        char buffer[80];
+        const char *what = va_arg(ap, char *);
+        var.args[0] = va_arg(ap, struct zis_object *);
+        assert(zis_object_type_is(zis_object_from(var.args[0]), z->globals->type_Symbol));
+        struct zis_symbol_obj *name_sym = zis_object_cast(var.args[0], struct zis_symbol_obj);
+        if (zis_symbol_obj_data_size(name_sym) <= sizeof buffer) {
+            const size_t n = zis_symbol_obj_data_size(name_sym);
+            memcpy(buffer, zis_symbol_obj_data(name_sym), n);
+            var.result = zis_exception_obj_format(z, "key", var.args[0], "no %s named %.*s", what, (int)n, buffer);
+        } else {
+            var.result = zis_exception_obj_format(z, "key", var.args[0], "no such a %s", what);
+        }
+        break;
+    }
+
     default:
         var.result = NULL;
     }

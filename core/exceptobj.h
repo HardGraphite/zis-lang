@@ -50,6 +50,7 @@ enum zis_exception_obj_format_common_template {
     ZIS_EXC_FMT_WRONG_ARGUMENT_TYPE, ///< (const char *arg_name, object *arg_obj) => "argument $arg_name cannot be $(typeof $arg_obj)"
     ZIS_EXC_FMT_INDEX_OUT_OF_RANGE, ///< (object *index) => "index out of range"
     ZIS_EXC_FMT_KEY_NOT_FOUND, ///< (object *key) => "key not found"
+    ZIS_EXC_FMT_NAME_NOT_FOUND, ///< (const char *what, symbol *name) => "no $what named $name""
 };
 
 /// Create an `Exception` with formatted string based on a templated.

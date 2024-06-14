@@ -85,7 +85,7 @@ struct zis_object *zis_type_obj_get_static(
     struct zis_symbol_obj *name
 );
 
-/// Get a static member. Returns NULL if not exists.
+/// Set a static member.
 void zis_type_obj_set_static(
     struct zis_context *z, struct zis_type_obj *self,
     struct zis_symbol_obj *name, struct zis_object *value

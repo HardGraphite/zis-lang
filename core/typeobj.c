@@ -6,10 +6,13 @@
 #include "locals.h"
 #include "ndefutil.h"
 #include "objmem.h"
+#include "stack.h"
 
 #include "arrayobj.h"
+#include "exceptobj.h"
 #include "funcobj.h"
 #include "mapobj.h"
+#include "stringobj.h"
 #include "symbolobj.h"
 
 /// Allocate but do not initialize.
@@ -259,8 +262,87 @@ void zis_type_obj_set_static(
     zis_map_obj_sym_set(z, self->_statics, name, value);
 }
 
+#define assert_arg1_Type(__z) \
+    (assert(zis_object_type_is((__z)->callstack->frame[1], (__z)->globals->type_Type)))
+
+ZIS_NATIVE_FUNC_DEF(T_Type_M_operator_equ, z, {2, 0, 2}) {
+    /*#DOCSTR# func Type:\'=='(other :: Type) :: Bool
+    Operator ==. */
+    assert_arg1_Type(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+    const bool result = frame[1] == frame[2];
+    frame[0] = zis_object_from(result ? g->val_true : g->val_false);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Type_M_operator_get_fld, z, {2, 0, 2}) {
+    /*#DOCSTR# func Type:\'.'(name :: Symbol) :: Any
+    Gets static variables. */
+    assert_arg1_Type(z);
+    struct zis_object **frame = z->callstack->frame;
+    if (zis_unlikely(!zis_object_type_is(frame[2], z->globals->type_Symbol))) {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN, ".", frame[1], frame[2]
+        ));
+        return ZIS_THR;
+    }
+    struct zis_type_obj *const self = zis_object_cast(frame[1], struct zis_type_obj);
+    struct zis_symbol_obj *const name = zis_object_cast(frame[2], struct zis_symbol_obj);
+    struct zis_object *const val = zis_type_obj_get_static(self, name);
+    if (zis_unlikely(!val)){
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_NAME_NOT_FOUND, "field", frame[2]
+        ));
+        return ZIS_THR;
+    }
+    frame[0] = val;
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Type_M_operator_set_fld, z, {3, 0, 3}) {
+    /*#DOCSTR# func Type:\'.='(name :: Symbol, value :: Any) :: Any
+    Updates static variables. */
+    assert_arg1_Type(z);
+    struct zis_object **frame = z->callstack->frame;
+    if (zis_unlikely(!zis_object_type_is(frame[2], z->globals->type_Symbol))) {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN, ".=", frame[1], frame[2]
+        ));
+        return ZIS_THR;
+    }
+    struct zis_type_obj *const self = zis_object_cast(frame[1], struct zis_type_obj);
+    struct zis_symbol_obj *const name = zis_object_cast(frame[2], struct zis_symbol_obj);
+    zis_type_obj_set_static(z, self, name, frame[3]);
+    frame[0] = frame[3];
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Type_F_of, z, {1, 0, 1}) {
+    /*#DOCSTR# func Type.of(x) :: Type
+    Gets the type of an object. */
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_type_obj *type = zis_object_type_1(frame[1]);
+    if (!type)
+        type = z->globals->type_Int;
+    frame[0] = zis_object_from(type);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF_LIST(
+    T_Type_D_methods,
+    { "=="          , &T_Type_M_operator_equ     },
+    { "."           , &T_Type_M_operator_get_fld },
+    { ".="          , &T_Type_M_operator_set_fld },
+);
+
+ZIS_NATIVE_VAR_DEF_LIST(
+    T_Type_D_statics,
+    { "of"          , { '^', .F = &T_Type_F_of  }},
+);
+
 ZIS_NATIVE_TYPE_DEF(
     Type,
     struct zis_type_obj, _slots_num,
-    NULL, NULL, NULL
+    NULL, T_Type_D_methods, T_Type_D_statics
 );
