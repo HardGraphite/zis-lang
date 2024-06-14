@@ -80,6 +80,23 @@ func Object:\'[]'(key) :: Any   #=>   object[key]
 func Object:\'[]='(key, value) :: Any  #=>   object[key] = value
 ```
 
+### Fallback field accessing: `.`, `.=`
+
+```
+func Object:`.`(name :: Symbol) :: Any  #=>  object.name
+func Object:`.=`(name :: Symbol, value :: Any)  #=>  object.name = value
+```
+
+Fallback field accessing methods. Used when a field is not found.
+
+### Fallback method accessing: `:`
+
+```
+func Object:`:`(name :: Symbol) :: Callable  #=>  object:name ( ... )
+```
+
+Fallback method accessing method. Used when a method is not found.
+
 ### Invocation: `()`
 
 ```

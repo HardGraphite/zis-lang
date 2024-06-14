@@ -499,12 +499,12 @@ _interp_loop:
     } while (0)
 
 /// Calls object `CALLABLE` with optional arguments `bp[ARG1_REG ... ARG3_REG]`
-/// and stores the return value to `bp[RET_REG]`.
+/// and stores the return value to `bp[RET_REG]`. Noreturn.
 #define CALL_OBJECT(RET_REG, CALLABLE, ARGC, ARG1_REG, ARG2_REG, ARG3_REG) \
     _DO_INTERNAL_CALL(RET_REG, callable = (CALLABLE), 0, ARGC, ARG1_REG, ARG2_REG, ARG3_REG)
 
 /// Calls method `NAME` of object `bp[OBJ_REG]` with optional arguments
-/// `bp[ARG2_REG]` and `bp[ARG3_REG]` and stores the return value to `bp[RET_REG]`.
+/// `bp[ARG2_REG]` and `bp[ARG3_REG]` and stores the return value to `bp[RET_REG]`. Noreturn.
 #define CALL_METHOD(RET_REG, NAME, ARGC, OBJ_REG, ARG2_REG, ARG3_REG) \
     _DO_INTERNAL_CALL(RET_REG, method = (NAME), 1, ARGC, OBJ_REG, ARG2_REG, ARG3_REG)
 
@@ -916,6 +916,14 @@ _interp_loop:
             zis_object_is_smallint(obj) ? g->type_Int : zis_object_type(obj);
         struct zis_object *meth_obj = zis_type_obj_get_method(obj_type, name_sym);
         if (zis_unlikely(!meth_obj)) {
+            if (obj_type) {
+                struct zis_object *m =
+                    zis_type_obj_get_method(obj_type, zis_symbol_registry_get(z, ":", 1));
+                if (m) {
+                    bp[0] = zis_object_from(name_sym);
+                    CALL_OBJECT(0, m, 2, obj_, 0, 0);
+                }
+            }
             format_error_method_not_exists(z, obj, name_sym);
             THROW_REG0;
         }
@@ -1069,6 +1077,14 @@ _interp_loop:
         } else {
             const size_t index = zis_type_obj_find_field(obj_type, name_sym);
             if (zis_unlikely(index == (size_t)-1)) {
+                if (obj_type) {
+                    struct zis_object *m =
+                        zis_type_obj_get_method(obj_type, zis_symbol_registry_get(z, ".", 1));
+                    if (m) {
+                        bp[0] = zis_object_from(name_sym);
+                        CALL_OBJECT(fld, m, 2, obj_, 0, 0);
+                    }
+                }
                 format_error_field_not_exists(z, this_func, name);
                 THROW_REG0;
             }
@@ -1096,6 +1112,14 @@ _interp_loop:
         } else {
             const size_t index = zis_type_obj_find_field(obj_type, name_sym);
             if (zis_unlikely(index == (size_t)-1)) {
+                if (obj_type) {
+                    struct zis_object *m =
+                        zis_type_obj_get_method(obj_type, zis_symbol_registry_get(z, ".=", 2));
+                    if (m) {
+                        bp[0] = zis_object_from(name_sym);
+                        CALL_OBJECT(0, m, 3, obj_, 0, fld);
+                    }
+                }
                 format_error_field_not_exists(z, this_func, name);
                 THROW_REG0;
             }
