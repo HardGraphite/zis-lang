@@ -452,9 +452,12 @@ zis_hot_fn static int invoke_bytecode_func(
     struct zis_context_globals *const g = z->globals;
 
     struct {
-        struct zis_symbol_obj *method;
+        union {
+            struct zis_object     *callable;
+            struct zis_symbol_obj *method;
+        };
         uint32_t extra_arg_regs; // arg2 and arg3
-    } internal_call_param; // See macro CALL_METHOD() and label _do_internal_send.
+    } internal_call_param; // See macro _DO_INTERNAL_CALL() and label _do_internal_call.
 
 #if OP_DISPATCH_USE_COMPUTED_GOTO // vvv
 
@@ -495,15 +498,23 @@ _interp_loop:
         goto _op_thr;   \
     } while (0)
 
+/// Calls object `CALLABLE` with optional arguments `bp[ARG1_REG ... ARG3_REG]`
+/// and stores the return value to `bp[RET_REG]`.
+#define CALL_OBJECT(RET_REG, CALLABLE, ARGC, ARG1_REG, ARG2_REG, ARG3_REG) \
+    _DO_INTERNAL_CALL(RET_REG, callable = (CALLABLE), 0, ARGC, ARG1_REG, ARG2_REG, ARG3_REG)
+
 /// Calls method `NAME` of object `bp[OBJ_REG]` with optional arguments
 /// `bp[ARG2_REG]` and `bp[ARG3_REG]` and stores the return value to `bp[RET_REG]`.
 #define CALL_METHOD(RET_REG, NAME, ARGC, OBJ_REG, ARG2_REG, ARG3_REG) \
-    do {                                                              \
-        assert((ARGC) <= 3 && (RET_REG) <= 0x3fff && (OBJ_REG) <= 0xffff && (ARG2_REG) <= 0xffff && (ARG3_REG) <= 0xffff); \
-        this_instr = (ARGC) | (RET_REG) << 2 | (OBJ_REG) << 16;       \
-        internal_call_param.extra_arg_regs = (ARG2_REG) | (ARG3_REG) << 16; \
-        internal_call_param.method = (NAME);                          \
-        goto _do_internal_send;                                       \
+    _DO_INTERNAL_CALL(RET_REG, method = (NAME), 1, ARGC, OBJ_REG, ARG2_REG, ARG3_REG)
+
+#define _DO_INTERNAL_CALL(RET_REG, FUNC_EXPR, IS_METHOD, ARGC, ARG1_REG, ARG2_REG, ARG3_REG) \
+    do {                                                                                     \
+        assert((ARGC) <= 3 && (RET_REG) <= 0x1fff && (ARG1_REG) <= 0xffff && (ARG2_REG) <= 0xffff && (ARG3_REG) <= 0xffff); \
+        this_instr = (ARGC) | ((IS_METHOD) ? 4 : 0) | (RET_REG) << 3 | (ARG1_REG) << 16;     \
+        internal_call_param.extra_arg_regs = (ARG2_REG) | (ARG3_REG) << 16;                  \
+        internal_call_param. FUNC_EXPR;                                                      \
+        goto _do_internal_call;                                                              \
     } while (0)
 
 #define BOUND_CHECK_REG(PTR) \
@@ -820,44 +831,48 @@ _interp_loop:
         goto _do_call_func_obj;
     }
 
-    _do_internal_send: {
+    _do_internal_call: {
         /*
-         * `this_instr[1:0]` = argc; `this_instr[15:2]` = ret_reg; `this_instr[31:16]` = arg1_reg;
+         * ``this_instr[1:0]` = argc; this_instr[2:2]` = is_method; `this_instr[15:3]` = ret_reg; `this_instr[31:16]` = arg1_reg;
          * `internal_call_param.extra_arg_regs[15:0]` = arg2_reg; `internal_call_param.extra_arg_regs[31:16]` = arg3_reg;
-         * `internal_call_param.method` = method_name.
-         * See macro `CALL_METHOD()`.
+         * `internal_call_param.callable` or `internal_call_param.method` = callable or method_name.
+         * See macro `_DO_INTERNAL_CALL()`.
          */
 
         static_assert(sizeof this_instr == 32 / 8, "");
         static_assert(sizeof internal_call_param.extra_arg_regs == 32 / 8, "");
         const unsigned int argc = this_instr & 3;
-        const unsigned int ret_reg = (this_instr & 0xffff) >> 2;
+        const bool         is_method = this_instr & 4;
+        const unsigned int ret_reg = (this_instr & 0xffff) >> 3;
         const unsigned int arg_regs[3] = {
             this_instr >> 16,
             internal_call_param.extra_arg_regs & 0xffff,
             internal_call_param.extra_arg_regs >> 16,
         };
-        struct zis_symbol_obj *const method_name = internal_call_param.method;
         assert(argc >= 1 && argc <= 3);
         assert(bp + ret_reg <= sp);
         assert(bp + arg_regs[0] <= sp && bp + arg_regs[1] <= sp && bp + arg_regs[2] <= sp);
-        assert(zis_object_type_is(zis_object_from(method_name), g->type_Symbol));
+        assert(!is_method || zis_object_type_is(internal_call_param.callable, g->type_Symbol));
 
         struct zis_object *const args[3] = {
             bp[arg_regs[0]], bp[arg_regs[1]], bp[arg_regs[2]]
         };
-        struct zis_object *method_obj = zis_type_obj_get_method(
-            zis_unlikely(zis_object_is_smallint(args[0])) ?
-                g->type_Int : zis_object_type(args[0]),
-            method_name
-        );
-        if (zis_unlikely(!method_obj)) {
-            format_error_method_not_exists(z, args[0], method_name);
-            THROW_REG0;
+        if (is_method) {
+            struct zis_object *method_obj = zis_type_obj_get_method(
+                zis_unlikely(zis_object_is_smallint(args[0])) ?
+                    g->type_Int : zis_object_type(args[0]),
+                internal_call_param.method
+            );
+            if (zis_unlikely(!method_obj)) {
+                format_error_method_not_exists(z, args[0], internal_call_param.method);
+                THROW_REG0;
+            }
+            bp[0] = method_obj;
+        } else {
+            bp[0] = internal_call_param.callable;
         }
 
         struct invocation_info ii;
-        bp[0] = method_obj;
         if (zis_unlikely(!invocation_enter(z, ip, bp + ret_reg, &ii)))
             THROW_REG0;
         BP_SP_CHANGED;
@@ -1819,7 +1834,9 @@ _interp_loop:
     }
 
 #undef THROW_REG0
+#undef CALL_OBJECT
 #undef CALL_METHOD
+#undef _DO_INTERNAL_CALL
 #undef BOUND_CHECK_REG
 #undef BOUND_CHECK_SYM
 #undef BOUND_CHECK_CON
