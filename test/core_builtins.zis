@@ -138,6 +138,12 @@ func test_Float_ceil()
     testing.check_equal(0.035:ceil(0.01), 0.04)
 end
 
+## Symbol
+
+func test_Symbol_operator_equ()
+    testing.check_equal(Symbol.\'for'("FOO"), Symbol.\'for'("FOO"))
+end
+
 ## Tuple
 
 func test_Tuple_operator_add()

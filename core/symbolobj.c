@@ -13,7 +13,9 @@
 #include "ndefutil.h"
 #include "objmem.h"
 #include "platform.h"
+#include "stack.h"
 
+#include "exceptobj.h"
 #include "stringobj.h"
 
 /* ----- symbol ------------------------------------------------------------- */
@@ -65,10 +67,120 @@ size_t zis_symbol_obj_data_size(const struct zis_symbol_obj *self) {
     return p ? (size_t)(p - self->data) : n;
 }
 
+#define assert_arg1_Symbol(__z) \
+    (assert(zis_object_type_is((__z)->callstack->frame[1], (__z)->globals->type_Symbol)))
+
+ZIS_NATIVE_FUNC_DEF(T_Symbol_M_operator_equ, z, {2, 0, 2}) {
+    /*#DOCSTR# func Symbol:\'=='(other :: Symbol) :: Bool
+    Operator ==. */
+    assert_arg1_Symbol(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+    const bool result = frame[1] == frame[2];
+    frame[0] = zis_object_from(result ? g->val_true : g->val_false);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Symbol_M_operator_cmp, z, {2, 0, 2}) {
+    /*#DOCSTR# func Symbol:\'<=>'(other :: Symbol) :: Int
+    Operator <=>. */
+    assert_arg1_Symbol(z);
+    struct zis_object **frame = z->callstack->frame;
+    int result;
+    if (frame[1] == frame[2]) {
+        result = 0;
+    } else if (!zis_object_type_is(frame[2], z->globals->type_Symbol)) {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN,
+            "<=>", frame[1], frame[2]
+        ));
+        return ZIS_THR;
+    } else {
+        struct zis_symbol_obj *lhs = zis_object_cast(frame[1], struct zis_symbol_obj);
+        struct zis_symbol_obj *rhs = zis_object_cast(frame[2], struct zis_symbol_obj);
+        const size_t lhs_size = zis_symbol_obj_data_size(lhs);
+        const char *const lhs_data = zis_symbol_obj_data(lhs);
+        const size_t rhs_size = zis_symbol_obj_data_size(rhs);
+        const char *const rhs_data = zis_symbol_obj_data(rhs);
+        if (lhs_size <= rhs_size) {
+            result = memcmp(lhs_data, rhs_data, lhs_size);
+            if (result == 0 && lhs_size != rhs_size)
+                result = -(int)(unsigned char)rhs_data[lhs_size];
+        } else {
+            result = memcmp(lhs_data, rhs_data, rhs_size);
+            if (result == 0)
+                result = (unsigned char)lhs_data[rhs_size];
+        }
+#if INT_MAX > ZIS_SMALLINT_MAX
+        if (result > ZIS_SMALLINT_MAX || result < ZIS_SMALLINT_MIN)
+            result /= 4;
+#endif
+    }
+    frame[0] = zis_smallint_to_ptr(result);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Symbol_M_hash, z, {1, 0, 1}) {
+    /*#DOCSTR# func Symbol:hash() :: Int
+    Generates hash code. */
+    assert_arg1_Symbol(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_symbol_obj *self = zis_object_cast(frame[1], struct zis_symbol_obj);
+    const size_t h = zis_hash_bytes(zis_symbol_obj_data(self), zis_symbol_obj_data_size(self));
+    frame[0] = zis_smallint_to_ptr((zis_smallint_t)h);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Symbol_M_to_string, z, {1, 1, 2}) {
+    /*#DOCSTR# func Symbol:to_string(?fmt) :: String
+    Generates a string representation. */
+    assert_arg1_Symbol(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_symbol_obj *self = zis_object_cast(frame[1], struct zis_symbol_obj);
+    struct zis_string_obj **result_p = (struct zis_string_obj **)frame;
+    *result_p = zis_string_obj_new(z, "\\<Symbol ", 9);
+    struct zis_string_obj *sym_as_str =
+        zis_string_obj_new(z, zis_symbol_obj_data(self), zis_symbol_obj_data_size(self));
+    if (!sym_as_str)
+        sym_as_str = zis_string_obj_new(z, "??", 2);
+    *result_p = zis_string_obj_concat(z, *result_p, sym_as_str);
+    *result_p = zis_string_obj_concat(z, *result_p, zis_string_obj_new(z, ">", 1));
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Symbol_F_for, z, {1, 0, 1}) {
+    /*#DOCSTR# func Symbol.\'for'(name :: String) :: Symbol
+    Retrieves or creates a symbol by name. */
+    struct zis_object **frame = z->callstack->frame;
+    if (!zis_object_type_is(frame[1], z->globals->type_String)) {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_WRONG_ARGUMENT_TYPE, "name", frame[1]
+        ));
+        return ZIS_THR;
+    }
+    struct zis_symbol_obj *const result =
+        zis_symbol_registry_gets(z, zis_object_cast(frame[1], struct zis_string_obj));
+    frame[0] = zis_object_from(result);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF_LIST(
+    T_Symbol_D_methods,
+    { "=="          , &T_Symbol_M_operator_equ  },
+    { "<=>"         , &T_Symbol_M_operator_cmp  },
+    { "hash"        , &T_Symbol_M_hash          },
+    { "to_string"   , &T_Symbol_M_to_string     },
+);
+
+ZIS_NATIVE_VAR_DEF_LIST(
+    T_Symbol_D_statics,
+    { "for"         , { '^', .F = &T_Symbol_F_for   }},
+);
+
 ZIS_NATIVE_TYPE_DEF_XB(
     Symbol,
     struct zis_symbol_obj, _bytes_size,
-    NULL, NULL, NULL
+    NULL, T_Symbol_D_methods, T_Symbol_D_statics
 );
 
 /* ----- symbol registry ---------------------------------------------------- */
