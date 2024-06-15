@@ -9,6 +9,7 @@
 #include "objmem.h"
 #include "stack.h"
 
+#include "exceptobj.h"
 #include "funcobj.h"
 #include "mapobj.h"
 #include "symbolobj.h"
@@ -334,9 +335,58 @@ int zis_module_obj_do_init(
     return zis_invoke_func(z, initializer);
 }
 
+#define assert_arg1_Module(__z) \
+    (assert(zis_object_type_is((__z)->callstack->frame[1], (__z)->globals->type_Module)))
+
+ZIS_NATIVE_FUNC_DEF(T_Module_M_operator_get_fld, z, {2, 0, 2}) {
+    /*#DOCSTR# func Module:\'.'(name :: Symbol) :: Any
+    Gets global variables. */
+    assert_arg1_Module(z);
+    struct zis_object **frame = z->callstack->frame;
+    if (zis_unlikely(!zis_object_type_is(frame[2], z->globals->type_Symbol))) {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN, ".", frame[1], frame[2]
+        ));
+        return ZIS_THR;
+    }
+    struct zis_module_obj *const self = zis_object_cast(frame[1], struct zis_module_obj);
+    struct zis_symbol_obj *const name = zis_object_cast(frame[2], struct zis_symbol_obj);
+    struct zis_object *val = zis_module_obj_get(self, name);
+    if (zis_unlikely(!val)) {
+        val = zis_module_obj_parent_get(z, self, name);
+        if (!val) {
+            frame[0] = zis_object_from(zis_exception_obj_format_common(
+                z, ZIS_EXC_FMT_NAME_NOT_FOUND, "variable", frame[2]
+            ));
+            return ZIS_THR;
+        }
+    }
+    frame[0] = val;
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Module_M_operator_set_fld, z, {3, 0, 3}) {
+    /*#DOCSTR# func Module:\'.='(name :: Symbol, value :: Any) :: Any
+    Updates global variables. */
+    assert_arg1_Module(z);
+    struct zis_object **frame = z->callstack->frame;
+    if (zis_unlikely(!zis_object_type_is(frame[2], z->globals->type_Symbol))) {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN, ".=", frame[1], frame[2]
+        ));
+        return ZIS_THR;
+    }
+    struct zis_module_obj *const self = zis_object_cast(frame[1], struct zis_module_obj);
+    struct zis_symbol_obj *const name = zis_object_cast(frame[2], struct zis_symbol_obj);
+    zis_module_obj_set(z, self, name, frame[3]);
+    frame[0] = frame[3];
+    return ZIS_OK;
+}
+
 ZIS_NATIVE_FUNC_DEF(T_Module_M_list_vars, z, {1, 0, 1}) {
     /*#DOCSTR# func Module:list_vars() :: Array[Tuple[Symbol, Object]]
     Lists the variables in the module. Returns an array of name-value pairs. */
+    assert_arg1_Module(z);
     struct zis_object **frame = z->callstack->frame;
     zis_locals_decl(
         z, var,
@@ -363,7 +413,9 @@ ZIS_NATIVE_FUNC_DEF(T_Module_M_list_vars, z, {1, 0, 1}) {
 
 ZIS_NATIVE_FUNC_DEF_LIST(
     T_module_D_methods,
-    { "list_vars", &T_Module_M_list_vars },
+    { "."           , &T_Module_M_operator_get_fld  },
+    { ".="          , &T_Module_M_operator_set_fld  },
+    { "list_vars"   , &T_Module_M_list_vars         },
 );
 
 ZIS_NATIVE_TYPE_DEF_NB(
