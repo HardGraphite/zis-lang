@@ -105,12 +105,24 @@ bool zis_object_equals(
         }
     }
 
-    struct zis_object *ret;
-    zis_context_set_reg0(z, zis_object_from(z->globals->sym_operator_equ));
-    if (zis_unlikely(zis_invoke_vn(z, &ret, NULL, (struct zis_object *[]){lhs, rhs}, 2)))
-        return false; // FIXME: REG-0 may have been modified.
-
-    return ret == zis_object_from(z->globals->val_true);
+    struct zis_context_globals *const g = z->globals;
+    struct zis_type_obj *const lhs_type =
+        zis_likely(!zis_object_is_smallint(lhs)) ? zis_object_type(lhs) : g->type_Int;
+    struct zis_object *ret, *method;
+    // ==
+    if (zis_likely((method = zis_type_obj_get_method(lhs_type, g->sym_operator_equ)))) {
+        if (zis_unlikely(zis_invoke_vn(z, &ret, method, (struct zis_object *[]){lhs, rhs}, 2)))
+            return false; // FIXME: REG-0 may have been modified.
+        return ret == zis_object_from(z->globals->val_true);
+    }
+    // <=>
+    if (zis_likely((method = zis_type_obj_get_method(lhs_type, g->sym_operator_cmp)))) {
+        if (zis_unlikely(zis_invoke_vn(z, &ret, method, (struct zis_object *[]){lhs, rhs}, 2)))
+            return false; // FIXME: REG-0 may have been modified.
+        return ret == zis_smallint_to_ptr(0);
+    }
+    // ===
+    return lhs == rhs;
 }
 
 struct zis_string_obj *zis_object_to_string(

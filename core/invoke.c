@@ -1476,7 +1476,22 @@ _interp_loop:
             IP_ADVANCE;
             OP_DISPATCH;
         } while (0);
-        CALL_METHOD(tgt, g->sym_operator_equ, 2, lhs, rhs, 0);
+        // See `zis_object_equals()`.
+        struct zis_type_obj *const lhs_type =
+            zis_likely(!zis_object_is_smallint(lhs_v)) ? zis_object_type(lhs_v) : g->type_Int;
+        struct zis_object *method;
+        if (zis_likely((method = zis_type_obj_get_method(lhs_type, g->sym_operator_equ))))
+            CALL_OBJECT(tgt, method, 2, lhs, rhs, 0);
+        if (zis_likely((method = zis_type_obj_get_method(lhs_type, g->sym_operator_cmp)))) {
+            struct zis_object *ret;
+            if (zis_unlikely(zis_invoke_vn(z, &ret, method, (struct zis_object *[]){lhs_v, rhs_v}, 2)))
+                THROW_REG0;
+            *tgt_p = zis_object_from(ret == zis_smallint_to_ptr(0) ? g->val_true : g->val_false);
+        } else {
+            *tgt_p = zis_object_from(g->val_false); // lhs_v != rhs_v
+        }
+        IP_ADVANCE;
+        OP_DISPATCH;
     }
 
     OP_DEFINE(CMPGT) {

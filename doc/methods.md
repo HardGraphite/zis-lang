@@ -50,6 +50,8 @@ Compares two objects. The expected return values are listed as follows:
 | `<=>()` |  `< 0`  |   `0`   |  `> 0`  |     *error*    |
 | `==()`  | `false` | `true`  | `false` |     `false`    |
 
+Method `<=>` will be used for equality test if method `==` is not defined.
+
 ### Unary operators support: `+#`, `-#`, `~`
 ```
 func Object:\'+#'() :: Any   #=>  + object
