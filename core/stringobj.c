@@ -6,9 +6,12 @@
 #include "context.h"
 #include "globals.h"
 #include "locals.h"
+#include "memory.h"
 #include "ndefutil.h"
 #include "objmem.h"
 #include "strutil.h"
+
+#include "streamobj.h"
 
 struct zis_string_obj {
     ZIS_OBJECT_HEAD
@@ -332,6 +335,25 @@ struct zis_string_obj *zis_string_obj_concat(
 
     zis_locals_drop(z, var);
     return var.new_str;
+}
+
+void zis_string_obj_write_to_stream(struct zis_string_obj *self, struct zis_stream_obj *stream) {
+    char *buffer;
+    size_t size;
+    buffer = zis_stream_obj_char_buf_ptr(stream, 0, &size);
+    size = zis_string_obj_value(self, buffer, size);
+    if (size != (size_t)-1) {
+        zis_stream_obj_char_buf_ptr(stream, size, NULL);
+    } else {
+        // TODO: make `zis_string_obj_value()` support copying part of a string,
+        // so that long strings can be copied to stream buffer separately.
+        size = zis_string_obj_value(self, NULL, 0);
+        buffer = zis_mem_alloc(size);
+        size = zis_string_obj_value(self, buffer, size);
+        assert(size != (size_t)-1);
+        zis_stream_obj_write_chars(stream, buffer, size);
+        zis_mem_free(buffer);
+    }
 }
 
 /* ----- type definition ---------------------------------------------------- */

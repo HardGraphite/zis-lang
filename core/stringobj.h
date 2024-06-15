@@ -9,6 +9,7 @@
 
 struct zis_context;
 struct zis_object;
+struct zis_stream_obj;
 
 typedef uint32_t zis_string_obj_wchar_t;
 
@@ -57,3 +58,6 @@ struct zis_string_obj *zis_string_obj_concat(
     struct zis_context *z,
     struct zis_string_obj *str1, struct zis_string_obj *str2
 );
+
+/// Write the string to an output stream.
+void zis_string_obj_write_to_stream(struct zis_string_obj *self, struct zis_stream_obj *stream);

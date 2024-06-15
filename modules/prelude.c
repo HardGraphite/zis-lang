@@ -24,71 +24,23 @@
 #include <core/symbolobj.h>
 #include <core/tupleobj.h>
 
-static void F_print__print_1(zis_t z, struct zis_object *value, struct zis_stream_obj *stream) {
-    char buffer[80];
-    struct zis_context_globals *g = z->globals;
-    struct zis_type_obj *type = zis_object_type_1(value);
-    if (!type) {
-        snprintf(buffer, sizeof buffer, "%lli", (long long)zis_smallint_from_ptr(value));
-    } else if (type == g->type_Nil) {
-        strcpy(buffer, "nil");
-    } else if (type == g->type_Bool) {
-        strcpy(buffer, value == zis_object_from(g->val_true) ? "true" : "false");
-    } else if (type == g->type_Int) {
-        struct zis_int_obj *v = zis_object_cast(value, struct zis_int_obj);
-        const size_t n = zis_int_obj_value_s(v, buffer, sizeof buffer - 1, 10);
-        if (n == (size_t)-1)
-            snprintf(buffer, sizeof buffer, "%f", zis_int_obj_value_f(v));
-        else
-            buffer[n] = 0;
-    } else if (type == g->type_Float) {
-        struct zis_float_obj *v = zis_object_cast(value, struct zis_float_obj);
-        snprintf(buffer, sizeof buffer, "%f", zis_float_obj_value(v));
-    } else if (type == g->type_String) {
-        struct zis_string_obj *v = zis_object_cast(value, struct zis_string_obj);
-        const size_t n = zis_string_obj_value(v, buffer, sizeof buffer - 1);
-        if (n == (size_t)-1)
-            strcpy(buffer, "\"...\"");
-        else
-            buffer[n] = 0;
-    } else if (type == g->type_Symbol) {
-        struct zis_symbol_obj *v = zis_object_cast(value, struct zis_symbol_obj);
-        size_t n = zis_symbol_obj_data_size(v);
-        if (n >= sizeof buffer)
-            n = sizeof buffer;
-        memcpy(buffer, zis_symbol_obj_data(v), n);
-        buffer[n] = 0;
-    } else if (type == g->type_Tuple) {
-        zis_locals_decl_1(z, var, struct zis_tuple_obj *v);
-        var.v = zis_object_cast(value, struct zis_tuple_obj);
-        zis_stream_obj_write_char(stream, '(');
-        for (size_t i = 0; i < zis_tuple_obj_length(var.v) ; i++) {
-            F_print__print_1(z, zis_tuple_obj_data(var.v)[i], stream);
-            zis_stream_obj_write_char(stream, ',');
-            zis_stream_obj_write_char(stream, ' ');
+static int _print_1(zis_t z, struct zis_object *value, struct zis_stream_obj *stream) {
+    if (zis_object_is_smallint(value)) {
+        char buffer[24];
+        snprintf(buffer, sizeof buffer, "%ji", (intmax_t)zis_smallint_from_ptr(value));
+        zis_stream_obj_write_chars(stream, buffer, strlen(buffer));
+    } else  {
+        struct zis_string_obj *str;
+        if (zis_object_type(value) == z->globals->type_String) {
+            str = zis_object_cast(value, struct zis_string_obj);
+        } else {
+            str = zis_object_to_string(z, value, false, NULL);
+            if (!str)
+                return ZIS_THR;
         }
-        zis_stream_obj_write_char(stream, ')');
-        zis_locals_drop(z, var);
-        buffer[0] = 0;
-    } else if (type == g->type_Array) {
-        zis_locals_decl_1(z, var, struct zis_array_obj *v);
-        var.v = zis_object_cast(value, struct zis_array_obj);
-        zis_stream_obj_write_char(stream, '[');
-        for (size_t i = 0; ; i++) {
-            struct zis_object *elem = zis_array_obj_get_checked(var.v, i);
-            if (!elem)
-                break;
-            F_print__print_1(z, elem, stream);
-            zis_stream_obj_write_char(stream, ',');
-            zis_stream_obj_write_char(stream, ' ');
-        }
-        zis_stream_obj_write_char(stream, ']');
-        zis_locals_drop(z, var);
-        buffer[0] = 0;
-    } else {
-        strcpy(buffer, "<?>");
+        zis_string_obj_write_to_stream(str, stream);
     }
-    zis_stream_obj_write_chars(stream, buffer, strlen(buffer));
+    return ZIS_OK;
 }
 
 ZIS_NATIVE_FUNC_DEF(F_print, z, {0, (unsigned char)-1, 1}) {
@@ -103,7 +55,9 @@ ZIS_NATIVE_FUNC_DEF(F_print, z, {0, (unsigned char)-1, 1}) {
     for (size_t i = 0, n = zis_tuple_obj_length(zis_object_cast(*reg1, struct zis_tuple_obj)); i < n; i++) {
         if (i)
             zis_stream_obj_write_char(stream, ' ');
-        F_print__print_1(z, zis_tuple_obj_data(zis_object_cast(*reg1, struct zis_tuple_obj))[i], stream);
+        const int status = _print_1(z, zis_tuple_obj_data(zis_object_cast(*reg1, struct zis_tuple_obj))[i], stream);
+        if (status == ZIS_THR)
+            return ZIS_THR;
     }
     zis_stream_obj_write_char(stream, '\n');
     zis_stream_obj_flush_chars(stream);
@@ -122,7 +76,8 @@ ZIS_NATIVE_FUNC_DEF(F_input, z, {0, 1, 1}) {
 
     if (zis_object_type_is(*reg1, z->globals->type_String)) {
         struct zis_stream_obj *stream = z->globals->val_stream_stdout;
-        F_print__print_1(z, *reg1, stream);
+        if (_print_1(z, *reg1, stream) == ZIS_THR)
+            return ZIS_THR;
         zis_stream_obj_flush_chars(stream);
     }
 
