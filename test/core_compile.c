@@ -279,6 +279,13 @@ zis_test_define(test_func_stmt, z) {
     check_int_value(z, 55);
 }
 
+zis_test_define(test_crlf, z) {
+    comp_and_exec_code(z, "x = 1 \r\n x += 2", "x");
+    check_int_value(z, 3);
+
+    comp_wrong_code(z, "x = 1 \r \n x += 2");
+}
+
 zis_test_list(
     100,
     test_lit_int,
@@ -293,4 +300,5 @@ zis_test_list(
     test_cond_stmt,
     test_while_stmt,
     test_func_stmt,
+    test_crlf,
 )

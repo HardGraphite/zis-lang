@@ -602,10 +602,19 @@ scan_next_char:
     } while(0)
 
     case '\t':
+    case '\v':
+    case '\f':
     case ' ':
         stream_ignore_1(input);
         loc_next_char(l);
         goto scan_next_char;
+
+    case '\r':
+        stream_ignore_1(input);
+        loc_next_char(l);
+        if (zis_unlikely(stream_peek(input) != '\n'))
+            error_unexpected_char(l, '\r');
+        zis_fallthrough;
 
     case '\n':
         if (zis_unlikely(l->ignore_eol)) {
