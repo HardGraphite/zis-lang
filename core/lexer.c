@@ -256,13 +256,10 @@ static void scan_number(
         if (has_temp_result) {
             const size_t k = consumed_size * digit_base;
             assert(k <= ZIS_SMALLINT_MAX);
-            int_obj = zis_int_obj_add_x(
-                z, int_obj,
-                zis_int_obj_mul_x(
-                    z, *temp_result_ref,
-                    zis_smallint_to_ptr((zis_smallint_t)k)
-                )
-            );
+            struct zis_object *prev_result = *temp_result_ref;
+            *temp_result_ref = int_obj;
+            prev_result = zis_int_obj_mul_x(z, prev_result, zis_smallint_to_ptr((zis_smallint_t)k));
+            int_obj = zis_int_obj_add_x(z, *temp_result_ref /* int_obj */, prev_result);
         } else {
             has_temp_result = true;
         }
