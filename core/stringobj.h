@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -58,6 +59,12 @@ struct zis_string_obj *zis_string_obj_concat(
     struct zis_context *z,
     struct zis_string_obj *str1, struct zis_string_obj *str2
 );
+
+/// Compare two strings.
+bool zis_string_obj_equals(struct zis_string_obj *lhs, struct zis_string_obj *rhs);
+
+/// Compare two strings.
+int zis_string_obj_compare(struct zis_string_obj *lhs, struct zis_string_obj *rhs);
 
 /// Write the string to an output stream.
 void zis_string_obj_write_to_stream(struct zis_string_obj *self, struct zis_stream_obj *stream);

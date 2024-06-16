@@ -9,8 +9,10 @@
 #include "memory.h"
 #include "ndefutil.h"
 #include "objmem.h"
+#include "stack.h"
 #include "strutil.h"
 
+#include "exceptobj.h"
 #include "streamobj.h"
 
 struct zis_string_obj {
@@ -337,6 +339,45 @@ struct zis_string_obj *zis_string_obj_concat(
     return var.new_str;
 }
 
+bool zis_string_obj_equals(struct zis_string_obj *lhs, struct zis_string_obj *rhs) {
+    const enum string_obj_char_type lhs_char_type  = string_obj_char_type(lhs);
+    const size_t lhs_char_count = string_obj_length(lhs);
+    const enum string_obj_char_type rhs_char_type  = string_obj_char_type(rhs);
+    const size_t rhs_char_count = string_obj_length(rhs);
+
+    if (lhs_char_type != rhs_char_type || lhs_char_count != rhs_char_count)
+        return false;
+
+    return memcmp(
+        string_obj_data(lhs), string_obj_data(rhs),
+        lhs_char_count * string_obj_char_size(lhs_char_type)
+    ) == 0;
+}
+
+int zis_string_obj_compare(struct zis_string_obj *lhs, struct zis_string_obj *rhs) {
+    const enum string_obj_char_type lhs_char_type = string_obj_char_type(lhs);
+    const size_t lhs_char_count = string_obj_length(lhs);
+    const void *lhs_data_raw = string_obj_data(lhs);
+    const enum string_obj_char_type rhs_char_type = string_obj_char_type(rhs);
+    const size_t rhs_char_count = string_obj_length(rhs);
+    const void *rhs_data_raw = string_obj_data(rhs);
+
+    if (lhs_char_type == rhs_char_type) {
+        switch (lhs_char_type) {
+        case STR_OBJ_C1:
+            return memcmp(lhs_data_raw, rhs_data_raw, lhs_char_count);
+        case STR_OBJ_C2:
+        case STR_OBJ_C4:
+            zis_unused_var(rhs_char_count);
+            break;
+        default:
+            zis_unreachable();
+        }
+    }
+
+    zis_context_panic(NULL, ZIS_CONTEXT_PANIC_IMPL);
+}
+
 void zis_string_obj_write_to_stream(struct zis_string_obj *self, struct zis_stream_obj *stream) {
     char *buffer;
     size_t size;
@@ -358,8 +399,160 @@ void zis_string_obj_write_to_stream(struct zis_string_obj *self, struct zis_stre
 
 /* ----- type definition ---------------------------------------------------- */
 
+#define assert_arg1_String(__z) \
+    (assert(zis_object_type_is((__z)->callstack->frame[1], (__z)->globals->type_String)))
+
+ZIS_NATIVE_FUNC_DEF(T_String_M_operator_add, z, {2, 0, 2}) {
+    /*#DOCSTR# func String:\'+'(s :: String) :: String
+    Concatenates two strings. */
+    assert_arg1_String(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+    if (zis_unlikely(!zis_object_type_is(frame[2], g->type_String))) {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN,
+            "+", frame[1], frame[2]
+        ));
+        return ZIS_THR;
+    }
+    struct zis_string_obj *lhs = zis_object_cast(frame[1], struct zis_string_obj);
+    struct zis_string_obj *rhs = zis_object_cast(frame[2], struct zis_string_obj);
+    struct zis_string_obj *result;
+    if (zis_unlikely(!string_obj_length(lhs)))
+        result = rhs;
+    else if (zis_unlikely(!string_obj_length(rhs)))
+        result = lhs;
+    else
+        result = zis_string_obj_concat(z, lhs, rhs);
+    frame[0] = zis_object_from(result);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_String_M_operator_get_elem, z, {2, 0, 2}) {
+    /*#DOCSTR# func String:\'[]'(position :: Int) :: Int
+    Gets the character at `position`. */
+    assert_arg1_String(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_string_obj *self = zis_object_cast(frame[1], struct zis_string_obj);
+
+    size_t index;
+    if (zis_object_is_smallint(frame[2])) {
+        index = zis_object_index_convert(string_obj_length(self), zis_smallint_from_ptr(frame[2]));
+        if (index == (size_t)-1)
+            goto index_out_of_range;
+
+    } else if (zis_object_type_is(frame[2], g->type_Int)) {
+    index_out_of_range:
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_INDEX_OUT_OF_RANGE, frame[2]
+        ));
+        return ZIS_THR;
+    } else {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN, "[]", frame[1], frame[2]
+        ));
+        return ZIS_THR;
+    }
+
+    zis_wchar_t ch;
+    void *raw_data = string_obj_data(self);
+    switch (string_obj_char_type(self)) {
+    case STR_OBJ_C1:
+        ch = ((const uint8_t *)raw_data)[index];
+        break;
+    case STR_OBJ_C2:
+        ch = ((const uint16_t *)raw_data)[index];
+        break;
+    case STR_OBJ_C4:
+        ch = ((const uint32_t *)raw_data)[index];
+        break;
+    default:
+        zis_unreachable();
+    }
+
+    frame[0] = zis_smallint_to_ptr((zis_smallint_t)ch);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_String_M_operator_equ, z, {2, 0, 2}) {
+    /*#DOCSTR# func String:\'=='(other :: String) :: Bool
+    Operator ==. */
+    assert_arg1_String(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+    if (zis_unlikely(!zis_object_type_is(frame[2], g->type_String))) {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN,
+            "==", frame[1], frame[2]
+        ));
+        return ZIS_THR;
+    }
+    const bool result = zis_string_obj_equals(
+        zis_object_cast(frame[1], struct zis_string_obj),
+        zis_object_cast(frame[2], struct zis_string_obj)
+    );
+    frame[0] = zis_object_from(result ? g->val_true : g->val_false);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_String_M_operator_cmp, z, {2, 0, 2}) {
+    /*#DOCSTR# func String:\'<=>'(other :: String) :: Int
+    Operator <=>. */
+    assert_arg1_String(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+    if (zis_unlikely(!zis_object_type_is(frame[2], g->type_String))) {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN,
+            "==", frame[1], frame[2]
+        ));
+        return ZIS_THR;
+    }
+    const int result = zis_string_obj_compare(
+        zis_object_cast(frame[1], struct zis_string_obj),
+        zis_object_cast(frame[2], struct zis_string_obj)
+    );
+    frame[0] = zis_smallint_to_ptr((zis_smallint_t)result);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_String_M_hash, z, {1, 0, 1}) {
+    /*#DOCSTR# func String:hash() :: Int
+    Generates hash code. */
+    assert_arg1_String(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_string_obj *self = zis_object_cast(frame[1], struct zis_string_obj);
+    const enum string_obj_char_type char_type  = string_obj_char_type(self);
+    const size_t char_count = string_obj_length(self);
+    const void *const str_data = string_obj_data(self);
+    const size_t h = zis_hash_bytes(str_data, char_type * char_count);
+    frame[0] = zis_smallint_to_ptr((zis_smallint_t)h);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_String_M_to_string, z, {1, 1, 2}) {
+    /*#DOCSTR# func String:to_string(?fmt) :: String
+    Returns string. */
+    assert_arg1_String(z);
+    struct zis_object **frame = z->callstack->frame;
+    // TODO: formatting.
+    frame[0] = frame[1];
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF_LIST(
+    T_String_D_methods,
+    { "+"           , &T_String_M_operator_add      },
+    { "[]"          , &T_String_M_operator_get_elem },
+    { "=="          , &T_String_M_operator_equ      },
+    { "<=>"         , &T_String_M_operator_cmp      },
+    { "hash"        , &T_String_M_hash              },
+    { "to_string"   , &T_String_M_to_string         },
+);
+
 ZIS_NATIVE_TYPE_DEF_XB(
     String,
     struct zis_string_obj, _bytes_size,
-    NULL, NULL, NULL
+    NULL, T_String_D_methods, NULL
 );
