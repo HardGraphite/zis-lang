@@ -257,9 +257,9 @@ static void scan_number(
             const size_t k = consumed_size * digit_base;
             assert(k <= ZIS_SMALLINT_MAX);
             int_obj = zis_int_obj_add_x(
-                z, *temp_result_ref,
+                z, int_obj,
                 zis_int_obj_mul_x(
-                    z, int_obj,
+                    z, *temp_result_ref,
                     zis_smallint_to_ptr((zis_smallint_t)k)
                 )
             );

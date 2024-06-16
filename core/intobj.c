@@ -327,11 +327,21 @@ size_t zis_smallint_to_str(zis_smallint_t i, char *restrict buf, size_t buf_sz, 
 }
 
 struct zis_object *zis_int_obj_add_x(struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs) {
+    if (zis_object_is_smallint(lhs) && zis_object_is_smallint(rhs)) {
+        const zis_smallint_t lhs_v = zis_smallint_from_ptr(lhs), rhs_v = zis_smallint_from_ptr(rhs);
+        const zis_smallint_t res_v = lhs_v + rhs_v; // FIXME: overflow check.
+        return zis_smallint_to_ptr(res_v);
+    }
     zis_context_panic(z, ZIS_CONTEXT_PANIC_IMPL);
     zis_unused_var(lhs), zis_unused_var(rhs);
 }
 
 struct zis_object *zis_int_obj_mul_x(struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs) {
+    if (zis_object_is_smallint(lhs) && zis_object_is_smallint(rhs)) {
+        const zis_smallint_t lhs_v = zis_smallint_from_ptr(lhs), rhs_v = zis_smallint_from_ptr(rhs);
+        const zis_smallint_t res_v = lhs_v * rhs_v; // FIXME: overflow check.
+        return zis_smallint_to_ptr(res_v);
+    }
     zis_context_panic(z, ZIS_CONTEXT_PANIC_IMPL);
     zis_unused_var(lhs), zis_unused_var(rhs);
 }

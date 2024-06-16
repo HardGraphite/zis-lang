@@ -1996,7 +1996,7 @@ struct zis_func_obj *zis_invoke_prepare_va(
     if (zis_unlikely(!invocation_enter(z, NULL, ret_to ? ret_to : z->callstack->frame, &ii))) {
         return NULL;
     }
-    assert(!argv || argv > ii.caller_frame);
+    // assert(!argv || argv > ii.caller_frame); // `argv` may not be a reference to the callstack, but would be dangerous if not.
     if (zis_unlikely(!invocation_pass_args_vec(z, argv, argc, &ii))) {
         invoke_prepare_xx_pass_args_fail_cleanup(z, &ii);
         return NULL;

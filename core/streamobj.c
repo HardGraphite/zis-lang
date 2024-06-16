@@ -245,7 +245,7 @@ struct zis_stream_obj *zis_stream_obj_new_strob(
 
 void zis_stream_obj_close(struct zis_stream_obj *self) {
     if (self->_ops)
-        self->_ops->close(self);
+        self->_ops->close(self->_ops_data);
     stream_obj_zero(self);
 }
 
