@@ -96,7 +96,19 @@ Examples:
 
 An identifier consists of any visible characters excepting whitespaces and punctuations.
 Specially, the first character of an identifier must not be a digit (0,1,2,...,9).
-An identifier cannot be the same with any of the keywords literally.
+A normal identifier cannot be the same with any of the keywords literally.
+To include special characters in an identifier,
+a string-like syntax can be used: `"\" ?lit_string?`.
+
+Examples:
+
+```
+i
+foo_bar_1
+AnIdentifier
+\"func"       #=>  func
+\"<\x41>"     #=>  <A>
+```
 
 ### Keywords
 
@@ -143,6 +155,7 @@ Binary operators:
 |     `&`      |     10     | bitwise and               |
 |    &#124;    |     12     | bitwise or                |
 |     `^`      |     11     | bitwise exclusive-or      |
+|     `**`     |     3      | power                     |
 |     `=`      |    -15     | assignment                |
 |     `+=`     |    -15     | assignment by sum         |
 |     `-=`     |    -15     | assignment by difference  |
@@ -369,6 +382,8 @@ if the module is run as the entry point.
 
 The function may accept one argument, an array of command line arguments.
 Or it can take on argument, which does not cause an error.
+The function can return an integer as the exit code.
+A non-Int return value will be replaced with "`0`", which represents success.
 
 Here is an example:
 

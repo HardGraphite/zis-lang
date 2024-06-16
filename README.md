@@ -2,7 +2,7 @@
 
 <!-- ![](misc/logo.svg) -->
 
-<div style="text-align: center;">
+<div align="center">
 <img src="misc/logo.svg" width="30%"/>
 </div>
 
@@ -53,6 +53,6 @@ The project files are organized as follows:
 | `start`   | source for the executable entry                   |
 | `modules` | source for the modules [...](modules/README.md)   |
 | `test`    | test code                                         |
-| `tools`   | programs that help develop                        |
+| `tools`   | programs that help develop [...](tools/README.md) |
 | `doc`     | documentations                                    |
-| `misc`    | miscellaneous files                               |
+| `misc`    | miscellaneous files [...](misc/README.md)         |

@@ -11,6 +11,7 @@ struct zis_context_globals;
 struct zis_module_loader;
 struct zis_object;
 struct zis_objmem_context;
+struct zis_string_obj;
 struct zis_symbol_registry;
 
 typedef void(*zis_context_panic_handler_t)(struct zis_context *, int);
@@ -49,3 +50,7 @@ enum zis_context_panic_reason {
 
 /// Call the panic handler and then abort.
 zis_noreturn void zis_context_panic(struct zis_context *z, enum zis_context_panic_reason r);
+
+/// Guess the name of a function/type/module.
+/// Returns NULL if cannot find a suitable representation.
+struct zis_string_obj *zis_context_guess_variable_name(struct zis_context *z, struct zis_object *var);

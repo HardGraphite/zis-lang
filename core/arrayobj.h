@@ -83,6 +83,12 @@ struct zis_array_obj *zis_array_obj_new2(
     size_t reserve, struct zis_object *v[], size_t n
 );
 
+/// Concatenate a vector of arrays. Always creates a new array.
+struct zis_array_obj *zis_array_obj_concat(
+    struct zis_context *z,
+    struct zis_array_obj *v[], size_t n
+);
+
 /// Return number of elements.
 zis_static_force_inline size_t zis_array_obj_length(
     const struct zis_array_obj *self
@@ -90,8 +96,16 @@ zis_static_force_inline size_t zis_array_obj_length(
     return self->length;
 }
 
-/// Get element with bounds checking. Return NULL if `i` is out of range,
+/// Get element without bounds checking.
 zis_static_force_inline struct zis_object *zis_array_obj_get(
+    const struct zis_array_obj *self, size_t i
+) {
+    assert(i < self->length);
+    return zis_array_slots_obj_get(self->_data, i);
+}
+
+/// Get element with bounds checking. Return NULL if `i` is out of range,
+zis_static_force_inline zis_nodiscard struct zis_object *zis_array_obj_get_checked(
     const struct zis_array_obj *self, size_t i
 ) {
     if (zis_unlikely(i >= self->length))
@@ -99,8 +113,16 @@ zis_static_force_inline struct zis_object *zis_array_obj_get(
     return zis_array_slots_obj_get(self->_data, i);
 }
 
+/// Set element without bounds checking.
+zis_static_force_inline void zis_array_obj_set(
+    struct zis_array_obj *self, size_t i, struct zis_object *v
+) {
+    assert(i < self->length);
+    zis_array_slots_obj_set(self->_data, i, v);
+}
+
 /// Set element with bounds checking. Return false if `i` is out of range,
-zis_static_force_inline bool zis_array_obj_set(
+zis_static_force_inline zis_nodiscard bool zis_array_obj_set_checked(
     struct zis_array_obj *self, size_t i, struct zis_object *v
 ) {
     if (zis_unlikely(i >= self->length))
@@ -108,6 +130,9 @@ zis_static_force_inline bool zis_array_obj_set(
     zis_array_slots_obj_set(self->_data, i, v);
     return true;
 }
+
+/// Reserve slots. Won't shrink.
+void zis_array_obj_reserve(struct zis_context *z, struct zis_array_obj *self, size_t n);
 
 /// Delete all elements.
 void zis_array_obj_clear(struct zis_array_obj *self);
@@ -153,28 +178,4 @@ bool zis_array_obj_insert(
 bool zis_array_obj_remove(
     struct zis_context *z,
     struct zis_array_obj *self, size_t pos
-);
-
-/// Mx: `array[ index ] -> ?value`.
-struct zis_object *zis_array_obj_Mx_get_element(
-    struct zis_context *z, const struct zis_array_obj *self,
-    struct zis_object *index
-);
-
-/// Mx: `array[ index ] = value -> ok`.
-bool zis_array_obj_Mx_set_element(
-    struct zis_context *z, struct zis_array_obj *self,
-    struct zis_object *index, struct zis_object *value
-);
-
-/// Mx: `array:insert( index , value )  -> ok`.
-bool zis_array_obj_Mx_insert_element(
-    struct zis_context *z, struct zis_array_obj *self,
-    struct zis_object *index, struct zis_object *value
-);
-
-/// Mx: `array:remove( index )  -> ok`.
-bool zis_array_obj_Mx_remove_element(
-    struct zis_context *z, struct zis_array_obj *self,
-    struct zis_object *index
 );

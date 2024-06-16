@@ -63,7 +63,7 @@ void cxx_hello() {
 
 ZIS_NATIVE_MODULE(foo) {
     // Designated initializers are available after C++20.
-    "",
+    nullptr,
     nullptr,
     nullptr,
 };

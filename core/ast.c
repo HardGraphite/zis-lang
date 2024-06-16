@@ -107,7 +107,6 @@ zis_ast_node_obj_location(struct zis_ast_node_obj *self) {
 }
 
 const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( AstNode ) = {
-    .name       = NULL,
     .slots_num  = (size_t)-1,
     .bytes_size = sizeof(struct zis_ast_node_obj_location),
     .fields     = NULL,

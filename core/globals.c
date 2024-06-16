@@ -8,6 +8,7 @@
 #include "memory.h"
 #include "ndefutil.h"
 #include "objmem.h"
+#include "platform.h"
 #include "stack.h"
 
 #include "arrayobj.h"
@@ -100,7 +101,10 @@ zis_cold_fn static void _init_values_1(
     g->val_mod_prelude = zis_module_obj_new(z, false);
     g->val_mod_unnamed = zis_module_obj_new(z, true);
 
-    const int stdio_common_flags = ZIS_STREAM_OBJ_TEXT | ZIS_STREAM_OBJ_UTF8;
+    int stdio_common_flags = ZIS_STREAM_OBJ_TEXT | ZIS_STREAM_OBJ_UTF8;
+#if ZIS_SYSTEM_WINDOWS
+    stdio_common_flags |= ZIS_STREAM_OBJ_CRLF;
+#endif // ZIS_SYSTEM_WINDOWS
     g->val_stream_stdin = zis_stream_obj_new_file_native(
         z, zis_file_stdio(ZIS_FILE_STDIN), stdio_common_flags | ZIS_STREAM_OBJ_MODE_IN
     );
@@ -123,9 +127,12 @@ zis_cold_fn static void _init_symbols(
 ) {
 
 #define E(NAME) g-> sym_##NAME = zis_symbol_registry_get(z, #NAME, (size_t)-1);
+    _ZIS_BUILTIN_SYM_LIST1
+#undef E
 
-    _ZIS_BUILTIN_SYM_LIST
 
+#define E(NAME, SYM) g-> sym_##NAME = zis_symbol_registry_get(z, SYM, (size_t)-1);
+    _ZIS_BUILTIN_SYM_LIST2
 #undef E
 
 }

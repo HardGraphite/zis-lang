@@ -8,9 +8,9 @@ set(zis_embedded_modules) # List of names
 set(zis_module_targets)   # List of targets
 
 function(zis_add_module_target mod_name conf_strings sources)
-    message(VERBOSE "Found ZiS module `${mod_name}'")
-    string(TOUPPER ${mod_name} mod_name_upper)
     zis_parse_module_conf(mod_conf "${conf_strings}")
+    string(TOUPPER ${mod_name} mod_name_upper)
+    message(VERBOSE "Found ZiS module `${mod_name}': ${mod_conf_name} -- ${mod_conf_description}")
 
     function(send_error_about_conf msg)
         message(SEND_ERROR "In the module.conf for `${mod_name}': ${msg}")
@@ -20,6 +20,11 @@ function(zis_add_module_target mod_name conf_strings sources)
     if(NOT mod_conf_name STREQUAL mod_name)
         send_error_about_conf("module name mismatches")
     endif()
+    # KEY description
+    if(NOT mod_conf_description)
+        send_error_about_conf("no description")
+    endif()
+    set(mod_desc "${mod_conf_description}")
     # KEY when
     if(NOT "${mod_conf_when}" STREQUAL "")
         cmake_language(EVAL CODE "
@@ -42,7 +47,7 @@ function(zis_add_module_target mod_name conf_strings sources)
     if(${mod_conf_required})
         set(${opt_name_enabled} TRUE)
     else()
-        option(${opt_name_enabled} "Module `${mod_name}': enable" "${mod_conf_default-enabled}")
+        option(${opt_name_enabled} "Module `${mod_name}' -- ${mod_desc}" "${mod_conf_default-enabled}")
     endif()
     # KEY force-embedded, default-embedded
     set(opt_name_embedded "ZIS_MOD_${mod_name_upper}_EMBED")

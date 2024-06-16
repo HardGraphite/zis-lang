@@ -168,6 +168,29 @@ zis_test_define(test_identifier, z) {
     do_test_identifier(z, "\tabc\n", "abc");
 }
 
+zis_test_define(test_tuple, z) {
+    comp_and_eval_expr(z, "()");
+    comp_and_eval_expr(z, "(1,)");
+    comp_and_eval_expr(z, "(1,2)");
+    comp_and_eval_expr(z, "(1,2,)");
+}
+
+zis_test_define(test_array, z) {
+    comp_and_eval_expr(z, "[]");
+    comp_and_eval_expr(z, "[1]");
+    comp_and_eval_expr(z, "[1,]");
+    comp_and_eval_expr(z, "[1,2]");
+    comp_and_eval_expr(z, "[1,2,]");
+}
+
+zis_test_define(test_map, z) {
+    comp_and_eval_expr(z, "{}");
+    comp_and_eval_expr(z, "{true->1}");
+    comp_and_eval_expr(z, "{true->1,}");
+    comp_and_eval_expr(z, "{true->1,false->0}");
+    comp_and_eval_expr(z, "{true->1,false->0}");
+}
+
 zis_test_define(test_comment, z) {
     comp_wrong_code(z, "'");
     comp_and_exec_code(z, " # '", NULL);
@@ -262,6 +285,9 @@ zis_test_list(
     test_lit_float,
     test_lit_string,
     test_identifier,
+    test_tuple,
+    test_array,
+    test_map,
     test_comment,
     test_expr,
     test_cond_stmt,

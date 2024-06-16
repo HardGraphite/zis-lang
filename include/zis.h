@@ -55,14 +55,14 @@ extern "C" {
 /** @name Status code */
 /** @{ */
 
-#define ZIS_OK          0      ///< Succeeded.
+#define ZIS_OK          0      /**< Succeeded. */
 
-#define ZIS_THR         (-1)   ///< An object (maybe an exception) was thrown.
+#define ZIS_THR         (-1)   /**< An object (maybe an exception) was thrown. */
 
-#define ZIS_E_ARG       (-11)  ///< Illegal argument.
-#define ZIS_E_IDX       (-12)  ///< Index out of range.
-#define ZIS_E_TYPE      (-13)  ///< Type mismatched.
-#define ZIS_E_BUF       (-14)  ///< Buffer is not big enough.
+#define ZIS_E_ARG       (-11)  /**< Illegal argument. */
+#define ZIS_E_IDX       (-12)  /**< Index out of range. */
+#define ZIS_E_TYPE      (-13)  /**< Type mismatched. */
+#define ZIS_E_BUF       (-14)  /**< Buffer is not big enough. */
 
 /** @} */
 
@@ -70,12 +70,12 @@ extern "C" {
  * Build information structure. @see `zis_build_info`.
  */
 struct zis_build_info {
-    const char *system;     ///< Operating system name.
-    const char *machine;    ///< Hardware (architecture) name.
-    const char *compiler;   ///< Compiler name and version.
-    const char *extra;      ///< Extra information. Optional.
-    uint32_t    timestamp;  ///< UNIX timestamp (UTC), divided by 60.
-    uint8_t     version[3]; ///< Version number (major, minor, patch).
+    const char *system;     /**< Operating system name. */
+    const char *machine;    /**< Hardware (architecture) name. */
+    const char *compiler;   /**< Compiler name and version. */
+    const char *extra;      /**< Extra information. Optional. */
+    uint32_t    timestamp;  /**< UNIX timestamp (UTC), divided by 60. */
+    uint8_t     version[3]; /**< Version number (major, minor, patch). */
 };
 
 /**
@@ -111,9 +111,9 @@ ZIS_API void zis_destroy(zis_t z) ZIS_NOEXCEPT;
 
 /** @name Panic cause */
 /** @{ */
-#define ZIS_PANIC_OOM   1  ///< Panic cause: out of memory (object memory)
-#define ZIS_PANIC_SOV   2  ///< Panic cause: stack overflow (runtime callstack)
-#define ZIS_PANIC_ILL   3  ///< Panic cause: illegal bytecode
+#define ZIS_PANIC_OOM   1  /**< Panic cause: out of memory (object memory) */
+#define ZIS_PANIC_SOV   2  /**< Panic cause: stack overflow (runtime callstack) */
+#define ZIS_PANIC_ILL   3  /**< Panic cause: illegal bytecode */
 /** @} */
 
 /**
@@ -138,6 +138,47 @@ ZIS_API zis_panic_handler_t zis_at_panic(zis_t z, zis_panic_handler_t h) ZIS_NOE
 /** @defgroup zis-api-natives API: native functions, types, and modules */
 /** @{ */
 
+struct zis_native_func_def;
+struct zis_native_type_def;
+struct zis_native_module_def;
+
+/**
+ * Definition of a simple native value.
+ */
+struct zis_native_value_def {
+    /**
+     * Type of the value.
+     *
+     * The type is represented as a character. Read the comment on the corresponding
+     * member variable for the type character.
+     */
+    char type;
+
+    union {
+        const void *n; /**< Type `Nil` (`.type`=`n`). */
+        bool        x; /**< Type `Bool` (`.type`=`b`). */
+        int64_t     i; /**< Type `Int` (`.type`=`i`). */
+        double      f; /**< Type `Float` (`.type`=`f`). */
+        const char *s; /**< Type `String` (`.type`=`s`). */
+        const char *y; /**< Type `Symbol` (`.type`=`y`). */
+        const struct zis_native_value_def *T; /**< Type `Tuple` (`.type`=`(`). */
+        const struct zis_native_value_def *A; /**< Type `Array` (`.type`=`[`). */
+        const struct zis_native_value_def *M; /**< Type `Map` (`.type`=`{`). */
+        const struct zis_native_func_def  *F; /**< Type `Function` (`.type`=`^`). */
+    }
+#if !defined(__cplusplus) && (!__STDC__ || __STDC_VERSION__ < 201112L)
+    value
+    /* Anonymous union is not supported before C11. */
+#endif
+    /* Designator initializer is not supported before C99 and C++20. */
+    ;
+};
+
+struct zis_native_value_def__named {
+    const char *name;
+    struct zis_native_value_def value;
+};
+
 /**
  * Implementation of a native function.
  */
@@ -147,30 +188,155 @@ typedef int (*zis_native_func_t)(zis_t) ZIS_NOEXCEPT;
  * Metadata of a native function.
  */
 struct zis_native_func_meta {
-    uint8_t  na; ///< Number of arguments (excluding optional ones).
-    uint8_t  no; ///< Number of optional arguments. Or `-1` to accept a `Tuple` holding the rest arguments (variadic).
-    uint16_t nl; ///< Number of local variables (excluding REG-0 and arguments).
+    /**
+     * Number of arguments.
+     *
+     * Number of required arguments in a function, excluding optional ones.
+     */
+    uint8_t na;
+
+    /**
+     * Number of optional arguments.
+     *
+     * Number of optional arguments in a function, passed after required ones.
+     * Or `-1` to accept a `Tuple` holding the rest arguments (variadic).
+     */
+    uint8_t no;
+
+    /**
+     * Number of local variables.
+     *
+     * Number of local variables in a function, excluding REG-0 (the first register)
+     * but including arguments. That is, the maximum of the indices of used registers.
+     */
+    uint16_t nl;
 };
 
 /**
  * Definition of a native function.
  */
 struct zis_native_func_def {
-    const char                 *name;
+    /**
+     * Function metadata.
+     */
     struct zis_native_func_meta meta;
-    zis_native_func_t           code;
+
+    /**
+     * The C function that implements this function.
+     *
+     * @warning The value must not be `0` or `1`. Otherwise this structure would
+     * be interpreted as a `struct zis_native_func_def_ex` object.
+     */
+    zis_native_func_t code;
+};
+
+/**
+ * Definition of a native function with extra information.
+ *
+ * @note A pointer to an object of this structure can be cast to `struct zis_native_func_def *`,
+ * but make sure that the value of member `code_type` is `0` or `1`.
+ */
+struct zis_native_func_def_ex {
+    /**
+     * Function metadata.
+     */
+    struct zis_native_func_meta meta;
+
+    /**
+     * Function implementation type.
+     *
+     * Specifies which implementation is provided in member `code`.
+     * Value `0` means using `code.bytecode`; value `1` means using `code.native`.
+     * Other values are not allowed.
+     *
+     * @warning The value must be either `0` or `1`. Otherwise this structure
+     * would be interpreted as a `struct zis_native_func_def` object.
+     */
+    uintptr_t code_type;
+
+    union {
+        /**
+         * Function implementation in bytecode, valid when `code_type` is `0`.
+         *
+         * An array of bytecode instructions, ternimated with `-1`.
+         */
+        const uint32_t *bytecode;
+
+        /**
+         * Function implementation in native function, valid when `code_type` is `1`.
+         */
+        zis_native_func_t native;
+    } code; /**< Function implementation. See member `code_type`. */
+
+    /**
+     * Symbols (optional).
+     *
+     * A NULL-terminated array of strings that defines the symbols to be used
+     * in this function.
+     */
+    const char *const *symbols;
+
+    /**
+     * Constants (optional).
+     *
+     * A NULL-terminated array of value definitions that defines the constants
+     * to be used in this function.
+     *
+     * @see ZIS_NATIVE_VALUE_DEF_LIST()
+     */
+    const struct zis_native_value_def *constants;
+};
+
+struct zis_native_func_def__named_ref {
+    const char *name;
+    const struct zis_native_func_def *def;
 };
 
 /**
  * Definition of a native type (struct).
  */
 struct zis_native_type_def {
-    const char                       *name;      ///< Type name.
-    size_t                            slots_num; ///< Number of slots in object SLOTS part.
-    size_t                            bytes_size;///< Size of object BYTES part.
-    const char *const                *fields;    ///< An array of field names (or NULL), the length of which must be `slots_num`. Optional.
-    const struct zis_native_func_def *methods;   ///< A zero-terminated array of functions that define methods. Optional.
-    const struct zis_native_func_def *statics;   ///< Static methods definitions like `methods`, but those without a name are ignored. Optional.
+    /**
+     * Number of slots in object SLOTS part.
+     */
+    size_t slots_num;
+
+    /**
+     * Size of object BYTES part.
+     */
+    size_t bytes_size;
+
+    /**
+     * List of field names (optional).
+     *
+     * An array of strings (or NULLs) indicating field names. The length of
+     * the array must be the same with member variable `slots_num`.
+     */
+    const char *const *fields;
+
+    /**
+     * List of method definitions (optional).
+     *
+     * A zero-terminated array of named function definitions that defines the methods.
+     *
+     * @see ZIS_NATIVE_FUNC_DEF_LIST()
+     */
+    const struct zis_native_func_def__named_ref *methods;
+
+    /**
+     * List of static variable definitions (optional).
+     *
+     * A zero-terminated array of named variable definitions that defines
+     * the type's static variables.
+     *
+     * @see ZIS_NATIVE_VAR_DEF_LIST()
+     */
+    const struct zis_native_value_def__named *statics;
+};
+
+struct zis_native_type_def__named_ref {
+    const char *name;
+    const struct zis_native_type_def *def;
 };
 
 /**
@@ -179,21 +345,47 @@ struct zis_native_type_def {
  * When a module is created based on such a definition, the functions and types
  * are created and stored as module variables (global variables), excepting
  * those without names (`.name = NULL`).
- * If the first function definition does not have a name, it is the module initializer
- * and will be called automatically after the module created.
  */
 struct zis_native_module_def {
-    const char                       *name;      ///< Module name.
-    const struct zis_native_func_def *functions; ///< A zero-terminated array of functions. Optional.
-    const struct zis_native_type_def *types;     ///< A zero-terminated array of types. Optional.
+    /**
+     * List of function definitions (optional).
+     *
+     * A zero-terminated array of named function definitions that defines
+     * the global functions in the module.
+     * If the first function definition does not have a name, it is the module
+     * initializer and will be called automatically after the module created.
+     *
+     * @see ZIS_NATIVE_FUNC_DEF_LIST()
+     */
+    const struct zis_native_func_def__named_ref *functions;
+
+    /**
+     * List of type definitions (optional).
+     *
+     * A zero-terminated array of named type definitions that defines
+     * the global types in the module.
+     *
+     * @see ZIS_NATIVE_TYPE_DEF_LIST()
+     */
+    const struct zis_native_type_def__named_ref *types;
+
+    /**
+     * List of variable definitions (optional).
+     *
+     * A zero-terminated array of named variable definitions that defines
+     * the global variables in the module.
+     *
+     * @see ZIS_NATIVE_VAR_DEF_LIST()
+     */
+    const struct zis_native_value_def__named *variables;
 };
 
 /**
- * A macro to define a global variable that exports a native module from C code.
+ * A macro to define a global variable that exports a native module from C source code.
  *
  * @see ZIS_NATIVE_MODULE__VAR
  */
-#define ZIS_NATIVE_MODULE(MODULE_NAME)  \
+#define ZIS_NATIVE_MODULE(MODULE_NAME) \
     ZIS_NATIVE_MODULE__EXTERN_C ZIS_NATIVE_MODULE__EXPORT \
     const struct zis_native_module_def ZIS_NATIVE_MODULE__VAR(MODULE_NAME)
 
@@ -402,6 +594,16 @@ ZIS_API int zis_make_bytes(zis_t z, unsigned int reg, const void *data, size_t s
 ZIS_API int zis_read_bytes(zis_t z, unsigned int reg, void *buf, size_t *sz) ZIS_NOEXCEPT;
 
 /**
+ * Create a value from `struct zis_native_value_def`.
+ *
+ * @param z zis instance
+ * @param reg register to store the value to
+ * @param def pointer to the definition
+ * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`).
+ */
+ZIS_API int zis_make_value(zis_t z, unsigned int reg, const struct zis_native_value_def *def);
+
+/**
  * Create values and store them to `REG[reg_begin ...]`.
  *
  * @param z zis instance
@@ -486,13 +688,13 @@ __attribute__((format(__printf__, 5, 6)))
 ZIS_API int zis_make_exception(
     zis_t z, unsigned int reg,
     const char *type, unsigned int reg_data, const char *msg_fmt, ...
-    ) ZIS_NOEXCEPT;
+) ZIS_NOEXCEPT;
 
-#define ZIS_RDE_TEST     0x00 ///< `zis_read_exception()`: do nothing.
-#define ZIS_RDE_TYPE     0x01 ///< `zis_read_exception()`: get the `type` field.
-#define ZIS_RDE_DATA     0x02 ///< `zis_read_exception()`: get the `data` field.
-#define ZIS_RDE_WHAT     0x03 ///< `zis_read_exception()`: get the `what` field.
-#define ZIS_RDE_DUMP     0x04 ///< `zis_read_exception()`: print this exception.
+#define ZIS_RDE_TEST     0x00 /**< `zis_read_exception()`: do nothing. */
+#define ZIS_RDE_TYPE     0x01 /**< `zis_read_exception()`: get the `type` field. */
+#define ZIS_RDE_DATA     0x02 /**< `zis_read_exception()`: get the `data` field. */
+#define ZIS_RDE_WHAT     0x03 /**< `zis_read_exception()`: get the `what` field. */
+#define ZIS_RDE_DUMP     0x04 /**< `zis_read_exception()`: print this exception. */
 
 /**
  * Read contents of an `Exception` object.
@@ -509,15 +711,15 @@ ZIS_API int zis_read_exception(zis_t z, unsigned int reg, int flag, unsigned int
 /** @name zis_make_stream() flags */
 /** @{ */
 
-#define ZIS_IOS_FILE    0x01 ///< `zis_make_stream()` type: file stream.
-#define ZIS_IOS_STDX    0x02 ///< `zis_make_stream()` type: standard I/O stream (0=stdin, 1=stdout, 2=stderr).
-#define ZIS_IOS_TEXT    0x03 ///< `zis_make_stream()` type: read-only string stream.
+#define ZIS_IOS_FILE    0x01 /**< `zis_make_stream()` type: file stream. */
+#define ZIS_IOS_STDX    0x02 /**< `zis_make_stream()` type: standard I/O stream (0=stdin, 1=stdout, 2=stderr). */
+#define ZIS_IOS_TEXT    0x03 /**< `zis_make_stream()` type: read-only string stream. */
 
-#define ZIS_IOS_RDONLY  0x10 ///< `zis_make_stream()` `ZIS_IOS_FILE` mode: read-only.
-#define ZIS_IOS_WRONLY  0x20 ///< `zis_make_stream()` `ZIS_IOS_FILE` mode: write-only.
-#define ZIS_IOS_WINEOL  0x40 ///< `zis_make_stream()` `ZIS_IOS_FILE` mode: use Windows style of end-of-line (CRLF).
+#define ZIS_IOS_RDONLY  0x10 /**< `zis_make_stream()` `ZIS_IOS_FILE` mode: read-only. */
+#define ZIS_IOS_WRONLY  0x20 /**< `zis_make_stream()` `ZIS_IOS_FILE` mode: write-only. */
+#define ZIS_IOS_WINEOL  0x40 /**< `zis_make_stream()` `ZIS_IOS_FILE` mode: use Windows style of end-of-line (CRLF). */
 
-#define ZIS_IOS_STATIC  0x80 ///< `zis_make_stream()` `ZIS_IOS_TEXT` mode: string is static (infinite lifetime).
+#define ZIS_IOS_STATIC  0x80 /**< `zis_make_stream()` `ZIS_IOS_TEXT` mode: string is static (infinite lifetime). */
 
 /** @} */
 
@@ -555,7 +757,7 @@ ZIS_API int zis_read_exception(zis_t z, unsigned int reg, int flag, unsigned int
  * int status = zis_make_stream(z, reg, ZIS_IOS_TEXT, NULL, reg_str_obj);
  * ```
  */
-ZIS_API int zis_make_stream(zis_t z, unsigned int reg, int flags, ...);
+ZIS_API int zis_make_stream(zis_t z, unsigned int reg, int flags, ...) ZIS_NOEXCEPT;
 
 /** @} */
 
@@ -567,7 +769,8 @@ ZIS_API int zis_make_stream(zis_t z, unsigned int reg, int flags, ...);
  *
  * @param z zis instance
  * @param reg register index
- * @param def native function definition; field `name` is ignored
+ * @param def native function definition, pointer to either a `struct zis_native_func_def`
+ * object or a `struct zis_native_func_def_ex` object
  * @param reg_module index of the register where the module is; or `-1` to ignore.
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg` or `reg_module`), `ZIS_E_ARG` (illegal `def`).
  */
@@ -581,32 +784,33 @@ ZIS_API int zis_make_function(
  *
  * @param z zis instance
  * @param reg register index
- * @param def native function definition; field `name` is ignored
+ * @param def native function definition
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`).
  */
 ZIS_API int zis_make_type(
     zis_t z, unsigned int reg,
     const struct zis_native_type_def *def
-);
+) ZIS_NOEXCEPT;
 
 /**
  * Create a module.
  *
  * @param z zis instance
  * @param reg register index
- * @param def native module definition; field `name` is ignored
+ * @param def native module definition
  * @return `ZIS_OK`; `ZIS_E_IDX` (invalid `reg`).
  */
 ZIS_API int zis_make_module(zis_t z, unsigned int reg, const struct zis_native_module_def *def) ZIS_NOEXCEPT;
 
 /**
- * Invoke a callable object.
+ * Invoke a callable object or method.
  *
  * @param z zis instance
  * @param regs A vector of register indices. `regs[0]` = return value register,
  * `regs[1]` = object to invoke, `regs[2]`...`regs[argc+1]` = arguments.
- * Specially, `regs[2]` = first one of a vector of elements when `regs[3]` is `-1`;
- * `regs[2]` = the packed arguments (`Array` or `Tuple`) when `argc` is `-1`.
+ * Specially, when `regs[3]` is `-1`, `regs[2]` = the first register of the argument vector;
+ * when `argc` is `-1`, `regs[2]` = the packed arguments (`Array` or `Tuple`);
+ * when `regs[-1]` = `-1`, call the first argument's method whose name is given in REG-0 (a symbol).
  * See @@details for special uses
  * @param argc number of arguments; or `-1` to indicate that `regs[2]` is the
  * packed arguments, which is an Array or a Tuple
@@ -625,6 +829,17 @@ ZIS_API int zis_make_module(zis_t z, unsigned int reg, const struct zis_native_m
  * zis_invoke(z, (unsigned[]){0, 0, 1}, (size_t)-1); // { 1 } means packed arguments at 1.
  * ```
  *
+ * @details Here are examples to call method `foo`:
+ * ```c
+ * // #1  enumerated arguments
+ * zis_make_symbol(z, 0, "foo", 3);
+ * zis_invoke(z, (unsigned[]){0, (unsigned)-1, 1, 2, 3}, 3);
+ * // #2  a vector of arguments
+ * zis_make_symbol(z, 0, "foo", 3);
+ * zis_invoke(z, (unsigned[]){0, (unsigned)-1, 1, (unsigned)-1}, 3);
+ * // !! packed arguments not supported
+ * ```
+ *
  * @note Normally, the minimum length of array `regs` is `(argc + 2)`: 1 ret + 1 obj + N args.
  * When `regs[3]` is `-1`, the minimum length is `4`: 1 ret + 1 obj + 1 first_arg + (-1).
  * When `argc` is `-1`, the minimum length is `3`: 1 ret + 1 obj + 1 packed_args.
@@ -636,12 +851,12 @@ ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) ZIS_NOEX
 /** @name zis_import() flags */
 /** @{ */
 
-#define ZIS_IMP_NAME     0x01 ///< `zis_import()` type: import by name.
-#define ZIS_IMP_PATH     0x02 ///< `zis_import()` type: import by file path.
-#define ZIS_IMP_CODE     0x03 ///< `zis_import()` type: compile source code.
-#define ZIS_IMP_ADDP     0x0f ///< `zis_import()` type: add to search path.
+#define ZIS_IMP_NAME     0x01 /**< `zis_import()` type: import by name. */
+#define ZIS_IMP_PATH     0x02 /**< `zis_import()` type: import by file path. */
+#define ZIS_IMP_CODE     0x03 /**< `zis_import()` type: compile source code. */
+#define ZIS_IMP_ADDP     0x0f /**< `zis_import()` type: add to search path. */
 
-#define ZIS_IMP_MAIN     0xf0 ///< `zis_import()` extra: call the `main` function (REG-1 = `(int)argc`, REG-2 = `(char**)argv`).
+#define ZIS_IMP_MAIN     0xf0 /**< `zis_import()` extra: call the `main` function (REG-1 = `(int)argc`, REG-2 = `(char**)argv`). */
 
 /** @} */
 
@@ -652,7 +867,8 @@ ZIS_API int zis_invoke(zis_t z, const unsigned int regs[], size_t argc) ZIS_NOEX
  * @param reg register index
  * @param what module name, or file path; see @@details
  * @param flags `ZIS_IMP_*` values; see @@details
- * @return `ZIS_OK` or `ZIS_THR`; `ZIS_E_ARG` (illegal `flags` or `what`).
+ * @return `ZIS_OK` or `ZIS_THR`; `ZIS_E_ARG` (illegal `flags` or `what`);
+ * the returned integer from `main()` function if `flags` contains `ZIS_IMP_MAIN`.
  *
  * @details Examples:
  * ```c
@@ -698,7 +914,7 @@ ZIS_API int zis_move_local(zis_t z, unsigned int dst, unsigned int src) ZIS_NOEX
  * @param reg register index
  * @param name name of the global variable; or `NULL` to get name from `REG-0`
  * @param name_len string length of parameter `name`; or `-1` to calculate length with `strlen()`
- * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (name does not exist or REG-0 is not a `Symbol`).
+ * @return `ZIS_OK`; `ZIS_THR`, `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (REG-0 is not a `Symbol`).
  *
  * @warning Do not try to access global variable outside a function,
  * in which case there is no *current module*.
@@ -729,7 +945,7 @@ ZIS_API int zis_store_global(zis_t z, unsigned int reg, const char *name, size_t
  * @param name field name string; or `NULL` to get name from `REG-0`.
  * @param name_len string length of parameter `name`; or `-1` to calculate length with `strlen()`
  * @param reg_val register to load the field to
- * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (name does not exist or REG-0 is not a `Symbol`).
+ * @return `ZIS_OK`; `ZIS_THR`, `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (REG-0 is not a `Symbol`).
  */
 ZIS_API int zis_load_field(
     zis_t z, unsigned int reg_obj,
@@ -746,7 +962,7 @@ ZIS_API int zis_load_field(
  * @param name field name string; or `NULL` to get name from `REG-0`.
  * @param name_len string length of parameter `name`; or `-1` to calculate length with `strlen()`
  * @param reg_val register where the new field value is
- * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (name does not exist or REG-0 is not a `Symbol`).
+ * @return `ZIS_OK`; `ZIS_THR`, `ZIS_E_IDX` (invalid reg index), `ZIS_E_ARG` (REG-0 is not a `Symbol`).
  */
 ZIS_API int zis_store_field(
     zis_t z, unsigned int reg_obj,
@@ -762,8 +978,7 @@ ZIS_API int zis_store_field(
  * @param reg_obj register where the object is
  * @param reg_key register where the key is
  * @param reg_val register to load the element to
- * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index); `ZIS_E_ARG` (key does not exist);
- * `ZIS_E_TYPE` (`reg_obj` does not allow elements).
+ * @return `ZIS_OK`; `ZIS_THR`, `ZIS_E_IDX` (invalid reg index); `ZIS_E_ARG` (key does not exist).
  */
 ZIS_API int zis_load_element(zis_t z, unsigned int reg_obj, unsigned int reg_key, unsigned int reg_val) ZIS_NOEXCEPT;
 
@@ -776,8 +991,7 @@ ZIS_API int zis_load_element(zis_t z, unsigned int reg_obj, unsigned int reg_key
  * @param reg_obj register where the object is
  * @param reg_key register where the key is
  * @param reg_val register where the new value of the element is
- * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index); `ZIS_E_ARG` (key does not exist);
- * `ZIS_E_TYPE` (`reg_obj` does not allow elements).
+ * @return `ZIS_OK`; `ZIS_THR`, `ZIS_E_IDX` (invalid reg index); `ZIS_E_ARG` (key does not exist).
  */
 ZIS_API int zis_store_element(zis_t z, unsigned int reg_obj, unsigned int reg_key, unsigned int reg_val) ZIS_NOEXCEPT;
 
@@ -790,8 +1004,7 @@ ZIS_API int zis_store_element(zis_t z, unsigned int reg_obj, unsigned int reg_ke
  * @param reg_obj register where the object is
  * @param reg_key register where the key is
  * @param reg_val register where the value is
- * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index); `ZIS_E_ARG` (key not valid);
- * `ZIS_E_TYPE` (`reg_obj` does not allow elements).
+ * @return `ZIS_OK`; `ZIS_THR`, `ZIS_E_IDX` (invalid reg index).
  */
 ZIS_API int zis_insert_element(zis_t z, unsigned int reg_obj, unsigned int reg_key, unsigned int reg_val) ZIS_NOEXCEPT;
 
@@ -803,10 +1016,149 @@ ZIS_API int zis_insert_element(zis_t z, unsigned int reg_obj, unsigned int reg_k
  * @param z zis instance
  * @param reg_obj register where the object is
  * @param reg_key register where the key is
- * @return `ZIS_OK`; `ZIS_E_IDX` (invalid reg index); `ZIS_E_ARG` (key not valid);
- * `ZIS_E_TYPE` (`reg_obj` does not allow elements).
+ * @return `ZIS_OK`; `ZIS_THR`, `ZIS_E_IDX` (invalid reg index).
  */
 ZIS_API int zis_remove_element(zis_t z, unsigned int reg_obj, unsigned int reg_key) ZIS_NOEXCEPT;
+
+/** @} */
+
+/** @defgroup zis-api-misc API: miscellaneous */
+/** @{ */
+
+#if defined(__cplusplus) && __cplusplus >= 201803L
+#    define ZIS_API__IF_LIKELY(EXPR) if (EXPR) [[likely]]
+#    define ZIS_API__IF_UNLIKELY(EXPR) if (EXPR) [[unlikely]]
+#elif defined(__GNUC__) || defined(__clang__)
+#    define ZIS_API__IF_LIKELY(EXPR) if (__builtin_expect((bool)(EXPR), 1))
+#    define ZIS_API__IF_UNLIKELY(EXPR) if (__builtin_expect((bool)(EXPR), 0))
+#else
+#    define ZIS_API__IF_LIKELY(EXPR) if (EXPR)
+#    define ZIS_API__IF_UNLIKELY(EXPR) if (EXPR)
+#endif
+
+#if __STDC__ && __STDC_VERSION__ >= 201112L
+#    define ZIS_API__EXPR_WITH_TYPE_CHECKED(EXPR, TYPE) (_Generic((EXPR), TYPE : (EXPR)))
+#else
+#    define ZIS_API__EXPR_WITH_TYPE_CHECKED(EXPR, TYPE) (EXPR)
+#endif
+
+/**
+ * Defines a IF branch, testing whether `expr` is `ZIS_OK`.
+ *
+ * @details Example:
+ * ```c
+ * int64_t value;
+ * zis_if_ok (zis_read_int(z, 0, &value)) {
+ *     printf("value = %" PRIi64, value);
+ * }
+ * ```
+ */
+#define zis_if_ok(__expr) \
+    ZIS_API__IF_LIKELY( ZIS_API__EXPR_WITH_TYPE_CHECKED(__expr, int) == ZIS_OK )
+
+/**
+ * Defines a IF branch, testing whether `expr` is `ZIS_THR`.
+ *
+ * @see zis_if_ok()
+ */
+#define zis_if_thr(__expr) \
+    ZIS_API__IF_UNLIKELY( ZIS_API__EXPR_WITH_TYPE_CHECKED(__expr, int) == ZIS_THR )
+
+/**
+ * Defines a IF branch, testing whether `expr` is not `ZIS_OK`.
+ *
+ * @see zis_if_ok()
+ */
+#define zis_if_err(__expr) \
+    ZIS_API__IF_UNLIKELY( ZIS_API__EXPR_WITH_TYPE_CHECKED(__expr, int) != ZIS_OK )
+
+#if (__STDC__ && __STDC_VERSION__ >= 199901L) || (defined(__cplusplus) && __cplusplus >= 201103L)
+/* C99, C++11: supports variable number of arguments in function-like macros. */
+
+/**
+ * Generates a static const variable that defines a function.
+ *
+ * `ZIS_NATIVE_FUNC_DEF(func_def_var, context_var, func_meta)`.
+ * Parameter `func_def_var` is the variable name of the definition; `context_var`
+ * is the argument (of type `zis_t`) name in the function implementation;
+ * `func_meta` is the function metadata initializer.
+ *
+ * @details Example:
+ * ```c
+ * ZIS_NATIVE_FUNC_DEF(F_add_int, z, {2, 0, 2}) {
+ *     int64_t lhs, rhs;
+ *     zis_read_int(z, 1, &lhs), zis_read_int(z, 2, &rhs);
+ *     zis_make_int(z, 0, lhs + rhs);
+ *     return ZIS_OK;
+ * }
+ * ```
+ *
+ * @see struct zis_native_func_def
+ */
+#define ZIS_NATIVE_FUNC_DEF(__func_def_var, __context_var, ...) \
+    static int __func_def_var##__impl (zis_t);                  \
+    static const struct zis_native_func_def __func_def_var = {  \
+        .meta = __VA_ARGS__ ,                                   \
+        .code = __func_def_var##__impl ,                        \
+    };                                                          \
+    static int __func_def_var##__impl ( zis_t __context_var )
+
+/**
+ * Generates a static const variable that defines an array of named function definitions.
+ *
+ * @details Example:
+ * ```c
+ * ZIS_NATIVE_FUNC_DEF(F_f1, z, {2, 0, 2}) { ... }
+ * ZIS_NATIVE_FUNC_DEF(F_f2, z, {1, 0, 3}) { ... }
+ * ZIS_NATIVE_FUNC_DEF_LIST(
+ *     func_list,
+ *     { "f1", &F_f1 },
+ *     { "f2", &F_f2 },
+ * );
+ * ```
+ *
+ * @see struct zis_native_func_def__named_ref
+ */
+#define ZIS_NATIVE_FUNC_DEF_LIST(__list_var, ...) \
+    static const struct zis_native_func_def__named_ref __list_var [] = { \
+        __VA_ARGS__                               \
+        { NULL, NULL }                            \
+    }
+
+/**
+ * Generates a static const variable that defines an array of named type definitions.
+ *
+ * @see struct zis_native_type_def__named_ref
+ */
+#define ZIS_NATIVE_TYPE_DEF_LIST(__list_var, ...) \
+    static const struct zis_native_type_def__named_ref __list_var [] = { \
+        __VA_ARGS__                               \
+        { NULL, NULL }                            \
+    }
+
+/**
+ * Generates a static const variable that defines an array of named variable definitions.
+ *
+ * @see struct zis_native_value_def__named
+ */
+#define ZIS_NATIVE_VAR_DEF_LIST(__list_var, ...) \
+    static const struct zis_native_value_def__named __list_var [] = { \
+        __VA_ARGS__                              \
+        { NULL, { .type = 0, .n = NULL } }       \
+    }
+
+/**
+ * Generates a static const variable that defines an array of value definitions.
+ *
+ * @see struct zis_native_value_def
+ */
+#define ZIS_NATIVE_VALUE_DEF_LIST(__list_var, ...) \
+    static const struct zis_native_value_def __list_var [] = { \
+        __VA_ARGS__                                \
+        { .type = 0, .n = NULL }                   \
+    }
+
+#endif /* C99, C++11 */
 
 /** @} */
 

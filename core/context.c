@@ -6,7 +6,6 @@
 #include <string.h>
 
 #include "debug.h"
-#include "fsutil.h"
 #include "globals.h"
 #include "loader.h"
 #include "memory.h"
@@ -16,8 +15,12 @@
 #include "symbolobj.h"
 #include "zis.h" // ZIS_PANIC_*
 
+#include "funcobj.h"
+#include "mapobj.h"
 #include "moduleobj.h"
 #include "pathobj.h"
+#include "stringobj.h"
+#include "typeobj.h"
 
 #include "zis_config.h"
 
@@ -157,18 +160,212 @@ struct zis_object *zis_context_get_reg0(struct zis_context *z) {
     return z->callstack->frame[0];
 }
 
-zis_noreturn void zis_context_panic(struct zis_context *z, enum zis_context_panic_reason r) {
-    static_assert(ZIS_PANIC_OOM == (int)ZIS_CONTEXT_PANIC_OOM, "");
-    static_assert(ZIS_PANIC_SOV == (int)ZIS_CONTEXT_PANIC_SOV, "");
-    static_assert(ZIS_PANIC_ILL == (int)ZIS_CONTEXT_PANIC_ILL, "");
+zis_noreturn zis_cold_fn void
+zis_context_panic(struct zis_context *z, enum zis_context_panic_reason r) {
+    static_assert(ZIS_PANIC_OOM == ZIS_CONTEXT_PANIC_OOM, "");
+    static_assert(ZIS_PANIC_SOV == ZIS_CONTEXT_PANIC_SOV, "");
+    static_assert(ZIS_PANIC_ILL == ZIS_CONTEXT_PANIC_ILL, "");
 
-    zis_debug_log(WARN, "Context", "context@%p: panic(%i)", (void *)z, (int)r);
+    zis_debug_log(
+        WARN, "Context", "context@%p: panic(%i:%s)", (void *)z, (int)r,
+        r == ZIS_CONTEXT_PANIC_ABORT ? "abort" :
+        r == ZIS_CONTEXT_PANIC_OOM ? "out-of-memory" :
+        r == ZIS_CONTEXT_PANIC_SOV ? "stack-overflow" :
+        r == ZIS_CONTEXT_PANIC_ILL ? "illegal-bytecode" :
+        r == ZIS_CONTEXT_PANIC_IMPL ? "not-implemented" :
+        "??"
+    );
 
-    if (r != ZIS_CONTEXT_PANIC_ABORT) {
+    if (r != ZIS_CONTEXT_PANIC_ABORT && z) {
         zis_context_panic_handler_t handler = z->panic_handler;
         if (handler)
             handler(z, (int)r);
     }
 
+    fprintf(stderr, ZIS_DISPLAY_NAME ": panic(%i)\n", (int)r);
     abort();
+}
+
+struct _guess_name_state {
+    struct zis_context *z;
+    char buffer[80];
+    char *external_buffer;
+    size_t external_buffer_capacity;
+    size_t size;
+};
+
+static void _guess_name_init(struct _guess_name_state *restrict state, struct zis_context *z) {
+    memset(state, 0, sizeof *state);
+    state->z = z;
+}
+
+static void _guess_name_fini(struct _guess_name_state *restrict state) {
+    if (state->external_buffer)
+        zis_mem_free(state->external_buffer);
+}
+
+static struct zis_string_obj *_guess_name_gen_str(struct _guess_name_state *restrict state) {
+    const char *buffer = state->external_buffer ? state->external_buffer : state->buffer;
+    return zis_string_obj_new(state->z, buffer, state->size);
+}
+
+static void _guess_name_clear(struct _guess_name_state *restrict state) {
+    state->size = 0;
+}
+
+static void _guess_name_append(struct _guess_name_state *restrict state, const char *s, size_t n) {
+    if (!state->external_buffer) {
+        if (state->size + n <= sizeof state->buffer) {
+            memcpy(state->buffer + state->size, s, n);
+            state->size += n;
+            return;
+        }
+        state->external_buffer_capacity = sizeof state->buffer * 2;
+        state->external_buffer = zis_mem_alloc(state->external_buffer_capacity);
+    }
+    if (state->size + n > state->external_buffer_capacity) {
+        size_t new_capacity = state->external_buffer_capacity * 2;
+        if (new_capacity < state->size + n)
+            new_capacity = state->size + n;
+        state->external_buffer_capacity = new_capacity;
+        state->external_buffer = zis_mem_realloc(state->external_buffer, new_capacity);
+    }
+    memcpy(state->external_buffer + state->size, s, n);
+    state->size += n;
+}
+
+static void _guess_name_append_sym(struct _guess_name_state *restrict state, struct zis_symbol_obj *sym) {
+    _guess_name_append(state, zis_symbol_obj_data(sym), zis_symbol_obj_data_size(sym));
+}
+
+static void _guess_name_append_char(struct _guess_name_state *restrict state, char c) {
+    _guess_name_append(state, &c, 1);
+}
+
+static bool _guess_name_of_var_in_mod(
+    struct _guess_name_state *restrict state,
+    struct zis_module_obj *mod, struct zis_object *var
+) {
+    for (size_t i = 0, n = zis_array_slots_obj_length(mod->_variables); i < n; i++) {
+        if (mod->_variables->_data[i] == var) {
+            struct zis_object *name =
+                zis_map_obj_reverse_lookup(state->z, mod->_name_map, zis_smallint_to_ptr((zis_smallint_t)i));
+            if (!name)
+                return false;
+            assert(zis_object_type_is(name, state->z->globals->type_Symbol));
+            _guess_name_append_sym(state, zis_object_cast(name, struct zis_symbol_obj));
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool _guess_name_of_type_member_in_mod(
+    struct _guess_name_state *restrict state,
+    struct zis_module_obj *mod, struct zis_object *var, bool check_methods
+) {
+    struct zis_type_obj *type_var = NULL;
+    struct zis_object *type_member_name = NULL;
+    bool var_is_method = false;
+
+    for (size_t i = 0, n = zis_array_slots_obj_length(mod->_variables); i < n; i++) {
+        struct zis_object *x = mod->_variables->_data[i];
+        if (!zis_object_type_is(x, state->z->globals->type_Type))
+            continue;
+        type_var = zis_object_cast(x, struct zis_type_obj);
+        {
+            type_member_name = zis_map_obj_reverse_lookup(state->z, type_var->_statics, var);
+            if (type_member_name)
+                break;
+        }
+        if (!check_methods)
+            continue;
+        for (size_t j = 0, m = zis_array_slots_obj_length(type_var->_methods); j < m; j++) {
+            if (type_var->_methods->_data[i] == var) {
+                type_member_name =
+                    zis_map_obj_reverse_lookup(state->z, type_var->_name_map, zis_smallint_to_ptr(-1 - (zis_smallint_t)j));
+                if (type_member_name) {
+                    var_is_method = true;
+                    i = n;
+                    break;
+                }
+            }
+        }
+    }
+    if (!(type_var && type_member_name))
+        return false;
+    _guess_name_of_var_in_mod(state, mod, zis_object_from(type_var));
+    _guess_name_append_char(state, var_is_method ? ':' : '.');
+    assert(zis_object_type_is(type_member_name, state->z->globals->type_Symbol));
+    _guess_name_append_sym(state, zis_object_cast(type_member_name, struct zis_symbol_obj));
+    return true;
+}
+
+static bool _guess_name_of_mod(struct _guess_name_state *restrict state, struct zis_module_obj *var) {
+    struct zis_symbol_obj *name[2];
+    if (!zis_module_loader_find_loaded_name(state->z, name, var))
+        return false;
+    _guess_name_append_sym(state, name[0]);
+    if (name[1]) {
+        _guess_name_append_char(state, '.');
+        _guess_name_append_sym(state, name[1]);
+    }
+    return true;
+}
+
+static bool _guess_name_of_type(struct _guess_name_state *restrict state, struct zis_type_obj *var) {
+    struct zis_module_obj *module = NULL;
+    for (size_t i = 0, n = zis_array_slots_obj_length(var->_methods); i < n; i++) {
+        struct zis_object *x = zis_array_slots_obj_get(var->_methods, i);
+        if (zis_object_type_is(x, state->z->globals->type_Function)) {
+            module = zis_func_obj_module(zis_object_cast(x, struct zis_func_obj));
+            break;
+        }
+    }
+    if (module) {
+        if (!_guess_name_of_mod(state, module))
+            _guess_name_append(state, "??", 2);
+        _guess_name_append_char(state, '.');
+        if (_guess_name_of_var_in_mod(state, module, zis_object_from(var)))
+            return true;
+        if (_guess_name_of_type_member_in_mod(state, module, zis_object_from(var), false))
+            return true;
+    }
+    module = state->z->globals->val_mod_prelude;
+    _guess_name_clear(state);
+    return _guess_name_of_var_in_mod(state, module, zis_object_from(var));
+}
+
+static bool _guess_name_of_func(struct _guess_name_state *restrict state, struct zis_func_obj *var) {
+    struct zis_module_obj *module = zis_func_obj_module(var);
+    if (!_guess_name_of_mod(state, module))
+        _guess_name_append(state, "??", 2);
+    _guess_name_append_char(state, '.');
+    if (_guess_name_of_var_in_mod(state, module, zis_object_from(var)))
+        return true;
+    if (_guess_name_of_type_member_in_mod(state, module, zis_object_from(var), true))
+        return true;
+    module = state->z->globals->val_mod_prelude;
+    _guess_name_clear(state);
+    return _guess_name_of_var_in_mod(state, module, zis_object_from(var));
+}
+
+struct zis_string_obj *
+zis_context_guess_variable_name(struct zis_context *z, struct zis_object *var) {
+    struct zis_context_globals *const g = z->globals;
+    struct zis_type_obj *const var_type = zis_object_type_1(var);
+    struct _guess_name_state state;
+    bool success;
+    _guess_name_init(&state, z);
+    if (var_type == g->type_Function)
+        success = _guess_name_of_func(&state, zis_object_cast(var, struct zis_func_obj));
+    else if (var_type == g->type_Type)
+        success = _guess_name_of_type(&state, zis_object_cast(var, struct zis_type_obj));
+    else if (var_type == g->type_Module)
+        success = _guess_name_of_mod(&state, zis_object_cast(var, struct zis_module_obj));
+    else
+        success = false;
+    struct zis_string_obj *str = success ? _guess_name_gen_str(&state) : NULL;
+    _guess_name_fini(&state);
+    return str;
 }

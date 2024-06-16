@@ -82,6 +82,12 @@ struct zis_map_obj *zis_map_obj_new(
     float load_factor, size_t reserve
 );
 
+/// Combine a vector of maps. On failure, returns NULL (throw REG-0).
+struct zis_map_obj *zis_map_obj_combine(
+    struct zis_context *z,
+    struct zis_map_obj *v[], size_t n
+);
+
 /// Get number of elements.
 zis_static_force_inline size_t zis_map_obj_length(const struct zis_map_obj *self) {
     return self->node_count;
@@ -140,4 +146,11 @@ void zis_map_obj_sym_set(
 int zis_map_obj_foreach(
     struct zis_context *z, struct zis_map_obj *self,
     int (*fn)(struct zis_object *key, struct zis_object *val, void *arg), void *fn_arg
+);
+
+/// Find a key by its associated value.
+/// Returns NULL if not found.
+struct zis_object *zis_map_obj_reverse_lookup(
+    struct zis_context *z, struct zis_map_obj *self,
+    struct zis_object *value
 );

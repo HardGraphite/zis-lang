@@ -168,24 +168,23 @@ static void make_func(
     zis_test_assert_eq(status, ZIS_OK);
 }
 
-static int F_a3(zis_t z) { // func(a1, a2, a3) -> ((a1, a2, a3), nil, nil)
+ZIS_NATIVE_FUNC_DEF(F_a3, z, {3, 0, 4}) { // func(a1, a2, a3) -> ((a1, a2, a3), nil, nil)
     zis_make_values(z, 4, "(%%%)", 1, 2, 3);
     zis_make_values(z, 0, "(%nn)", 4);
     return ZIS_OK;
 }
 
 zis_test_define(test_F_a3, z) {
-    const struct zis_native_func_def fd = {NULL, {3, 0, 1}, F_a3};
-    make_func(z, &fd);
+    make_func(z, &F_a3);
 
-    call_and_check_int_seq(z, &fd, 3, true); // F(1, 2, 3)
+    call_and_check_int_seq(z, &F_a3, 3, true); // F(1, 2, 3)
     for (size_t i = 0; i <= 2; i++)
-        call_and_check_int_seq(z, &fd, i, false);
+        call_and_check_int_seq(z, &F_a3, i, false);
     for (size_t i = 4; i <= 7; i++)
-        call_and_check_int_seq(z, &fd, i, false);
+        call_and_check_int_seq(z, &F_a3, i, false);
 }
 
-static int F_a2o2(zis_t z) { // func(a1, a2, ?o1, ?o2) -> ((a1, a2), (o1, o2), nil)
+ZIS_NATIVE_FUNC_DEF(F_a2o2, z, {2, 2, 6}) { // func(a1, a2, ?o1, ?o2) -> ((a1, a2), (o1, o2), nil)
     zis_make_values(z, 5, "(%%)", 1, 2);
     zis_make_values(z, 6, "(%%)", 3, 4);
     zis_make_values(z, 0, "(%%n)", 5, 6);
@@ -193,31 +192,29 @@ static int F_a2o2(zis_t z) { // func(a1, a2, ?o1, ?o2) -> ((a1, a2), (o1, o2), n
 }
 
 zis_test_define(test_F_a2o2, z) {
-    const struct zis_native_func_def fd = {NULL, {2, 2, 2}, F_a2o2};
-    make_func(z, &fd);
+    make_func(z, &F_a2o2);
 
     for (size_t i = 2; i <= 4; i++)
-        call_and_check_int_seq(z, &fd, i, true); // F(1, 2, ?3, ?4)
+        call_and_check_int_seq(z, &F_a2o2, i, true); // F(1, 2, ?3, ?4)
     for (size_t i = 0; i <= 1; i++)
-        call_and_check_int_seq(z, &fd, i, false);
+        call_and_check_int_seq(z, &F_a2o2, i, false);
     for (size_t i = 5; i <= 7; i++)
-        call_and_check_int_seq(z, &fd, 5, false);
+        call_and_check_int_seq(z, &F_a2o2, 5, false);
 }
 
-static int F_a2v(zis_t z) { // func(a1, a2, *v) -> ((a1, a2), nil, v)
+ZIS_NATIVE_FUNC_DEF(F_a2v, z, {2, (unsigned char)-1, 4}) { // func(a1, a2, *v) -> ((a1, a2), nil, v)
     zis_make_values(z, 4, "(%%)", 1, 2);
     zis_make_values(z, 0, "(%n%)", 4, 3);
     return ZIS_OK;
 }
 
 zis_test_define(test_F_a2v, z) {
-    const struct zis_native_func_def fd = {NULL, {2, (unsigned char)-1, 1}, F_a2v};
-    make_func(z, &fd);
+    make_func(z, &F_a2v);
 
     for (size_t i = 2; i <= 5; i++)
-        call_and_check_int_seq(z, &fd, i, true); // F(1, 2, ...)
+        call_and_check_int_seq(z, &F_a2v, i, true); // F(1, 2, ...)
     for (size_t i = 0; i <= 1; i++)
-        call_and_check_int_seq(z, &fd, 1, false);
+        call_and_check_int_seq(z, &F_a2v, 1, false);
 }
 
 zis_test_list(

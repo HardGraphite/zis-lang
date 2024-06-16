@@ -43,6 +43,22 @@ struct zis_exception_obj *zis_exception_obj_vformat(
     const char *restrict what_fmt, va_list what_args
 );
 
+enum zis_exception_obj_format_common_template {
+    ZIS_EXC_FMT_UNSUPPORTED_OPERATION_UN, ///< (const char *op, object *obj1) => "unsupported operation: $op $(typeof $obj1)"
+    ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN, ///< (const char *op, object *obj1, object *obj2) => "unsupported operation: $(typeof $obj1) $op $(typeof $obj2)"
+    ZIS_EXC_FMT_UNSUPPORTED_OPERATION_SUBS, ///< (const char *op, object *obj1, object *obj2) => "unsupported operation: $(typeof $obj1) $op[0] $(typeof $obj2) $op[1..]"
+    ZIS_EXC_FMT_WRONG_ARGUMENT_TYPE, ///< (const char *arg_name, object *arg_obj) => "argument $arg_name cannot be $(typeof $arg_obj)"
+    ZIS_EXC_FMT_INDEX_OUT_OF_RANGE, ///< (object *index) => "index out of range"
+    ZIS_EXC_FMT_KEY_NOT_FOUND, ///< (object *key) => "key not found"
+    ZIS_EXC_FMT_NAME_NOT_FOUND, ///< (const char *what, symbol *name) => "no $what named $name""
+};
+
+/// Create an `Exception` with formatted string based on a templated.
+/// Returns NULL if the template is illegal.
+struct zis_exception_obj *zis_exception_obj_format_common(
+    struct zis_context *z, int template, ...
+);
+
 /// Add a record to the stack trace.
 void zis_exception_obj_stack_trace(
     struct zis_context *z, struct zis_exception_obj *self,
@@ -57,7 +73,7 @@ size_t zis_exception_obj_stack_trace_length(
 /// Traverse the stack trace.
 int zis_exception_obj_walk_stack_trace(
     struct zis_context *z, struct zis_exception_obj *self,
-    int (*fn)(unsigned int index, struct zis_func_obj *func_obj, unsigned int instr_offset, void *arg),
+    int (*fn)(struct zis_context *, unsigned int index, struct zis_func_obj *func_obj, unsigned int instr_offset, void *arg),
     void *fn_arg
 );
 

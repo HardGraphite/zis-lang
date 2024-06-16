@@ -37,8 +37,13 @@
 ZIS_EMBEDDED_MODULE_LIST
 #undef E
 
-static const struct zis_native_module_def *const embedded_module_list[] = {
-#define E(NAME)  & ZIS_NATIVE_MODULE_VARNAME(NAME) ,
+struct zis_native_module_def__named_ref {
+    const char *name;
+    const struct zis_native_module_def *def;
+};
+
+static const struct zis_native_module_def__named_ref embedded_module_list[] = {
+#define E(NAME) { #NAME, & ZIS_NATIVE_MODULE_VARNAME(NAME) } ,
     ZIS_EMBEDDED_MODULE_LIST
 #undef E
 };
@@ -60,15 +65,7 @@ static const struct zis_native_module_def *find_embedded_module(const char *name
 
     // List sorted. Use the binary search algorithm.
 
-    typedef
-#if ZIS_WORDSIZE == 64
-    int64_t
-#elif ZIS_WORDSIZE == 32
-    int32_t
-#else
-    int
-#endif
-    _ssize_t;
+    typedef intptr_t _ssize_t;
     static_assert(sizeof(size_t) == sizeof(_ssize_t), "");
 
     assert(embedded_module_count && embedded_module_count < SIZE_MAX / 2);
@@ -76,10 +73,10 @@ static const struct zis_native_module_def *find_embedded_module(const char *name
 
     do {
         const size_t index_m = index_l + (index_r - index_l) / 2;
-        const struct zis_native_module_def *const def = embedded_module_list[index_m];
+        const struct zis_native_module_def__named_ref *const def = &embedded_module_list[index_m];
         const int diff = strcmp(def->name, name);
         if (diff == 0)
-            return def;
+            return def->def;
         if (diff < 0)
             index_l = index_m + 1;
         else
@@ -153,10 +150,10 @@ static int _module_loader_search_fn(const zis_path_char_t *mod_name, void *_arg)
     zis_path_char_t *buffer = state->buffer;
 
     for (size_t i = 0; ; i++) {
-        struct zis_object *entry = zis_array_obj_get(d->search_path, i);
+        struct zis_object *entry = zis_array_obj_get_checked(d->search_path, i);
         if (!entry)
             break;
-        if (zis_object_type(entry) != z->globals->type_Path)
+        if (!zis_object_type_is(entry, z->globals->type_Path))
             continue;
         struct zis_path_obj *const path_obj = zis_object_cast(entry, struct zis_path_obj);
         const zis_path_char_t *const dir = zis_path_obj_data(path_obj);
@@ -327,10 +324,13 @@ static bool module_loader_load_from_file(
 
 #if ZIS_FEATURE_SRC
     case MOD_FILE_SRC: {
+        struct zis_compilation_bundle comp_bundle;
+        zis_compilation_bundle_init(&comp_bundle, z);
         const int ff = ZIS_STREAM_OBJ_MODE_IN | ZIS_STREAM_OBJ_TEXT | ZIS_STREAM_OBJ_UTF8;
         struct zis_stream_obj *f = zis_stream_obj_new_file(z, file, ff);
-        var.init_func = zis_compile_source(z, f, var.module);
+        var.init_func = zis_compile_source(&comp_bundle, f, var.module);
         zis_stream_obj_close(f);
+        zis_compilation_bundle_fini(&comp_bundle);
         if (!var.init_func) {
             status = ZIS_THR;
             break;
@@ -381,7 +381,7 @@ static bool module_loader_load_from_file(
 #endif // ZIS_FEATURE_ASM
 
     default:
-        zis_context_panic(z, ZIS_CONTEXT_PANIC_ABORT); // Not implemented.
+        zis_context_panic(z, ZIS_CONTEXT_PANIC_IMPL);
     }
 
     if (status == ZIS_OK)
@@ -399,6 +399,7 @@ static bool module_loader_load_from_source(
 ) {
 #if ZIS_FEATURE_SRC
 
+    struct zis_compilation_bundle comp_bundle;
     zis_locals_decl(
         z, var,
         struct zis_module_obj *module;
@@ -406,7 +407,9 @@ static bool module_loader_load_from_source(
     );
     zis_locals_zero(var);
     var.module = _module;
-    var.init_func = zis_compile_source(z, input, var.module);
+    zis_compilation_bundle_init(&comp_bundle, z);
+    var.init_func = zis_compile_source(&comp_bundle, input, var.module);
+    zis_compilation_bundle_fini(&comp_bundle);
     int status = ZIS_OK;
     if (!var.init_func)
         status = ZIS_THR;
@@ -479,10 +482,10 @@ void zis_module_loader_add_path(struct zis_context *z, struct zis_path_obj *path
     struct module_loader_data *const d = &z->module_loader->data;
 
     for (size_t i = 0; ; i++) {
-        struct zis_object *e = zis_array_obj_get(d->search_path, i);
+        struct zis_object *e = zis_array_obj_get_checked(d->search_path, i);
         if (!e)
             break;
-        if (zis_object_type(e) != z->globals->type_Path)
+        if (!zis_object_type_is(e, z->globals->type_Path))
             continue;
         struct zis_path_obj *const e_path = zis_object_cast(e, struct zis_path_obj);
         if (zis_path_obj_same(path, e_path))
@@ -524,7 +527,7 @@ void zis_module_loader_add_loaded(
     struct zis_context_globals *const g = z->globals;
 
     struct zis_object *entry = zis_map_obj_sym_get(d->loaded_modules, module_name);
-    struct zis_type_obj *entry_type = entry ? zis_object_type(entry) : NULL;
+    struct zis_type_obj *entry_type = entry ? zis_object_type_1(entry) : NULL;
 
     if (sub_module_name) {
         if (entry_type == g->type_Map) {
@@ -584,7 +587,7 @@ struct zis_module_obj *zis_module_loader_get_loaded(
     struct zis_object *entry = zis_map_obj_sym_get(d->loaded_modules, module_name);
     if (!entry)
         return NULL;
-    struct zis_type_obj *entry_type = zis_object_type(entry);
+    struct zis_type_obj *entry_type = zis_object_type_1(entry);
     if (entry_type == g->type_Module)
         return zis_object_cast(entry, struct zis_module_obj);
     if (entry_type != g->type_Map)
@@ -592,10 +595,47 @@ struct zis_module_obj *zis_module_loader_get_loaded(
     entry = zis_map_obj_sym_get(zis_object_cast(entry, struct zis_map_obj), g->sym_init);
     if (!entry)
         return NULL;
-    entry_type = zis_object_type(entry);
+    entry_type = zis_object_type_1(entry);
     if (entry_type == g->type_Module)
         return zis_object_cast(entry, struct zis_module_obj);
     return NULL;
+}
+
+struct _find_loaded_name_state {
+    struct zis_context *z;
+    struct zis_type_obj *type_Map;
+    struct zis_symbol_obj **name;
+    struct zis_module_obj *module;
+};
+
+static int _find_loaded_name_fn(struct zis_object *_key, struct zis_object *_val, void *_arg) {
+    struct _find_loaded_name_state *const state = _arg;
+    if (_val == zis_object_from(state->module)) {
+        assert(zis_object_type_is(_key, state->z->globals->type_Symbol));
+        state->name[0] = zis_object_cast(_key, struct zis_symbol_obj);
+        state->name[1] = NULL;
+        return 1;
+    } else if (zis_object_type_is(_val, state->type_Map)) {
+        struct zis_object *sub_name = zis_map_obj_reverse_lookup(
+            state->z, zis_object_cast(_val, struct zis_map_obj),
+            zis_object_from(state->module)
+        );
+        assert(zis_object_type_is(_key, state->z->globals->type_Symbol));
+        assert(zis_object_type_is(sub_name, state->z->globals->type_Symbol));
+        state->name[0] = zis_object_cast(_key, struct zis_symbol_obj);
+        state->name[1] = zis_object_cast(sub_name, struct zis_symbol_obj);
+    }
+    return 0;
+}
+
+bool zis_module_loader_find_loaded_name(
+    struct zis_context *z,
+    struct zis_symbol_obj *name[ZIS_PARAMARRAY_STATIC 2],
+    struct zis_module_obj *module
+) {
+    name[0] = NULL, name[1] = NULL;
+    struct _find_loaded_name_state state = { z, z->globals->type_Map, name, module };
+    return zis_map_obj_foreach(z, z->module_loader->data.loaded_modules, _find_loaded_name_fn, &state);
 }
 
 static bool _module_loader_load_top(
@@ -649,7 +689,7 @@ static bool _module_loader_load_sub(
     int flags
 ) {
     zis_unused_var(z), zis_unused_var(top_module), zis_unused_var(module_name), zis_unused_var(sub_module_name), zis_unused_var(flags);
-    zis_context_panic(z, ZIS_CONTEXT_PANIC_ABORT); // Not implemented.
+    zis_context_panic(z, ZIS_CONTEXT_PANIC_IMPL);
 }
 
 struct zis_module_obj *zis_module_loader_import(

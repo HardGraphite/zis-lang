@@ -7,6 +7,8 @@
 #include <stdint.h>
 
 #include "attributes.h"
+#include "platform.h"
+#include "smallint.h"
 
 /* ----- numbers ------------------------------------------------------------ */
 
@@ -118,4 +120,44 @@ size_t zis_hash_bytes(const void *data, size_t size) {
 #else
     return (size_t)h & (SIZE_MAX >> 2);
 #endif
+}
+
+void zis_hash_combine(size_t *restrict hash_code_p, size_t new_hash_code) {
+    // Adapted from Boost version 1.86 (boost::hash_combine).
+    // License: https://www.boost.org/LICENSE_1_0.txt .
+
+    size_t x = *hash_code_p + 0x9e3779b9 + new_hash_code;
+
+#if ZIS_WORDSIZE == 64
+
+    const uint64_t m = 0xe9846af9b1a615d;
+
+    x ^= x >> 32;
+    x *= m;
+    x ^= x >> 32;
+    x *= m;
+    x ^= x >> 28;
+
+#else // ZIS_WORDSIZE == 32
+
+    const uint32_t m1 = 0x21f0aaad;
+    const uint32_t m2 = 0x735a2d97;
+
+    x ^= x >> 16;
+    x *= m1;
+    x ^= x >> 15;
+    x *= m2;
+    x ^= x >> 15;
+
+#endif // ZIS_WORDSIZE
+
+    *hash_code_p = x;
+}
+
+size_t zis_hash_truncate(size_t hash_code) {
+    static_assert(sizeof hash_code == sizeof(zis_smallint_t), "");
+    hash_code = (size_t)(((zis_smallint_t)hash_code << 1) >> 1);
+    assert((zis_smallint_t)hash_code >= ZIS_SMALLINT_MIN);
+    assert((zis_smallint_t)hash_code <= ZIS_SMALLINT_MAX);
+    return hash_code;
 }

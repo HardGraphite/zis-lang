@@ -234,12 +234,13 @@ static void scan_number(
         }
     }
 
-    l->temp_var = NULL;
+    struct zis_object **temp_result_ref = &l->temp_var;
+    bool has_temp_result = false;
     while (true) {
         size_t buf_sz;
         const char *buf = stream_buffer(input, &buf_sz);
         if (!buf) {
-            if (!l->temp_var)
+            if (!has_temp_result)
                 error_unexpected_end_of(l, "number literal");
             break;
         }
@@ -252,22 +253,24 @@ static void scan_number(
         stream_buffer_ignore(input, consumed_size);
         if (!int_obj)
             error_unexpected_end_of(l, "number literal");
-        if (l->temp_var) {
+        if (has_temp_result) {
             const size_t k = consumed_size * digit_base;
             assert(k <= ZIS_SMALLINT_MAX);
             int_obj = zis_int_obj_add_x(
-                z, l->temp_var,
+                z, int_obj,
                 zis_int_obj_mul_x(
-                    z, int_obj,
+                    z, *temp_result_ref,
                     zis_smallint_to_ptr((zis_smallint_t)k)
                 )
             );
+        } else {
+            has_temp_result = true;
         }
-        l->temp_var = int_obj;
-        if (consumed_size < buf_sz || zis_char_digit((zis_wchar_t)stream_peek(input)) < digit_base)
+        *temp_result_ref = int_obj;
+        if (consumed_size < buf_sz || zis_char_digit((zis_wchar_t)stream_peek(input)) >= digit_base)
             break;
     }
-    tok->value = l->temp_var;
+    tok->value = *temp_result_ref;
     clear_temp_var(l);
 
     if (stream_peek(input) != '.') {
@@ -410,7 +413,8 @@ static void scan_string(
     stream_ignore_1(input);
     loc_next_char(l);
 
-    l->temp_var = NULL;
+    struct zis_string_obj **temp_result_ref = (struct zis_string_obj **)&l->temp_var;
+    bool has_temp_result = false;
     for (bool end_reached = false; !end_reached; ) {
         size_t buf_sz;
         const char *buf = stream_buffer(input, &buf_sz);
@@ -455,15 +459,16 @@ static void scan_string(
         loc_next_char_n(l, (unsigned int)consumed_size);
         if (!str_obj)
             error(l, "illegal string literal");
-        if (l->temp_var) {
-            assert(zis_object_type(l->temp_var) == z->globals->type_String);
-            struct zis_string_obj *s = zis_object_cast(l->temp_var, struct zis_string_obj);
-            str_obj = zis_string_obj_concat(z, s, str_obj);
+        if (has_temp_result) {
+            assert(zis_object_type(zis_object_from(*temp_result_ref)) == z->globals->type_String);
+            str_obj = zis_string_obj_concat(z, *temp_result_ref, str_obj);
+        } else {
+            has_temp_result = true;
         }
-        l->temp_var = zis_object_from(str_obj);
+        *temp_result_ref = str_obj;
     }
-    assert(zis_object_type(l->temp_var) == z->globals->type_String);
-    tok->value_string = zis_object_cast(l->temp_var, struct zis_string_obj);
+    assert(zis_object_type(zis_object_from(*temp_result_ref)) == z->globals->type_String);
+    tok->value_string = *temp_result_ref;
     clear_temp_var(l);
 
     assert(stream_peek(input) == delimiter);
@@ -484,12 +489,13 @@ static void scan_identifier_or_keyword(struct zis_lexer *restrict l, struct zis_
     struct zis_context *const z = l->z;
     struct zis_stream_obj *const input = l->input;
 
-    l->temp_var = NULL;
+    struct zis_symbol_obj **temp_result_ref = (struct zis_symbol_obj **)&l->temp_var;
+    bool has_temp_result = false;
     for (bool end_reached = false; !end_reached; ) {
         size_t buf_sz;
         const char *buf = stream_buffer(input, &buf_sz);
         if (!buf) {
-            assert(l->temp_var);
+            assert(has_temp_result);
             break;
         }
         const char *end_p = buf;
@@ -517,22 +523,22 @@ static void scan_identifier_or_keyword(struct zis_lexer *restrict l, struct zis_
         assert(consumed_size <= buf_sz);
         loc_next_char_n(l, (unsigned int)consumed_size);
         struct zis_symbol_obj *sym_obj;
-        if (l->temp_var) {
-            assert(zis_object_type(l->temp_var) == z->globals->type_Symbol);
-            sym_obj = zis_object_cast(l->temp_var, struct zis_symbol_obj);
+        if (has_temp_result) {
+            assert(zis_object_type(zis_object_from(*temp_result_ref)) == z->globals->type_Symbol);
             sym_obj = zis_symbol_registry_get2(
                 z,
-                zis_symbol_obj_data(sym_obj), zis_symbol_obj_data_size(sym_obj),
+                zis_symbol_obj_data(*temp_result_ref), zis_symbol_obj_data_size(*temp_result_ref),
                 buf, consumed_size
             );
         } else {
+            has_temp_result = true;
             sym_obj = zis_symbol_registry_get(z, buf, consumed_size);
         }
-        l->temp_var = zis_object_from(sym_obj);
+        *temp_result_ref = sym_obj;
         stream_buffer_ignore(input, consumed_size);
     }
-    assert(zis_object_type(l->temp_var) == z->globals->type_Symbol);
-    tok->value_identifier = zis_object_cast(l->temp_var, struct zis_symbol_obj);
+    assert(zis_object_type(zis_object_from(*temp_result_ref)) == z->globals->type_Symbol);
+    tok->value_identifier = *temp_result_ref;
     const int kw_id = keyword_table_lookup(l->keywords, tok->value_identifier);
     if (kw_id)
         token_set_type(tok, (enum zis_token_type)kw_id);
@@ -598,26 +604,6 @@ scan_next_char:
         }                                                               \
     } while(0)
 
-// For 'C': C, C=, CC, CX.
-#define CASE_OPERATOR_4X(C, TOK_TYPE_C, TOK_TYPE_C_EQL, TOK_TYPE_CC, X, TOK_TYPE_CX) \
-    do {                                                                             \
-        stream_ignore_1(input);                                                      \
-        const int32_t second_char = stream_peek(input);                              \
-        if (second_char == X) {                                                      \
-            token_set_type(tok, TOK_TYPE_CX);                                        \
-            goto loc_next__input_ignore1__token_set_loc1__loc_next__return;          \
-        } else if (second_char == C) {                                               \
-            token_set_type(tok, TOK_TYPE_CC);                                        \
-            goto loc_next__input_ignore1__token_set_loc1__loc_next__return;          \
-        } else if (second_char == '=') {                                             \
-            token_set_type(tok, TOK_TYPE_C_EQL);                                     \
-            goto loc_next__input_ignore1__token_set_loc1__loc_next__return;          \
-        } else {                                                                     \
-            token_set_type(tok, TOK_TYPE_C);                                         \
-            goto token_set_loc1__loc_next__return;                                   \
-        }                                                                            \
-    } while(0)
-
     case '\t':
     case ' ':
         stream_ignore_1(input);
@@ -649,11 +635,22 @@ scan_next_char:
         stream_ignore_1(input);
         loc_next_char(l);
         first_char = stream_peek(input);
-        if (first_char != '\n')
-            error_unexpected_char(l, first_char);
-        stream_ignore_1(input);
-        loc_next_line(l);
-        goto scan_next_char;
+        if (first_char == '\n') {
+            stream_ignore_1(input);
+            loc_next_line(l);
+            goto scan_next_char;
+        } else if (first_char == '"' || first_char == '\'') {
+            scan_string(l, tok, first_char, true);
+            assert(tok->type == ZIS_TOK_LIT_STRING);
+            tok->value_identifier = zis_symbol_registry_gets(l->z, tok->value_string);
+            tok->type = ZIS_TOK_IDENTIFIER;
+            break;
+        } else {
+            if (first_char == -1)
+                error_unexpected_end_of(l, "input stream");
+            else
+                error_unexpected_char(l, first_char);
+        }
 
     case '!': // "!", "!="
         CASE_OPERATOR_2('!', ZIS_TOK_OP_NOT, ZIS_TOK_OP_NE);
@@ -667,11 +664,11 @@ scan_next_char:
     case '&': // "&", "&=", "&&"
         CASE_OPERATOR_3('&', ZIS_TOK_OP_BIT_AND, ZIS_TOK_OP_BIT_AND_EQL, ZIS_TOK_OP_AND);
 
-    case '*': // "*", "*="
-        CASE_OPERATOR_2('*', ZIS_TOK_OP_MUL, ZIS_TOK_OP_MUL_EQL);
+    case '*': // "*", "*=", "**"
+        CASE_OPERATOR_3('*', ZIS_TOK_OP_MUL, ZIS_TOK_OP_MUL_EQL, ZIS_TOK_OP_POW);
 
     case '+': // "+", "+="
-        CASE_OPERATOR_2('*', ZIS_TOK_OP_ADD, ZIS_TOK_OP_ADD_EQL);
+        CASE_OPERATOR_2('+', ZIS_TOK_OP_ADD, ZIS_TOK_OP_ADD_EQL);
 
     case ',': // ","
         CASE_OPERATOR_1(',', ZIS_TOK_COMMA);
@@ -701,8 +698,30 @@ scan_next_char:
     case ':': // ":"
         CASE_OPERATOR_1(':', ZIS_TOK_OP_COLON);
 
-    case '<': // "<", "<=", "<<", "<-
-        CASE_OPERATOR_4X('<', ZIS_TOK_OP_LT, ZIS_TOK_OP_LE, ZIS_TOK_OP_SHL, '-', ZIS_TOK_L_ARROW);
+    case '<': // "<", "<=", "<<", "<-", "<=>"
+        stream_ignore_1(input);
+        {
+            const int32_t second_char = stream_peek(input);
+            if (second_char == '=') {
+                stream_ignore_1(input);
+                loc_next_char(l);
+                if (stream_peek(input) == '>') {
+                    token_set_type(tok, ZIS_TOK_OP_CMP);
+                    goto loc_next__input_ignore1__token_set_loc1__loc_next__return;
+                }
+                token_set_type(tok, ZIS_TOK_OP_LE);
+                goto token_set_loc1__loc_next__return;
+            } else if (second_char == '<') {
+                token_set_type(tok, ZIS_TOK_OP_SHL);
+                goto loc_next__input_ignore1__token_set_loc1__loc_next__return;
+            } else if (second_char == '-') {
+                token_set_type(tok, ZIS_TOK_L_ARROW);
+                goto loc_next__input_ignore1__token_set_loc1__loc_next__return;
+            } else {
+                token_set_type(tok, ZIS_TOK_OP_LT);
+                goto token_set_loc1__loc_next__return;
+            }
+        }
 
     case '=': // "=", "=="
         CASE_OPERATOR_2('=', ZIS_TOK_OP_EQL, ZIS_TOK_OP_EQ);
@@ -848,7 +867,6 @@ scan_next_char:
 #undef CASE_OPERATOR_2
 #undef CASE_OPERATOR_3
 #undef CASE_OPERATOR_3X
-#undef CASE_OPERATOR_4X
 
     }
     return;
@@ -888,14 +906,14 @@ void zis_lexer_start(
     l->ignore_eol = 0;
     l->input_eof = false;
     l->input = input_stream;
-    l->temp_var = zis_smallint_to_ptr(0);
+    clear_temp_var(l);
     l->error_handler = error_handler;
+    assert(l->keywords == l->z->globals->val_lexer_keywords);
 }
 
 void zis_lexer_finish(struct zis_lexer *restrict l) {
     l->input = zis_object_cast(zis_smallint_to_ptr(0), struct zis_stream_obj);
-    l->keywords = zis_object_cast(zis_smallint_to_ptr(0), struct zis_map_obj);
-    l->temp_var = zis_smallint_to_ptr(0);
+    clear_temp_var(l);
     l->error_handler = NULL;
 }
 

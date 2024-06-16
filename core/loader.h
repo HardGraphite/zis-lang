@@ -45,6 +45,14 @@ struct zis_module_obj *zis_module_loader_get_loaded(
     struct zis_symbol_obj *module_name
 );
 
+/// Find the name of a loaded module.
+/// The result is stored to `name`: `name[0]` = module_name, `name[1]` = submod_name/NULL.
+bool zis_module_loader_find_loaded_name(
+    struct zis_context *z,
+    struct zis_symbol_obj *name[ZIS_PARAMARRAY_STATIC 2],
+    struct zis_module_obj *module
+);
+
 #define ZIS_MOD_LDR_SEARCH_LOADED   0x01  ///< Search in loaded modules.
 #define ZIS_MOD_LDR_UPDATE_LOADED   0x02  ///< Add to loaded modules.
 

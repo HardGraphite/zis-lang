@@ -179,16 +179,20 @@ static unsigned int frame_scope_alloc_regs(
                 zis_debug_log(TRACE, "CGen", "frame_scope_alloc_regs(%u) -> %u (free_list[%zu])", n, reg_start, i);
                 return reg_start;
             }
-            if (regs_i_n < min_n && regs_i_n >= n) {
+            if (regs_i_n > n && regs_i_n < min_n) {
                 min_n = regs_i_n;
                 min_n_i = i;
             }
         }
-        const unsigned int reg = free_regs_list[min_n_i].start;
-        free_regs_list[min_n_i].start = reg + n;
-        assert(free_regs_list[min_n_i].start < free_regs_list[min_n_i].end);
-        zis_debug_log(TRACE, "CGen", "frame_scope_alloc_regs(%u) -> %u (free_list[%zu][0:%u])", n, reg, min_n_i, n);
-        return reg;
+        if (min_n != UINT_MAX) {
+            assert(min_n > n);
+            assert(min_n_i < free_regs_list_len);
+            const unsigned int reg = free_regs_list[min_n_i].start;
+            free_regs_list[min_n_i].start = reg + n;
+            assert(free_regs_list[min_n_i].start + 1 < free_regs_list[min_n_i].end);
+            zis_debug_log(TRACE, "CGen", "frame_scope_alloc_regs(%u) -> %u (free_list[%zu][0:%u])", n, reg, min_n_i, n);
+            return reg;
+        }
     }
 
     const unsigned int reg = fs->reg_allocated_max + 1;
@@ -224,6 +228,13 @@ static void frame_scope_free_regs(
 
     if (freed_regs.end - 1 == fs->reg_allocated_max) {
         fs->reg_allocated_max -= n;
+        if (fs->free_regs_list_len) {
+            const size_t last_i = fs->free_regs_list_len - 1;
+            if (fs->free_regs_list[last_i].end - 1 == fs->reg_allocated_max) {
+                fs->reg_allocated_max = fs->free_regs_list[last_i].start - 1;
+                frame_scope__free_regs_list_remove(fs, last_i);
+            }
+        }
         zis_debug_log(TRACE, "CGen", "frame_scope_free_regs(%u, %u) (shrink tail)", regs_start, n);
         return;
     }
@@ -693,7 +704,7 @@ static void check_obj_is_node(
     struct zis_codegen *restrict cg,
     struct zis_ast_node_obj *parent_node, struct zis_object *obj
 ) {
-    if (zis_unlikely(zis_object_is_smallint(obj) || zis_object_type(obj) != cg->z->globals->type_AstNode))
+    if (zis_unlikely(!zis_object_type_is(obj, cg->z->globals->type_AstNode)))
         error(cg, parent_node, "sub-node is not a node object");
 }
 
@@ -898,7 +909,7 @@ static struct zis_ast_node_obj *emit_elements(
     );
     var.node = _node, var.elements = _elements;
     for (unsigned int i = 0; ; i++) {
-        struct zis_object *sub_node = zis_array_obj_get(var.elements, i);
+        struct zis_object *sub_node = zis_array_obj_get_checked(var.elements, i);
         if (!sub_node)
             break;
         check_obj_is_node(cg, var.node, sub_node);
@@ -955,18 +966,24 @@ static int emit_list_like_node(
 /// Handle a Call-like node (Call, Send).
 static int emit_call_node(
     struct zis_codegen *cg, struct zis_ast_node_obj *_node, unsigned int tgt_reg,
-    struct zis_array_obj *_args, struct zis_ast_node_obj *_func
+    struct zis_array_obj *_args, struct zis_object *_func_or_meth /* func: Node; meth: Symbol */
 ) {
+    bool is_send_node;
+    {
+        const enum zis_ast_node_type node_type = zis_ast_node_obj_type(_node);
+        assert(node_type == ZIS_AST_NODE_Call || node_type == ZIS_AST_NODE_Send);
+        is_send_node = node_type == ZIS_AST_NODE_Send;
+    }
     if (zis_unlikely(tgt_reg == NTGT))
         tgt_reg = 0;
     int atgt;
     zis_locals_decl(
         cg, var,
         struct zis_array_obj *args;
-        struct zis_ast_node_obj *func;
+        struct zis_object *func_or_meth;
         struct zis_ast_node_obj *node;
     );
-    var.args = _args, var.func = _func, var.node = _node;
+    var.args = _args, var.func_or_meth = _func_or_meth, var.node = _node;
     struct frame_scope *fs = scope_stack_last_frame_scope(&cg->scope_stack);
     struct zis_assembler *const as = scope_assembler(cg);
     const unsigned int argc = (unsigned int)zis_array_obj_length(var.args);
@@ -981,7 +998,18 @@ static int emit_call_node(
             arg_atgt_list[i] = arg_atgt;
             operand_args |= (atgt_abs(arg_atgt) & 63) << (6 * i);
         }
-        emit_any(cg, var.func, 0);
+        if (!is_send_node) {
+            check_obj_is_node(cg, var.node, var.func_or_meth);
+            emit_any(cg, zis_object_cast(var.func_or_meth, struct zis_ast_node_obj), 0);
+        } else {
+            assert(zis_object_type_is(var.func_or_meth, codegen_z(cg)->globals->type_Symbol));
+            const unsigned int method_name_sym = zis_assembler_func_symbol(
+                as, codegen_z(cg),
+                zis_object_cast(var.func_or_meth, struct zis_symbol_obj)
+            );
+            assert(argc >= 1);
+            zis_assembler_append_ABw(as, ZIS_OPC_LDMTH, atgt_abs(arg_atgt_list[0]), method_name_sym);
+        }
         for (unsigned int i = 0; i < argc; i++)
             atgt_free1(fs, arg_atgt_list[i]);
         if (tgt_reg == ATGT)
@@ -997,7 +1025,17 @@ static int emit_call_node(
     } else if (argc < 64) {
         const unsigned int arg_regs_start = frame_scope_alloc_regs(fs, argc);
         emit_elements(cg, var.node, var.args, arg_regs_start);
-        emit_any(cg, var.func, 0);
+        if (!is_send_node) {
+            check_obj_is_node(cg, var.node, var.func_or_meth);
+            emit_any(cg, zis_object_cast(var.func_or_meth, struct zis_ast_node_obj), 0);
+        } else {
+            assert(zis_object_type_is(var.func_or_meth, codegen_z(cg)->globals->type_Symbol));
+            const unsigned int method_name_sym = zis_assembler_func_symbol(
+                as, codegen_z(cg),
+                zis_object_cast(var.func_or_meth, struct zis_symbol_obj)
+            );
+            zis_assembler_append_ABw(as, ZIS_OPC_LDMTH, arg_regs_start, method_name_sym);
+        }
         frame_scope_free_regs(fs, arg_regs_start, argc);
         if (tgt_reg == ATGT)
             tgt_reg = frame_scope_alloc_regs(fs, 1), atgt = -(int)tgt_reg;
@@ -1044,7 +1082,7 @@ static struct zis_ast_node_obj *emit_block(
     );
     var.node = _node, var.block = _block;
     for (size_t i = 0; ; i++) {
-        struct zis_object *sub_node = zis_array_obj_get(var.block, i);
+        struct zis_object *sub_node = zis_array_obj_get_checked(var.block, i);
         if (!sub_node)
             break;
         check_obj_is_node(cg, var.node, sub_node);
@@ -1223,6 +1261,11 @@ static int emit_BitXor(struct zis_codegen *cg, struct zis_ast_node_obj *node, un
     return emit_bin_op_node(cg, node, tgt_reg, ZIS_OPC_BITXOR);
 }
 
+static int emit_Pow(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
+    assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Pow);
+    return emit_bin_op_node(cg, node, tgt_reg, ZIS_OPC_POW);
+}
+
 static int emit_Assign(struct zis_codegen *cg, struct zis_ast_node_obj *_node, unsigned int tgt_reg) {
     assert(zis_ast_node_obj_type(_node) == ZIS_AST_NODE_Assign);
     struct zis_ast_node_Assign_data *_node_data =
@@ -1266,13 +1309,13 @@ static int emit_Assign(struct zis_codegen *cg, struct zis_ast_node_obj *_node, u
         }
     } else {
         int rhs_atgt; unsigned int rhs_reg;
-        const bool tgt_reg_is_normal = tgt_reg != NTGT && tgt_reg != ATGT;
+        const bool tgt_reg_is_normal = tgt_reg != NTGT && tgt_reg != ATGT && tgt_reg != 0;
         if (!tgt_reg_is_normal) {
             rhs_atgt = emit_any(cg, var.rhs, ATGT);
             rhs_reg = atgt_abs(rhs_atgt);
         } else {
             rhs_atgt = 0, rhs_reg = tgt_reg;
-            emit_any(cg, var.rhs, tgt_reg);
+            emit_any(cg, var.rhs, rhs_reg);
         }
         struct frame_scope *fs = scope_stack_last_frame_scope(&cg->scope_stack);
 
@@ -1294,6 +1337,7 @@ static int emit_Assign(struct zis_codegen *cg, struct zis_ast_node_obj *_node, u
                         if (zis_object_is_smallint(key)) {
                             const zis_smallint_t key_smi = zis_smallint_from_ptr(key);
                             if (ZIS_INSTR_I9_MIN <= key_smi && key_smi <= ZIS_INSTR_I9_MAX) {
+                                assert(rhs_reg != 0);
                                 zis_assembler_append_AsBC(
                                     as, ZIS_OPC_STELMI,
                                     (int32_t)key_smi, rhs_reg, atgt_abs(value_atgt)
@@ -1356,6 +1400,11 @@ static int emit_Gt(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsign
 static int emit_Ge(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
     assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Ge);
     return emit_bin_op_node(cg, node, tgt_reg, ZIS_OPC_CMPGE);
+}
+
+static int emit_Cmp(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
+    assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Cmp);
+    return emit_bin_op_node(cg, node, tgt_reg, ZIS_OPC_CMP);
 }
 
 static int emit_And(struct zis_codegen *cg, struct zis_ast_node_obj *_node, unsigned int tgt_reg) {
@@ -1456,7 +1505,7 @@ static int emit_Subscript(struct zis_codegen *cg, struct zis_ast_node_obj *_node
                 struct zis_object *key = zis_ast_node_get_field(var.key, Constant, value);
                 if (zis_object_is_smallint(key)) {
                     const zis_smallint_t key_smi = zis_smallint_from_ptr(key);
-                    if (ZIS_INSTR_I9_MIN <= key_smi && key_smi <= ZIS_INSTR_I9_MAX) {
+                    if (ZIS_INSTR_I9_MIN <= key_smi && key_smi <= ZIS_INSTR_I9_MAX && tgt_reg != 0) {
                         zis_assembler_append_AsBC(
                             as, ZIS_OPC_LDELMI,
                             (int32_t)key_smi, tgt_reg, atgt_abs(value_atgt)
@@ -1513,14 +1562,14 @@ static int emit_Call(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsi
     assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Call);
     struct zis_ast_node_Call_data *node_data =
         _zis_ast_node_obj_data_as(node, struct zis_ast_node_Call_data);
-    return emit_call_node(cg, node, tgt_reg, node_data->args, node_data->value);
+    return emit_call_node(cg, node, tgt_reg, node_data->args, zis_object_from(node_data->value));
 }
 
 static int emit_Send(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
-    zis_unused_var(cg), zis_unused_var(node), zis_unused_var(tgt_reg);
     assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Send);
-    error_not_implemented(cg, __func__, node);
-    // TODO: modify `emit_call_node()` to support this node.
+    struct zis_ast_node_Send_data *node_data =
+        _zis_ast_node_obj_data_as(node, struct zis_ast_node_Send_data);
+    return emit_call_node(cg, node, tgt_reg, node_data->args, zis_object_from(node_data->method));
 }
 
 static int emit_Tuple(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
@@ -1530,12 +1579,12 @@ static int emit_Tuple(struct zis_codegen *cg, struct zis_ast_node_obj *node, uns
 
 static int emit_Array(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
     assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Array);
-    return emit_list_like_node(cg, node, tgt_reg, ZIS_OPC_MKTUP);
+    return emit_list_like_node(cg, node, tgt_reg, ZIS_OPC_MKARR);
 }
 
 static int emit_Map(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
     assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Map);
-    return emit_list_like_node(cg, node, tgt_reg, ZIS_OPC_MKTUP);
+    return emit_list_like_node(cg, node, tgt_reg, ZIS_OPC_MKMAP);
 }
 
 static int emit_Import(struct zis_codegen *cg, struct zis_ast_node_obj *_node, unsigned int tgt_reg) {
@@ -1575,7 +1624,7 @@ static int emit_Return(struct zis_codegen *cg, struct zis_ast_node_obj *node, un
     if (value == zis_object_from(codegen_z(cg)->globals->val_nil)) {
         zis_assembler_append_Aw(as, ZIS_OPC_RETNIL, 0);
     } else {
-        assert(zis_object_type(value) == codegen_z(cg)->globals->type_AstNode);
+        assert(zis_object_type_is(value, codegen_z(cg)->globals->type_AstNode));
         struct zis_ast_node_obj *value_node = zis_object_cast(value, struct zis_ast_node_obj);
         unsigned int value_reg;
         if (node_is_constant(value_node)) {
@@ -1600,7 +1649,7 @@ static int emit_Throw(struct zis_codegen *cg, struct zis_ast_node_obj *node, uns
         error_not_implemented(cg, __func__, node);
         // TODO: Throw statement without argument.
     } else {
-        assert(zis_object_type(value) == codegen_z(cg)->globals->type_AstNode);
+        assert(zis_object_type_is(value, codegen_z(cg)->globals->type_AstNode));
         struct zis_ast_node_obj *value_node = zis_object_cast(value, struct zis_ast_node_obj);
         unsigned int value_reg;
         if (node_is_constant(value_node)) {
@@ -1658,9 +1707,9 @@ static int emit_Cond(struct zis_codegen *cg, struct zis_ast_node_obj *_node, uns
     label_end = zis_assembler_alloc_label(as);
     for (size_t i = 0, n = zis_array_obj_length(var.args); i < n ; i += 2) {
         {
-            struct zis_object *x0 = zis_array_obj_get(var.args, i);
+            struct zis_object *x0 = zis_array_obj_get_checked(var.args, i);
             assert(x0);
-            struct zis_object *x1 = zis_array_obj_get(var.args, i + 1);
+            struct zis_object *x1 = zis_array_obj_get_checked(var.args, i + 1);
             if (zis_unlikely(!x1)) {
                 error(
                     cg, var.node, "illegal <%s> node args (%zu): %s",
@@ -1669,7 +1718,7 @@ static int emit_Cond(struct zis_codegen *cg, struct zis_ast_node_obj *_node, uns
             }
             check_obj_is_node(cg, var.node, x0);
             var.branch_cond = zis_object_cast(x0, struct zis_ast_node_obj);
-            if (zis_unlikely(zis_object_type(x1) != codegen_z(cg)->globals->type_Array)) {
+            if (zis_unlikely(!zis_object_type_is(x1, codegen_z(cg)->globals->type_Array))) {
                 error(
                     cg, var.node, "illegal <%s> node args (%zu): %s",
                     zis_ast_node_type_represent(ZIS_AST_NODE_Cond), i + 2, "not an Array"
@@ -1740,10 +1789,10 @@ static int emit_Func(struct zis_codegen *cg, struct zis_ast_node_obj *_node, uns
         error_too_many_args(cg, var.node);
     struct zis_type_obj *type_sym = codegen_z(cg)->globals->type_Symbol;
     for (size_t i = 0; ; i++) {
-        struct zis_object *arg_decl = zis_array_obj_get(var.args, i);
+        struct zis_object *arg_decl = zis_array_obj_get_checked(var.args, i);
         if (!arg_decl)
             break;
-        if (zis_object_type(arg_decl) != type_sym) // TODO: support optional arguments.
+        if (!zis_object_type_is(arg_decl, type_sym)) // TODO: support optional arguments.
             error(cg, var.node, "formal argument is not symbol");
         struct zis_symbol_obj *arg_name = zis_object_cast(arg_decl, struct zis_symbol_obj);
         if (frame_scope_find_var(fs, arg_name)) {

@@ -27,3 +27,5 @@ CMakeFiles/
 
 __pycache__/
 *.py[cdo]
+
+*.el[cn]

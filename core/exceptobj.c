@@ -97,6 +97,126 @@ struct zis_exception_obj *zis_exception_obj_vformat(
     return self;
 }
 
+static void _represent_type_of_obj(
+    struct zis_context *z, struct zis_object *obj,
+    char *restrict buf, size_t buf_sz
+) {
+    struct zis_type_obj *obj_type = zis_object_type_1(obj);
+    if (!obj_type)
+        obj_type = z->globals->type_Int;
+    struct zis_string_obj *represent =
+        zis_context_guess_variable_name(z, zis_object_from(obj_type));
+    if (represent) {
+        const size_t n = zis_string_obj_value(represent, buf, buf_sz - 1);
+        if (n != (size_t)-1) {
+            buf[n] = 0;
+            return;
+        }
+    }
+    assert(buf_sz > 3);
+    memcpy(buf, "??", 3);
+}
+
+struct zis_exception_obj *zis_exception_obj_format_common(
+    struct zis_context *z, int _template, ...
+) {
+    const enum zis_exception_obj_format_common_template template =
+        (enum zis_exception_obj_format_common_template)_template;
+    zis_locals_decl(
+        z, var,
+        struct zis_exception_obj *result;
+        struct zis_object *args[2];
+    );
+    zis_locals_zero(var);
+    va_list ap;
+    va_start(ap, _template);
+
+    switch (template) {
+    case ZIS_EXC_FMT_UNSUPPORTED_OPERATION_UN: {
+        char buffer[1][80];
+        const char *op = va_arg(ap, const char *);
+        _represent_type_of_obj(z, va_arg(ap, struct zis_object *), buffer[0], sizeof buffer[0]);
+        var.result = zis_exception_obj_format(
+            z, "type", NULL, "unsupported operation: %s %s",
+            op, buffer[0]
+        );
+        break;
+    }
+
+    case ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN: {
+        char buffer[2][80];
+        const char *op = va_arg(ap, const char *);
+        var.args[0] = va_arg(ap, struct zis_object *);
+        var.args[1] = va_arg(ap, struct zis_object *);
+        _represent_type_of_obj(z, var.args[0], buffer[0], sizeof buffer[0]);
+        _represent_type_of_obj(z, var.args[1], buffer[1], sizeof buffer[1]);
+        var.result = zis_exception_obj_format(
+            z, "type", NULL, "unsupported operation: %s %s %s",
+            buffer[0], op, buffer[1]
+        );
+        break;
+    }
+
+    case ZIS_EXC_FMT_UNSUPPORTED_OPERATION_SUBS: {
+        char buffer[2][80];
+        const char *op = va_arg(ap, const char *);
+        var.args[0] = va_arg(ap, struct zis_object *);
+        var.args[1] = va_arg(ap, struct zis_object *);
+        _represent_type_of_obj(z, var.args[0], buffer[0], sizeof buffer[0]);
+        _represent_type_of_obj(z, var.args[1], buffer[1], sizeof buffer[1]);
+        var.result = zis_exception_obj_format(
+            z, "type", NULL, "unsupported operation: %s %c %s %s",
+            buffer[0], op[0], buffer[1], op + 1
+        );
+        break;
+    }
+
+    case ZIS_EXC_FMT_WRONG_ARGUMENT_TYPE: {
+        char arg_type_buf[80];
+        const char *arg_name = va_arg(ap, const char *);
+        _represent_type_of_obj(z, va_arg(ap, struct zis_object *), arg_type_buf, sizeof arg_type_buf);
+        var.result = zis_exception_obj_format(
+            z, "type", NULL, "argument %s cannot be %s",
+            arg_name, arg_type_buf
+        );
+        break;
+    }
+
+    case ZIS_EXC_FMT_INDEX_OUT_OF_RANGE:
+        var.args[0] = va_arg(ap, struct zis_object *);
+        var.result = zis_exception_obj_format(z, "key", var.args[0], "index out of range");
+        break;
+
+    case ZIS_EXC_FMT_KEY_NOT_FOUND:
+        var.args[0] = va_arg(ap, struct zis_object *);
+        var.result = zis_exception_obj_format(z, "key", var.args[0], "key not found");
+        break;
+
+    case ZIS_EXC_FMT_NAME_NOT_FOUND: {
+        char buffer[80];
+        const char *what = va_arg(ap, char *);
+        var.args[0] = va_arg(ap, struct zis_object *);
+        assert(zis_object_type_is(zis_object_from(var.args[0]), z->globals->type_Symbol));
+        struct zis_symbol_obj *name_sym = zis_object_cast(var.args[0], struct zis_symbol_obj);
+        if (zis_symbol_obj_data_size(name_sym) <= sizeof buffer) {
+            const size_t n = zis_symbol_obj_data_size(name_sym);
+            memcpy(buffer, zis_symbol_obj_data(name_sym), n);
+            var.result = zis_exception_obj_format(z, "key", var.args[0], "no %s named %.*s", what, (int)n, buffer);
+        } else {
+            var.result = zis_exception_obj_format(z, "key", var.args[0], "no such a %s", what);
+        }
+        break;
+    }
+
+    default:
+        var.result = NULL;
+    }
+
+    va_end(ap);
+    zis_locals_drop(z, var);
+    return var.result;
+}
+
 void zis_exception_obj_stack_trace(
     struct zis_context *z, struct zis_exception_obj *self,
     struct zis_func_obj *func_obj, const void *ip
@@ -119,7 +239,7 @@ void zis_exception_obj_stack_trace(
     var.stack_trace = zis_object_cast(self->_stack_trace, struct zis_array_obj);
     var.func_obj = func_obj;
 
-    if (zis_object_type(self->_stack_trace) != z->globals->type_Array) {
+    if (!zis_object_type_is(self->_stack_trace, z->globals->type_Array)) {
         struct zis_array_obj *x = zis_array_obj_new(z, NULL, 0);
         var.stack_trace = x;
         var.self->_stack_trace = zis_object_from(x);
@@ -135,7 +255,7 @@ void zis_exception_obj_stack_trace(
 size_t zis_exception_obj_stack_trace_length(
     struct zis_context *z, const struct zis_exception_obj *self
 ) {
-    if (zis_object_type(self->_stack_trace) != z->globals->type_Array)
+    if (!zis_object_type_is(self->_stack_trace, z->globals->type_Array))
         return 0;
     const size_t n =
         zis_array_obj_length(zis_object_cast(self->_stack_trace, struct zis_array_obj));
@@ -145,23 +265,24 @@ size_t zis_exception_obj_stack_trace_length(
 
 int zis_exception_obj_walk_stack_trace(
     struct zis_context *z, struct zis_exception_obj *self,
-    int (*fn)(unsigned int index, struct zis_func_obj *func_obj, unsigned int instr_offset, void *arg),
+    int (*fn)(struct zis_context *, unsigned int index, struct zis_func_obj *func_obj, unsigned int instr_offset, void *arg),
     void *fn_arg
 ) {
     const size_t n = zis_exception_obj_stack_trace_length(z, self);
     if (!n)
         return 0;
 
-    assert(zis_object_type(self->_stack_trace) == z->globals->type_Array);
+    assert(zis_object_type_is(self->_stack_trace, z->globals->type_Array));
     zis_locals_decl_1(z, var, struct zis_array_obj *stack_trace);
     var.stack_trace = zis_object_cast(self->_stack_trace, struct zis_array_obj);
 
     int fn_ret = 0;
     for (unsigned int i = 0; i < n; i++) {
         struct zis_object *const *const v = zis_array_obj_data(var.stack_trace);
-        assert(zis_object_type(v[i * 2]) == z->globals->type_Function);
+        assert(zis_object_type_is(v[i * 2], z->globals->type_Function));
         assert(zis_object_is_smallint(v[i * 2 + 1]));
         fn_ret = fn(
+            z,
             i,
             zis_object_cast(v[i * 2], struct zis_func_obj),
             (unsigned int)zis_smallint_from_ptr(v[i * 2 + 1]),
@@ -176,15 +297,31 @@ int zis_exception_obj_walk_stack_trace(
 }
 
 static int _print_stack_trace_fn(
-    unsigned int index, struct zis_func_obj *func_obj, unsigned int instr_offset, void *_arg
+    struct zis_context *z, unsigned int index,
+    struct zis_func_obj *func_obj, unsigned int instr_offset, void *_arg
 ) {
     struct zis_stream_obj *out_stream = _arg;
     zis_unused_var(out_stream);
     char buffer[80];
-    // TODO: print pretty function name and source location.
-    snprintf(buffer, sizeof buffer, " [%u] <Function@%p>+%u\n", index, (void *)func_obj, instr_offset);
-    // TODO: print to the `out_stream`.
+    snprintf(buffer, sizeof buffer, "[%02u] ", index);
     fputs(buffer, stdout);
+    do {
+        struct zis_string_obj *func_name =
+            zis_context_guess_variable_name(z, zis_object_from(func_obj));
+        if (func_name) {
+            size_t n = zis_string_obj_value(func_name, buffer, sizeof buffer - 1);
+            if (n != (size_t)-1) {
+                buffer[n] = 0;
+                break;
+            }
+        }
+        strcpy(buffer, "??");
+    } while (0);
+    fputs(buffer, stdout);
+    snprintf(buffer, sizeof buffer, " (+%u)\n", instr_offset);
+    fputs(buffer, stdout);
+    // TODO: print source location.
+    // TODO: print to the `out_stream`.
     return 0;
 }
 
@@ -201,7 +338,7 @@ int zis_exception_obj_print(
 ) {
     // TODO: print to the `out_stream`.
     fputs("Exception: ", stdout);
-    if (zis_object_type(self->what) == z->globals->type_String) {
+    if (zis_object_type_is(self->what, z->globals->type_String)) {
         char buffer[80];
         buffer[zis_string_obj_value(zis_object_cast(self->what, struct zis_string_obj), buffer, sizeof buffer)] = 0;
         fputs(buffer, stdout);
@@ -215,17 +352,14 @@ int zis_exception_obj_print(
     return 0;
 }
 
-ZIS_NATIVE_NAME_LIST_DEF(
-    Exception_slots,
+static const char *const T_Exception_D_fields[] = {
     "type",
     "what",
     "data",
-    NULL,
-);
+    NULL, // _stack_trace
+};
 
 ZIS_NATIVE_TYPE_DEF_NB(
     Exception, struct zis_exception_obj,
-    ZIS_NATIVE_NAME_LIST_VAR(Exception_slots),
-    NULL,
-    NULL
+    T_Exception_D_fields, NULL, NULL
 );

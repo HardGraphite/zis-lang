@@ -84,6 +84,11 @@ struct zis_ast_node_BitXor_data {
     struct zis_ast_node_obj *rhs;
 };
 
+struct zis_ast_node_Pow_data {
+    struct zis_ast_node_obj *lhs;
+    struct zis_ast_node_obj *rhs;
+};
+
 struct zis_ast_node_Assign_data {
     struct zis_ast_node_obj *lhs;
     struct zis_ast_node_obj *rhs;
@@ -119,6 +124,11 @@ struct zis_ast_node_Ge_data {
     struct zis_ast_node_obj *rhs;
 };
 
+struct zis_ast_node_Cmp_data {
+    struct zis_ast_node_obj *lhs;
+    struct zis_ast_node_obj *rhs;
+};
+
 struct zis_ast_node_And_data {
     struct zis_ast_node_obj *lhs;
     struct zis_ast_node_obj *rhs;
@@ -145,7 +155,6 @@ struct zis_ast_node_Call_data {
 };
 
 struct zis_ast_node_Send_data {
-    struct zis_ast_node_obj *target;
     struct zis_symbol_obj *method;
     struct zis_array_obj *args;
 };
@@ -221,6 +230,7 @@ struct zis_ast_node_Module_data {
     E(BitAnd         , "Node\0lhs\0Node\0rhs\0") \
     E(BitOr          , "Node\0lhs\0Node\0rhs\0") \
     E(BitXor         , "Node\0lhs\0Node\0rhs\0") \
+    E(Pow            , "Node\0lhs\0Node\0rhs\0") \
     E(Assign         , "Node\0lhs\0Node\0rhs\0") \
     E(Eq             , "Node\0lhs\0Node\0rhs\0") \
     E(Ne             , "Node\0lhs\0Node\0rhs\0") \
@@ -228,12 +238,13 @@ struct zis_ast_node_Module_data {
     E(Le             , "Node\0lhs\0Node\0rhs\0") \
     E(Gt             , "Node\0lhs\0Node\0rhs\0") \
     E(Ge             , "Node\0lhs\0Node\0rhs\0") \
+    E(Cmp            , "Node\0lhs\0Node\0rhs\0") \
     E(And            , "Node\0lhs\0Node\0rhs\0") \
     E(Or             , "Node\0lhs\0Node\0rhs\0") \
     E(Subscript      , "Node\0value\0Node\0key\0") \
     E(Field          , "Node\0value\0Symbol\0name\0") \
     E(Call           , "Node\0value\0Array\0args\0") \
-    E(Send           , "Node\0target\0Symbol\0method\0Array\0args\0") \
+    E(Send           , "Symbol\0method\0Array\0args\0") \
     E(Tuple          , "Array\0args\0") \
     E(Array          , "Array\0args\0") \
     E(Map            , "Array\0args\0") \

@@ -7,7 +7,10 @@
 #include "locals.h"
 #include "ndefutil.h"
 #include "objmem.h"
+#include "stack.h"
 
+#include "exceptobj.h"
+#include "stringobj.h"
 #include "symbolobj.h"
 
 /* ----- hashmap bucket node ------------------------------------------------ */
@@ -90,11 +93,9 @@ zis_hashmap_buckets_get_bucket(const zis_hashmap_buckets_obj_t *mb, size_t key_h
 }
 
 struct hashmap_buckets_get_node_locals {
-    union {
-        zis_hashmap_buckets_obj_t *buckets;
-        struct zis_hashmap_bucket_node_obj *node;
-    };
+    zis_hashmap_buckets_obj_t *buckets;
     struct zis_object *key;
+    struct zis_hashmap_bucket_node_obj *node;
 };
 
 /// Find a bucket node by its key.
@@ -103,7 +104,7 @@ static struct zis_hashmap_bucket_node_obj *zis_hashmap_buckets_get_node(
     struct zis_context *z,
     struct hashmap_buckets_get_node_locals *locals, size_t key_hash
 ) {
-    assert(zis_object_type(zis_object_from(locals->buckets)) == z->globals->type_Array_Slots);
+    assert(zis_object_type_is(zis_object_from(locals->buckets), z->globals->type_Array_Slots));
     struct zis_hashmap_bucket_node_obj *node =
         zis_hashmap_buckets_get_bucket(locals->buckets, key_hash);
 
@@ -244,6 +245,49 @@ struct zis_map_obj *zis_map_obj_new(
     return self;
 }
 
+struct _combine_foreach_state {
+    struct zis_context *z;
+    struct zis_map_obj **result_ref;
+};
+
+static int _combine_foreach_fn(struct zis_object *key, struct zis_object *val, void *_state) {
+    struct _combine_foreach_state *restrict const state = _state;
+    if (zis_map_obj_set(state->z, *state->result_ref, key, val) != ZIS_OK)
+        return 1;
+    return 0;
+}
+
+struct zis_map_obj *zis_map_obj_combine(
+    struct zis_context *z,
+    struct zis_map_obj *v[], size_t n
+) {
+    float load_factor = 0.0f;
+    size_t max_elem_cnt = 0;
+
+    for (size_t i = 0; i < n; i++) {
+        struct zis_map_obj *map = v[i];
+        if (map->load_factor > load_factor)
+            load_factor = map->load_factor;
+        max_elem_cnt += zis_map_obj_length(map);
+    }
+
+    zis_locals_decl_1(z, var, struct zis_map_obj *result);
+    zis_locals_zero_1(var, result);
+    var.result = zis_map_obj_new(z, load_factor, max_elem_cnt);
+
+    bool ok = true;
+    struct _combine_foreach_state state = { z, &var.result };
+    for (size_t i = 0; i < n; i++) {
+        if (zis_map_obj_foreach(z, v[i], _combine_foreach_fn, &state)) {
+            ok = false;
+            break;
+        }
+    }
+
+    zis_locals_drop(z, var);
+    return ok ? var.result : NULL;
+}
+
 void zis_map_obj_rehash(
     struct zis_context *z,
     struct zis_map_obj *_self, size_t n_buckets
@@ -305,6 +349,7 @@ int zis_map_obj_get(
     var.self = _self;
     var.l_gn.buckets = _self->_buckets;
     var.l_gn.key = _key;
+    var.l_gn.node = (struct zis_hashmap_bucket_node_obj *)zis_smallint_to_ptr(0);
 
     size_t key_hash;
     if (zis_unlikely(!zis_object_hash(&key_hash, z, var.l_gn.key))) {
@@ -339,6 +384,7 @@ int zis_map_obj_set(
     var.self = _self;
     var.l_gn.buckets = _self->_buckets;
     var.l_gn.key = _key;
+    var.l_gn.node = (struct zis_hashmap_bucket_node_obj *)zis_smallint_to_ptr(0);
     var.l_nn.key = _key;
     var.l_nn.value = _value;
 
@@ -455,9 +501,250 @@ break_loop:
     return fn_ret;
 }
 
+struct _reverse_lookup_state {
+    struct zis_context *z;
+    struct zis_object *value;
+    struct zis_object *found_key;
+};
+
+static int _reverse_lookup_fn(struct zis_object *_key, struct zis_object *_val, void *_arg) {
+    struct _reverse_lookup_state *const state = _arg;
+    if (_val == state->value) {
+        state->found_key = _key;
+        return 1;
+    }
+    return 0;
+}
+
+struct zis_object *zis_map_obj_reverse_lookup(
+    struct zis_context *z, struct zis_map_obj *self,
+    struct zis_object *value
+) {
+    struct _reverse_lookup_state state = { .z = z, .value = value, .found_key = NULL };
+    if (zis_map_obj_foreach(z, self, _reverse_lookup_fn, &state))
+        return state.found_key;
+    return NULL;
+}
+
+#define assert_arg1_Map(__z) \
+    (assert(zis_object_type_is((__z)->callstack->frame[1], (__z)->globals->type_Map)))
+
+ZIS_NATIVE_FUNC_DEF(T_Map_M_operator_or, z, {2, 0, 2}) {
+    /*#DOCSTR# func Map:\'|'(other :: Map) :: Map
+    Combines two maps. */
+    assert_arg1_Map(z);
+    struct zis_object **frame = z->callstack->frame;
+    if (!zis_object_type_is(frame[2], z->globals->type_Map)) {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN,
+            "|", frame[1], frame[2]
+        ));
+        return ZIS_THR;
+    }
+    struct zis_map_obj *result =
+        zis_map_obj_combine(z, (struct zis_map_obj **)(frame + 1), 2);
+    if (!result)
+        return ZIS_THR;
+    frame[0] = zis_object_from(result);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Map_M_operator_get_elem, z, {2, 0, 2}) {
+    /*#DOCSTR# func Map:\'[]'(key :: Any) :: Any
+    Gets the value mapped to the given key. */
+    assert_arg1_Map(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_map_obj *self = zis_object_cast(frame[1], struct zis_map_obj);
+    const int status = zis_map_obj_get(z, self, frame[2], frame);
+    if (status == ZIS_OK || status == ZIS_THR)
+        return status;
+    frame[0] = zis_object_from(zis_exception_obj_format_common(
+        z, ZIS_EXC_FMT_KEY_NOT_FOUND, frame[2]
+    ));
+    return ZIS_THR;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Map_M_operator_set_elem, z, {3, 0, 3}) {
+    /*#DOCSTR# func Map:\'[]='(key :: Any, value :: Any)
+    Add or update value mapped to a key. */
+    assert_arg1_Map(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_map_obj *self = zis_object_cast(frame[1], struct zis_map_obj);
+    const int status = zis_map_obj_set(z, self, frame[2], frame[3]);
+    if (zis_unlikely(status == ZIS_THR))
+        return ZIS_THR;
+    frame[0] = zis_object_from(z->globals->val_nil);
+    return ZIS_OK;
+}
+
+struct _op_equ_foreach_state {
+    struct zis_context *z;
+    struct zis_object **temp_regs; // [2]
+};
+
+static int _op_equ_foreach_fn(struct zis_object *key, struct zis_object *_val, void *_state) {
+    struct _op_equ_foreach_state *restrict state = _state;
+    struct zis_context *z = state->z;
+    struct zis_object **frame = z->callstack->frame;
+    assert_arg1_Map(z);
+    state->temp_regs[0] = _val;
+    if (zis_map_obj_get(z, zis_object_cast(frame[1], struct zis_map_obj), key, &state->temp_regs[1]) != ZIS_OK)
+        return 1;
+    if (!zis_object_equals(z, state->temp_regs[0], state->temp_regs[1]))
+        return 2;
+    return 0;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Map_M_operator_equ, z, {2, 0, 4}) {
+    /*#DOCSTR# func Map:\'=='(other :: Map) :: Bool
+    Operator ==. */
+    assert_arg1_Map(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+
+    bool equals;
+    if (zis_unlikely(!zis_object_type_is(frame[2], g->type_Map))) {
+        equals = false;
+    } else if (
+        zis_map_obj_length(zis_object_cast(frame[1], struct zis_map_obj)) !=
+        zis_map_obj_length(zis_object_cast(frame[2], struct zis_map_obj))
+    ) {
+        equals = false;
+    } else {
+        struct _op_equ_foreach_state state = { z, frame + 3 };
+        const int status = zis_map_obj_foreach(
+            z, zis_object_cast(frame[2], struct zis_map_obj),
+            _op_equ_foreach_fn, &state
+        );
+        equals = status == 0;
+    }
+
+    frame[0] = zis_object_from(equals ? g->val_true : g->val_false);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Map_M_length, z, {1, 0, 1}) {
+    /*#DOCSTR# func Map:length() :: Int
+    Returns the number of key-value pairs. */
+    assert_arg1_Map(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_map_obj *self = zis_object_cast(frame[1], struct zis_map_obj);
+    const size_t len = zis_map_obj_length(self);
+    assert(len <= ZIS_SMALLINT_MAX);
+    frame[0] = zis_smallint_to_ptr((zis_smallint_t)(zis_smallint_unsigned_t)len);
+    return ZIS_OK;
+}
+
+struct _to_str_foreach_state {
+    struct zis_context *z;
+    struct zis_string_obj **str_obj_p;
+    struct zis_object **temp_regs; // [2]
+    bool is_first;
+};
+
+static int _to_str_foreach_fn(struct zis_object *key, struct zis_object *val, void *_state) {
+    struct _to_str_foreach_state *restrict state = _state;
+    struct zis_context *z = state->z;
+    state->temp_regs[0] = key, state->temp_regs[1] = val;
+    if (state->is_first)
+        state->is_first = false;
+    else
+        *state->str_obj_p = zis_string_obj_concat(z, *state->str_obj_p, zis_string_obj_new(z, ", ", 2));
+    *state->str_obj_p = zis_string_obj_concat(z, *state->str_obj_p, zis_object_to_string(z, state->temp_regs[0], true, NULL));
+    *state->str_obj_p = zis_string_obj_concat(z, *state->str_obj_p, zis_string_obj_new(z, " -> ", 4));
+    *state->str_obj_p = zis_string_obj_concat(z, *state->str_obj_p, zis_object_to_string(z, state->temp_regs[1], true, NULL));
+
+    return 0;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Map_M_to_string, z, {1, 1, 4}) {
+    /*#DOCSTR# func Map:to_string(?fmt) :: String
+    Returns a string representation. */
+    assert_arg1_Map(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct _to_str_foreach_state state = {
+        z, (struct zis_string_obj **)(frame + 2), frame + 3, true
+    };
+    *state.str_obj_p = zis_string_obj_new(z, "{", 1);
+    zis_map_obj_foreach(
+        z, zis_object_cast(frame[1], struct zis_map_obj),
+        _to_str_foreach_fn, &state
+    );
+    *state.str_obj_p = zis_string_obj_concat(z, *state.str_obj_p, zis_string_obj_new(z, "}" , 1));
+    frame[0] = zis_object_from(*state.str_obj_p);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Map_M_get, z, {2, 1, 3}) {
+    /*#DOCSTR# func Map:get(key, :: Any, ?default_value :: Any) :: Any
+    Gets the value mapped to the given key. Returns the `default_value` if the
+    key does not exist. */
+    assert_arg1_Map(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_map_obj *self = zis_object_cast(frame[1], struct zis_map_obj);
+    const int status = zis_map_obj_get(z, self, frame[2], frame);
+    if (status == ZIS_OK || status == ZIS_THR)
+        return status;
+    frame[0] = frame[3]; // default_value
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Map_M_contains, z, {2, 0, 2}) {
+    /*#DOCSTR# func Map:get(key, :: Any) :: Bool
+    Checks whether the given key exists. */
+    assert_arg1_Map(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_map_obj *self = zis_object_cast(frame[1], struct zis_map_obj);
+    const int status = zis_map_obj_get(z, self, frame[2], frame);
+    if (status == ZIS_THR)
+        return ZIS_THR;
+    frame[0] = zis_object_from(status == ZIS_OK ? g->val_true : g->val_false);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Map_M_remove, z, {2, 0, 2}) {
+    /*#DOCSTR# func Map:remove(key :: Any) :: Bool
+    Deletes a key-value pair and returns whether succeeded. */
+    assert_arg1_Map(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_map_obj *self = zis_object_cast(frame[1], struct zis_map_obj);
+    const int status = zis_map_obj_unset(z, self, frame[2]);
+    if (status == ZIS_THR)
+        return ZIS_THR;
+    frame[0] = zis_object_from(status == ZIS_OK ? g->val_true : g->val_false);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Map_M_clear, z, {1, 0, 1}) {
+    /*#DOCSTR# func Map:clear()
+    Deletes all elements. */
+    assert_arg1_Map(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_map_obj *self = zis_object_cast(frame[1], struct zis_map_obj);
+    zis_map_obj_clear(self);
+    frame[0] = zis_object_from(z->globals->val_nil);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF_LIST(
+    T_Map_D_methods,
+    { "|"           , &T_Map_M_operator_or       },
+    { "[]"          , &T_Map_M_operator_get_elem },
+    { "[]="         , &T_Map_M_operator_set_elem },
+    { "=="          , &T_Map_M_operator_equ      },
+    { "length"      , &T_Map_M_length            },
+    { "to_string"   , &T_Map_M_to_string         },
+    { "get"         , &T_Map_M_get               },
+    { "contains"    , &T_Map_M_contains          },
+    { "remove"      , &T_Map_M_remove            },
+    { "clear"       , &T_Map_M_clear             },
+);
+
 ZIS_NATIVE_TYPE_DEF(
     Map,
     struct zis_map_obj,
     node_count,
-    NULL, NULL, NULL
+    NULL, T_Map_D_methods, NULL
 );

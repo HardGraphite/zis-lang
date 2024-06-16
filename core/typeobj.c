@@ -6,10 +6,13 @@
 #include "locals.h"
 #include "ndefutil.h"
 #include "objmem.h"
+#include "stack.h"
 
 #include "arrayobj.h"
+#include "exceptobj.h"
 #include "funcobj.h"
 #include "mapobj.h"
+#include "stringobj.h"
 #include "symbolobj.h"
 
 /// Allocate but do not initialize.
@@ -79,12 +82,20 @@ struct zis_type_obj *zis_type_obj_new(struct zis_context *z) {
     return self;
 }
 
-zis_noinline static size_t _func_def_arr_len(const struct zis_native_func_def *arr) {
+zis_noinline static size_t _named_func_def_arr_len(const struct zis_native_func_def__named_ref *restrict arr) {
     if (!arr)
         return 0;
-    size_t n = 0;
-    for (const struct zis_native_func_def *p = arr; p->code; p++, n++);
-    return n;
+    const struct zis_native_func_def__named_ref *end_p;
+    for (end_p = arr; end_p->def; end_p++);
+    return (size_t)(end_p - arr);
+}
+
+zis_noinline static size_t _named_var_def_arr_len(const struct zis_native_value_def__named *restrict arr) {
+    if (!arr)
+        return 0;
+    const struct zis_native_value_def__named *end_p;
+    for (end_p = arr; end_p->name; end_p++);
+    return (size_t)(end_p - arr);
 }
 
 void zis_type_obj_load_native_def(
@@ -99,8 +110,8 @@ void zis_type_obj_load_native_def(
     assert(_self->_methods == z->globals->val_empty_array_slots);
 
     const size_t field_count = def->fields ? def->slots_num : 0;
-    const size_t method_count = _func_def_arr_len(def->methods);
-    const size_t static_count = _func_def_arr_len(def->statics);
+    const size_t method_count = _named_func_def_arr_len(def->methods);
+    const size_t static_count = _named_var_def_arr_len(def->statics);
     const size_t name_map_reserve = field_count + method_count;
 
     zis_locals_decl(
@@ -115,8 +126,6 @@ void zis_type_obj_load_native_def(
 
     if (name_map_reserve)
         zis_map_obj_reserve(z, var.self->_name_map, name_map_reserve);
-
-    // ~~ tmp_regs[0] = self, tmp_regs[1] = name_map / statics_map, tmp_regs[2] = method_table ~~
 
     if (field_count) {
         const char *const *const fields = def->fields;
@@ -136,7 +145,7 @@ void zis_type_obj_load_native_def(
     }
 
     if (method_count) {
-        const struct zis_native_func_def *const methods = def->methods;
+        const struct zis_native_func_def__named_ref *const methods = def->methods;
         assert(methods);
 
         var.name_map = var.self->_name_map;
@@ -145,12 +154,13 @@ void zis_type_obj_load_native_def(
         zis_object_write_barrier(var.self, var.method_table);
 
         for (size_t i = 0; i < method_count; i++) {
-            const struct zis_native_func_def *const func_def = &methods[i];
+            const char *const func_name = methods[i].name;
+            const struct zis_native_func_def *const func_def = methods[i].def;
             struct zis_func_obj_meta func_obj_meta;
             if (zis_unlikely(!zis_func_obj_meta_conv(&func_obj_meta, func_def->meta))) {
                 zis_debug_log(
                     ERROR, "Loader",
-                    "(struct zis_native_func_meta){ .na=%u, .no=%u, .nl=%u }: `.nl' is too big",
+                    "(struct zis_native_func_meta){ .na=%u, .no=%u, .nl=%u }: illegal",
                     func_def->meta.na, func_def->meta.no, func_def->meta.nl
                 );
                 continue;
@@ -159,37 +169,28 @@ void zis_type_obj_load_native_def(
                 var.method_table, i,
                 zis_object_from(zis_func_obj_new_native(z, func_obj_meta, func_def->code))
             );
-            if (func_def->name) {
+            if (func_name) {
                 assert(i <= ZIS_SMALLINT_MAX);
                 struct zis_object *idx = zis_smallint_to_ptr(-1 - (zis_smallint_t)i);
-                struct zis_symbol_obj *sym = zis_symbol_registry_get(z, func_def->name, (size_t)-1);
+                struct zis_symbol_obj *sym = zis_symbol_registry_get(z, func_name, (size_t)-1);
                 zis_map_obj_sym_set(z, var.name_map, sym, idx);
             }
         }
     }
 
     if (static_count) {
-        const struct zis_native_func_def *const statics = def->statics;
+        const struct zis_native_value_def__named *const statics = def->statics;
         assert(statics);
 
         var.statics_map = var.self->_statics;
 
         for (size_t i = 0; i < static_count; i++) {
-            const struct zis_native_func_def *const func_def = &statics[i];
-            if (!func_def->name)
+            const struct zis_native_value_def__named *const var_def = &statics[i];
+            if (zis_unlikely(zis_make_value(z, 0, &var_def->value) != ZIS_OK))
                 continue;
-            struct zis_func_obj_meta func_obj_meta;
-            if (zis_unlikely(!zis_func_obj_meta_conv(&func_obj_meta, func_def->meta))) {
-                zis_debug_log(
-                    ERROR, "Loader",
-                    "(struct zis_native_func_meta){ .na=%u, .no=%u, .nl=%u }: `.nl' is too big",
-                    func_def->meta.na, func_def->meta.no, func_def->meta.nl
-                );
-                continue;
-            }
-            struct zis_func_obj *func = zis_func_obj_new_native(z, func_obj_meta, func_def->code);
-            struct zis_symbol_obj *sym = zis_symbol_registry_get(z, func_def->name, (size_t)-1);
-            zis_map_obj_sym_set(z, var.statics_map, sym, zis_object_from(func));
+            struct zis_symbol_obj *sym = zis_symbol_registry_get(z, var_def->name, (size_t)-1);
+            struct zis_object *value = zis_context_get_reg0(z);
+            zis_map_obj_sym_set(z, var.statics_map, sym, value);
         }
     }
 
@@ -200,7 +201,7 @@ size_t zis_type_obj_find_field(
     const struct zis_type_obj *self,
     struct zis_symbol_obj *name
 ) {
-    struct zis_object *const x = zis_map_obj_sym_get(self->_statics, name);
+    struct zis_object *const x = zis_map_obj_sym_get(self->_name_map, name);
     if (zis_unlikely(!x))
         return (size_t)-1;
     assert(zis_object_is_smallint(x));
@@ -214,7 +215,7 @@ size_t zis_type_obj_find_method(
     const struct zis_type_obj *self,
     struct zis_symbol_obj *name
 ) {
-    struct zis_object *const x = zis_map_obj_sym_get(self->_statics, name);
+    struct zis_object *const x = zis_map_obj_sym_get(self->_name_map, name);
     if (zis_unlikely(!x))
         return (size_t)-1;
     assert(zis_object_is_smallint(x));
@@ -237,7 +238,7 @@ struct zis_object *zis_type_obj_get_method(
 ) {
     // See `zis_type_obj_get_method_i()` and `zis_type_obj_find_method()`.
 
-    struct zis_object *const x = zis_map_obj_sym_get(self->_statics, name);
+    struct zis_object *const x = zis_map_obj_sym_get(self->_name_map, name);
     if (zis_unlikely(!x))
         return NULL;
     assert(zis_object_is_smallint(x));
@@ -261,18 +262,87 @@ void zis_type_obj_set_static(
     zis_map_obj_sym_set(z, self->_statics, name, value);
 }
 
-ZIS_NATIVE_FUNC_LIST_DEF(
-    type_methods,
+#define assert_arg1_Type(__z) \
+    (assert(zis_object_type_is((__z)->callstack->frame[1], (__z)->globals->type_Type)))
+
+ZIS_NATIVE_FUNC_DEF(T_Type_M_operator_equ, z, {2, 0, 2}) {
+    /*#DOCSTR# func Type:\'=='(other :: Type) :: Bool
+    Operator ==. */
+    assert_arg1_Type(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+    const bool result = frame[1] == frame[2];
+    frame[0] = zis_object_from(result ? g->val_true : g->val_false);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Type_M_operator_get_fld, z, {2, 0, 2}) {
+    /*#DOCSTR# func Type:\'.'(name :: Symbol) :: Any
+    Gets static variables. */
+    assert_arg1_Type(z);
+    struct zis_object **frame = z->callstack->frame;
+    if (zis_unlikely(!zis_object_type_is(frame[2], z->globals->type_Symbol))) {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN, ".", frame[1], frame[2]
+        ));
+        return ZIS_THR;
+    }
+    struct zis_type_obj *const self = zis_object_cast(frame[1], struct zis_type_obj);
+    struct zis_symbol_obj *const name = zis_object_cast(frame[2], struct zis_symbol_obj);
+    struct zis_object *const val = zis_type_obj_get_static(self, name);
+    if (zis_unlikely(!val)){
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_NAME_NOT_FOUND, "field", frame[2]
+        ));
+        return ZIS_THR;
+    }
+    frame[0] = val;
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Type_M_operator_set_fld, z, {3, 0, 3}) {
+    /*#DOCSTR# func Type:\'.='(name :: Symbol, value :: Any) :: Any
+    Updates static variables. */
+    assert_arg1_Type(z);
+    struct zis_object **frame = z->callstack->frame;
+    if (zis_unlikely(!zis_object_type_is(frame[2], z->globals->type_Symbol))) {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_UNSUPPORTED_OPERATION_BIN, ".=", frame[1], frame[2]
+        ));
+        return ZIS_THR;
+    }
+    struct zis_type_obj *const self = zis_object_cast(frame[1], struct zis_type_obj);
+    struct zis_symbol_obj *const name = zis_object_cast(frame[2], struct zis_symbol_obj);
+    zis_type_obj_set_static(z, self, name, frame[3]);
+    frame[0] = frame[3];
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Type_F_of, z, {1, 0, 1}) {
+    /*#DOCSTR# func Type.of(x) :: Type
+    Gets the type of an object. */
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_type_obj *type = zis_object_type_1(frame[1]);
+    if (!type)
+        type = z->globals->type_Int;
+    frame[0] = zis_object_from(type);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF_LIST(
+    T_Type_D_methods,
+    { "=="          , &T_Type_M_operator_equ     },
+    { "."           , &T_Type_M_operator_get_fld },
+    { ".="          , &T_Type_M_operator_set_fld },
 );
 
-ZIS_NATIVE_FUNC_LIST_DEF(
-    type_statics,
+ZIS_NATIVE_VAR_DEF_LIST(
+    T_Type_D_statics,
+    { "of"          , { '^', .F = &T_Type_F_of  }},
 );
 
 ZIS_NATIVE_TYPE_DEF(
     Type,
     struct zis_type_obj, _slots_num,
-    NULL,
-    ZIS_NATIVE_FUNC_LIST_VAR(type_methods),
-    ZIS_NATIVE_FUNC_LIST_VAR(type_statics)
+    NULL, T_Type_D_methods, T_Type_D_statics
 );

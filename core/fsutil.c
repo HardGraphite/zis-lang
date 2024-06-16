@@ -523,7 +523,7 @@ zis_file_handle_t zis_file_stdio(int file_std_xxx) {
     static_assert((DWORD)(-ZIS_FILE_STDERR - 10) ==  STD_ERROR_HANDLE, "");
 
     HANDLE h = GetStdHandle((DWORD)(-file_std_xxx - 10));
-    if (h = INVALID_HANDLE_VALUE)
+    if (h == INVALID_HANDLE_VALUE)
         return NULL;
     return (void *)h;
 

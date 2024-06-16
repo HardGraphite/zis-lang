@@ -28,6 +28,12 @@ size_t zis_hash_pointer(const void *ptr);
 /// Calculate hash code for bytes or a string.
 size_t zis_hash_bytes(const void *data, size_t size);
 
+/// Combine hash code values.
+void zis_hash_combine(size_t *restrict hash_code, size_t new_hash_code);
+
+/// Truncate `hash_code` to fit the `zis_smallint_t` type.
+size_t zis_hash_truncate(size_t hash_code);
+
 /* ----- others ------------------------------------------------------------- */
 
 /// Unreachable statement.

@@ -1,6 +1,7 @@
 #include "debug.h"
 
 #include <assert.h>
+#include <stdlib.h>
 
 #include "platform.h"
 #include "strutil.h"
@@ -34,6 +35,7 @@ void zis_debug_time(struct timespec *tp) {
 static FILE *logging_stream = NULL;
 static char logging_group[32] = { 0 };
 static enum zis_debug_log_level logging_level = ZIS_DEBUG_LOG_WARN;
+static bool logging_colorful = false;
 
 static const char *const logging_level_name[] = {
     [ZIS_DEBUG_LOG_FATAL] = "Fatal",
@@ -42,6 +44,15 @@ static const char *const logging_level_name[] = {
     [ZIS_DEBUG_LOG_INFO ] = "Info" ,
     [ZIS_DEBUG_LOG_TRACE] = "Trace",
     [ZIS_DEBUG_LOG_DUMP ] = "Dump" ,
+};
+
+static const char *const logging_color_by_level[] = {
+    [ZIS_DEBUG_LOG_FATAL] = "\033[1;31m", // red
+    [ZIS_DEBUG_LOG_ERROR] = "\033[1;31m", // red
+    [ZIS_DEBUG_LOG_WARN ] = "\033[1;33m", // yellow
+    [ZIS_DEBUG_LOG_INFO ] = "\033[1;34m", // blue
+    [ZIS_DEBUG_LOG_TRACE] = "\033[1;36m", // cyan
+    [ZIS_DEBUG_LOG_DUMP ] = "\033[1;32m", // green
 };
 
 #define logging_level_count (sizeof logging_level_name / sizeof logging_level_name[0])
@@ -69,6 +80,7 @@ zis_unused_fn static void logging_parse_config(const char *conf_str) {
     zis_unused_var(file_ch);
     assert(file_ch == file_name[0]);
     logging_stream = fopen(file_name, "w");
+    logging_colorful = false;
 }
 
 static void logging_fini(void) {
@@ -84,6 +96,7 @@ static void logging_init(void) {
         return;
 
     logging_stream = stderr;
+    logging_colorful = true;
 
 #ifdef ZIS_ENVIRON_NAME_DEBUG_LOG
     const char *config_string = getenv(ZIS_ENVIRON_NAME_DEBUG_LOG);
@@ -122,9 +135,14 @@ zis_noinline static void logging_print(
     const char *group, const char *message, int msg_len
 ) {
     fprintf(
-        logging_stream, "[T%.03ju.%.03u|" ZIS_DISPLAY_NAME "|%-5s|%-6s] %.*s\n",
+        logging_stream, "%s[T%.03ju.%.03u|" ZIS_DISPLAY_NAME "|%-5s|%-6s]%s %.*s%s\n",
+        logging_colorful && (size_t)level < logging_level_count ?
+            logging_color_by_level[(size_t)level] : "",
         timestamp / 1000, (unsigned int)(timestamp % 1000),
-        logging_level_name[(size_t)level], group, msg_len, message
+        logging_level_name[(size_t)level], group,
+        logging_colorful ? "\033[0m\033[1m" : "",
+        msg_len, message,
+        logging_colorful ? "\033[0m" : ""
     );
 }
 

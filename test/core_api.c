@@ -434,7 +434,7 @@ static void do_test_make_values__basic(zis_t z) {
 
         zis_make_int(z, 0, 4);
         status = zis_load_element(z, reg, 0, 0);
-        zis_test_assert_eq(status, ZIS_E_ARG); // out of range
+        zis_test_assert_eq(status, ZIS_THR); // out of range
     }
 
     {
@@ -449,7 +449,7 @@ static void do_test_make_values__basic(zis_t z) {
 
         zis_make_int(z, 0, 2);
         status = zis_load_element(z, reg, 0, 0);
-        zis_test_assert_eq(status, ZIS_E_ARG); // out of range
+        zis_test_assert_eq(status, ZIS_THR); // out of range
     }
 
     {
@@ -468,7 +468,7 @@ static void do_test_make_values__basic(zis_t z) {
 
         zis_make_int(z, 0, -1);
         status = zis_load_element(z, reg, 0, 0);
-        zis_test_assert_eq(status, ZIS_E_ARG); // key not found
+        zis_test_assert_eq(status, ZIS_THR); // key not found
     }
 
     v_size = sizeof v_str;
@@ -587,7 +587,7 @@ zis_test_define(test_read_values, z) {
 
 // zis-api-code //
 
-static int F_add_int(zis_t z) {
+ZIS_NATIVE_FUNC_DEF(F_add_int, z, { 2, 0, 3 }) {
     int64_t lhs, rhs;
     if (zis_read_values(z, 1, "ii", &lhs, &rhs) != 2) {
         zis_make_exception(z, 0, "type", (unsigned int)-1, "wrong argument types");
@@ -624,13 +624,9 @@ static void do_test_function__check_exception(zis_t z, unsigned reg, const char 
 static void do_test_function__F_add_int(zis_t z) {
     int status;
     int64_t v_i64;
-    struct zis_native_func_def func_def;
 
     // make function
-    func_def.name = NULL;
-    func_def.meta = (struct zis_native_func_meta){ 2, 0, 0 };
-    func_def.code = F_add_int;
-    status = zis_make_function(z, 1, &func_def, (unsigned int)-1);
+    status = zis_make_function(z, 1, &F_add_int, (unsigned int)-1);
     zis_test_assert_eq(status, ZIS_OK);
 
     // call
@@ -691,16 +687,15 @@ zis_test_define(test_type, z) {
     const char *const type_fields[] = {
         "foo",
     };
-    const struct zis_native_func_def type_methods[] = {
-        { "add_int", { 2, 0, 3 }, F_add_int },
-        { NULL, {0}, NULL },
+    const struct zis_native_func_def__named_ref type_methods[] = {
+        { "add_int", &F_add_int },
+        { NULL, NULL },
     };
-    const struct zis_native_func_def type_statics[] = {
-        { "add_int", { 2, 0, 3 }, F_add_int },
-        { NULL, {0}, NULL },
+    const struct zis_native_value_def__named type_statics[] = {
+        { "add_int", { .type ='^', .F = &F_add_int } },
+        { NULL, { .type = 0, .n = NULL } },
     };
     const struct zis_native_type_def type_def = {
-        NULL,
         1,
         0,
         type_fields,
@@ -718,18 +713,19 @@ zis_test_define(test_module, z) {
     int status;
 
     // Create a module.
-    const struct zis_native_func_def mod_funcs[] = {
-        { "add_int", { 2, 0, 3 }, F_add_int },
-        { NULL, {0}, NULL },
+    const struct zis_native_func_def__named_ref mod_funcs[] = {
+        { "add_int", &F_add_int },
+        { NULL, NULL },
     };
-    const struct zis_native_type_def mod_types[] = {
-        { "some_type", 0, 0, NULL, NULL, NULL },
-        { NULL, 0, 0, NULL, NULL, NULL },
+    const struct zis_native_type_def some_type = { 0, 0, NULL, NULL, NULL };
+    const struct zis_native_type_def__named_ref mod_types[] = {
+        { "some_type", &some_type },
+        { NULL, NULL },
     };
     const struct zis_native_module_def mod_def = {
-        .name = NULL,
         .functions = mod_funcs,
         .types = mod_types,
+        .variables = NULL,
     };
     status = zis_make_module(z, 1, &mod_def);
     zis_test_assert_eq(status, ZIS_OK);
@@ -742,7 +738,7 @@ zis_test_define(test_module, z) {
 
     // Set and get variables.
     status = zis_load_field(z, 1, "num", (size_t)-1, 0);
-    zis_test_assert_eq(status, ZIS_E_ARG);
+    zis_test_assert_eq(status, ZIS_THR);
     for (int64_t i = 100; i < 110; i++) {
         int64_t v_i64;
         zis_make_int(z, 0, i);
@@ -758,13 +754,13 @@ zis_test_define(test_module, z) {
 
 // zis-api-variables //
 
-static int F_test_load_store_global(zis_t z) {
+ZIS_NATIVE_FUNC_DEF(F_test_load_store_global, z, {0, 0, 10}) {
     int status;
     int64_t v_i64;
     const char *var_name = "__test_load_store_global__var";
 
     status = zis_load_global(z, 1, var_name, (size_t)-1);
-    zis_test_assert_eq(status, ZIS_E_ARG);
+    zis_test_assert_eq(status, ZIS_THR);
 
     for (int i = 0; i < 10; i++) {
         zis_make_int(z, 1, i);
@@ -785,7 +781,7 @@ static int F_test_load_store_global(zis_t z) {
 zis_test_define(test_load_store_global, z) {
     zis_make_function(
         z, 0,
-        &(struct zis_native_func_def){NULL, {0, 0, 10}, F_test_load_store_global},
+        &F_test_load_store_global,
         (unsigned int)-1
     );
     zis_invoke(z, (unsigned[]){0, 0}, 0);
@@ -812,7 +808,7 @@ static void do_test_load_element__array_and_tuple(zis_t z) {
                 zis_test_assert_eq(status, ZIS_OK);
                 zis_test_assert_eq(v_double, in[jx - 1]);
             } else {
-                zis_test_assert_eq(status, ZIS_E_ARG); // out of range
+                zis_test_assert_eq(status, ZIS_THR); // out of range
             }
         }
     }
@@ -837,7 +833,7 @@ static void do_test_load_element__map(zis_t z) {
             zis_test_assert_eq(status, ZIS_OK);
             zis_test_assert_eq(v_double, in[i]);
         } else {
-            zis_test_assert_eq(status, ZIS_E_ARG);
+            zis_test_assert_eq(status, ZIS_THR);
         }
     }
 }
@@ -850,7 +846,7 @@ static void do_test_load_element__bad_type(zis_t z) {
     status = zis_make_int(z, 0, 1);
     zis_test_assert_eq(status, ZIS_OK);
     status = zis_load_element(z, 1, 0, 0);
-    zis_test_assert_eq(status, ZIS_E_TYPE);
+    zis_test_assert_eq(status, ZIS_THR);
 }
 
 zis_test_define(test_load_element, z) {
@@ -873,7 +869,7 @@ static void do_test_store_element__array_and_tuple(zis_t z) {
             status = zis_make_float(z, 3, in[j > 3 ? 0 : j - 1]);
             zis_test_assert_eq(status, ZIS_OK);
             status = zis_store_element(z, i, 0, 3);
-            zis_test_assert_eq(status, i == 1 ? ZIS_E_TYPE : j > 3 ? ZIS_E_ARG : ZIS_OK);
+            zis_test_assert_eq(status, i == 2 && j <= 3 ? ZIS_OK : ZIS_THR);
         }
     }
     {
@@ -928,7 +924,7 @@ static void do_test_store_element__bad_type(zis_t z) {
     status = zis_make_int(z, 0, 1);
     zis_test_assert_eq(status, ZIS_OK);
     status = zis_store_element(z, 1, 0, 0);
-    zis_test_assert_eq(status, ZIS_E_TYPE);
+    zis_test_assert_eq(status, ZIS_THR);
 }
 
 zis_test_define(test_store_element, z) {
@@ -963,7 +959,7 @@ static void do_test_insert_element__array(zis_t z) {
         );
         status = zis_insert_element(z, 1, 2, 3);
         if (!c->ins_val) {
-            zis_test_assert_eq(status, ZIS_E_ARG);
+            zis_test_assert_eq(status, ZIS_THR);
             continue;
         }
         zis_test_assert_eq(status, ZIS_OK);
@@ -990,9 +986,9 @@ static void do_test_remove_element__array(zis_t z) {
         { { 1, 5, 2 }, -2, ZIS_OK },
         { { 1, 2, 5 }, 3, ZIS_OK },
         { { 1, 2, 5 }, -1, ZIS_OK },
-        { { 1, 2, 3 }, 0, ZIS_E_ARG },
-        { { 1, 2, 3 }, 4, ZIS_E_ARG },
-        { { 1, 2, 3 }, -4, ZIS_E_ARG },
+        { { 1, 2, 3 }, 0, ZIS_THR },
+        { { 1, 2, 3 }, 4, ZIS_THR },
+        { { 1, 2, 3 }, -4, ZIS_THR },
     };
     for (size_t i = 0; i < sizeof cases / sizeof cases[0]; i++) {
         int status;
@@ -1051,7 +1047,7 @@ static void do_test_remove_element__map(zis_t z) {
             zis_test_assert_eq(status, ZIS_OK);
             zis_test_assert_eq(v, -i);
         } else {
-            zis_test_assert_eq(status, ZIS_E_ARG);
+            zis_test_assert_eq(status, ZIS_THR);
         }
     }
 }

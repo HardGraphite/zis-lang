@@ -3,9 +3,11 @@
 #pragma once
 
 #include <assert.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h> // uintptr_t
 
+#include "attributes.h"
 #include "platform.h"
 #include "smallint.h"
 
@@ -169,9 +171,25 @@ struct zis_object {
 #define zis_object_cast(obj_ptr, type) \
     ((type *)(obj_ptr))
 
-/// Get type of an object.
+/// Get type of an object. The `obj` must not be a small integer.
 #define zis_object_type(obj) \
     (assert(!zis_object_is_smallint(obj)), zis_object_meta_get_type_ptr((obj)->_meta))
+
+/// Get type of an object. The `obj` can be a small integer, in which case NULL is returned.
+/// @warning This function may return NULL!
+/// @note `zis_object_type()` should be used instead if `obj` is definitely not a small integer.
+zis_static_force_inline struct zis_type_obj *zis_object_type_1(struct zis_object *obj) {
+    if (zis_unlikely(zis_object_is_smallint(obj)))
+        return NULL;
+    return zis_object_type(obj);
+}
+
+/// Check the type of an object. The `obj` can be a small integer, in which case always returns false.
+zis_static_force_inline bool zis_object_type_is(struct zis_object *obj, struct zis_type_obj *type) {
+    if (zis_unlikely(zis_object_is_smallint(obj)))
+        return false;
+    return zis_object_type(obj) == type;
+}
 
 /// Get field in SLOTS by index. No bounds checking for the index.
 #define zis_object_get_slot(obj, index) \
@@ -193,9 +211,10 @@ do {                                           \
 #define zis_object_ref_bytes(obj, slot_cnt) \
     (assert(!zis_object_is_smallint(obj)), (obj)->_body + sizeof(void *) * (slot_cnt))
 
-/* ----- object common methods ---------------------------------------------- */
+/* ----- object common methods and functions -------------------------------- */
 
 struct zis_context;
+struct zis_string_obj;
 
 /// Calculate the hash code of an object.
 /// On success, stores the hash code to `*hash_code` and returns true.
@@ -225,5 +244,39 @@ enum zis_object_ordering zis_object_compare(
 /// This operation never fails.
 bool zis_object_equals(
     struct zis_context *z,
-    struct zis_object *obj1, struct zis_object *obj2
+    struct zis_object *lhs, struct zis_object *rhs
 );
+
+/// Generates a string representing the object `obj`.
+/// On failure, stores the thrown object to REG-0 and returns NULL.
+struct zis_string_obj *zis_object_to_string(
+    struct zis_context *z,
+    struct zis_object *obj, bool represent, const char *restrict format /* = NULL */
+);
+
+/// Get element.
+/// On failure, stores the thrown object to REG-0 and returns NULL.
+struct zis_object *zis_object_get_element(
+    struct zis_context *z,
+    struct zis_object *obj, struct zis_object *key
+);
+
+/// Set element.
+/// On failure, stores the thrown object to REG-0 and returns ZIS_THR.
+int zis_object_set_element(
+    struct zis_context *z,
+    struct zis_object *obj, struct zis_object *key, struct zis_object *value
+);
+
+size_t _zis_object_index_convert_slow(zis_smallint_unsigned_t, zis_smallint_t);
+
+/// Convert a 1-based negative-able index to a C-style 0-based one.
+/// When `index` is greater than 0, it is converted to `index - 1`;
+/// when `index` is less than 0, it is converted to `length + index`.
+/// Returns -1 if the index is out of range.
+zis_static_force_inline size_t
+zis_object_index_convert(zis_smallint_unsigned_t length, zis_smallint_t index) {
+    if (zis_likely(index > 0 && (zis_smallint_unsigned_t)index <= length))
+        return (zis_smallint_unsigned_t)index - 1U;
+    return _zis_object_index_convert_slow(length, index);
+}

@@ -68,9 +68,23 @@ struct zis_type_obj;
 #endif // ZIS_FEATURE_SRC
 
 /// List of frequently used symbols.
-#define _ZIS_BUILTIN_SYM_LIST \
-    E(init)                   \
-// ^^^ _ZIS_BUILTIN_SYM_LIST ^^^
+#define _ZIS_BUILTIN_SYM_LIST1 \
+    E(init)                    \
+    E(hash)                    \
+// ^^^ _ZIS_BUILTIN_SYM_LIST1 ^^^
+
+/// List of frequently used symbols.
+#define _ZIS_BUILTIN_SYM_LIST2 \
+    E(operator_equ,     "==" ) \
+    E(operator_cmp,     "<=>") \
+    E(operator_add,     "+"  ) \
+    E(operator_sub,     "-"  ) \
+    E(operator_mul,     "*"  ) \
+    E(operator_div,     "/"  ) \
+    E(operator_get_element,  "[]" ) \
+    E(operator_set_element,  "[]=") \
+    E(operator_call,    "()" ) \
+// ^^^ _ZIS_BUILTIN_SYM_LIST2 ^^^
 
 /// Globals. This is a GC root.
 struct zis_context_globals {
@@ -86,7 +100,10 @@ struct zis_context_globals {
 #undef E
 
 #define E(NAME) struct zis_symbol_obj * sym_##NAME ;
-    _ZIS_BUILTIN_SYM_LIST
+    _ZIS_BUILTIN_SYM_LIST1
+#undef E
+#define E(NAME, SYM) struct zis_symbol_obj * sym_##NAME ;
+    _ZIS_BUILTIN_SYM_LIST2
 #undef E
 
 };
