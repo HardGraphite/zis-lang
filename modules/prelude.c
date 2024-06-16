@@ -27,8 +27,9 @@
 static int _print_1(zis_t z, struct zis_object *value, struct zis_stream_obj *stream) {
     if (zis_object_is_smallint(value)) {
         char buffer[24];
-        snprintf(buffer, sizeof buffer, "%ji", (intmax_t)zis_smallint_from_ptr(value));
-        zis_stream_obj_write_chars(stream, buffer, strlen(buffer));
+        size_t n = zis_smallint_to_str(zis_smallint_from_ptr(value), buffer, sizeof buffer, 10);
+        assert(n != (size_t)-1);
+        zis_stream_obj_write_chars(stream, buffer, n);
     } else  {
         struct zis_string_obj *str;
         if (zis_object_type(value) == z->globals->type_String) {

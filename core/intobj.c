@@ -1,8 +1,6 @@
 #include "intobj.h"
 
-#include <ctype.h>
 #include <errno.h>
-#include <limits.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -15,7 +13,11 @@
 #include "memory.h"
 #include "ndefutil.h"
 #include "objmem.h"
+#include "stack.h"
 #include "strutil.h"
+
+#include "exceptobj.h"
+#include "stringobj.h"
 
 /* ----- big int arithmetics ------------------------------------------------ */
 
@@ -334,10 +336,62 @@ struct zis_object *zis_int_obj_mul_x(struct zis_context *z, struct zis_object *l
     zis_unused_var(lhs), zis_unused_var(rhs);
 }
 
+#define assert_arg1_smi_or_Int(__z) \
+do {                                \
+    struct zis_object *x = (__z)->callstack->frame[1]; \
+    zis_unused_var(x);              \
+    assert(zis_object_is_smallint(x) || zis_object_type_is(x, (__z)->globals->type_Int)); \
+} while (0)
+
+ZIS_NATIVE_FUNC_DEF(T_Int_M_hash, z, {1, 0, 1}) {
+    /*#DOCSTR# func Int:hash() :: Int
+    Generates hash code. */
+    assert_arg1_smi_or_Int(z);
+    struct zis_object **frame = z->callstack->frame;
+    if (zis_object_is_smallint(frame[1])) {
+        frame[0] = frame[1];
+    } else {
+        struct zis_int_obj *v = zis_object_cast(frame[1], struct zis_int_obj);
+        size_t h = zis_hash_bytes(v->cells, sizeof v->cells[0] * v->cell_count);
+        frame[0] = zis_smallint_to_ptr((zis_smallint_t)h);
+    }
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Int_M_to_string, z, {1, 1, 2}) {
+    /*#DOCSTR# func Int:to_string(?fmt) :: String
+    Returns "nil". */
+    assert_arg1_smi_or_Int(z);
+    struct zis_object **frame = z->callstack->frame;
+    char light_buffer[80];
+    char *str; size_t str_sz;
+    if (zis_object_is_smallint(frame[1])) {
+        const zis_smallint_t x = zis_smallint_from_ptr(frame[1]);
+        size_t n = zis_smallint_to_str(x, light_buffer, sizeof light_buffer, 10);
+        assert(n != (size_t)-1);
+        str = light_buffer;
+        str_sz = n;
+    } else {
+        struct zis_int_obj *v = zis_object_cast(frame[1], struct zis_int_obj);
+        size_t n = zis_int_obj_value_s(v, NULL, 0, 10);
+        str = n <= sizeof light_buffer ? light_buffer : zis_mem_alloc(n);
+        str_sz = zis_int_obj_value_s(v, str, n, 10);
+        assert(str_sz != (size_t)-1);
+    }
+    frame[0] = zis_object_from(zis_string_obj_new(z, str, str_sz));
+    if (str != light_buffer)
+        zis_mem_free(str);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF_LIST(
+    T_Int_D_methods,
+    { "hash"        , &T_Int_M_hash           },
+    { "to_string"   , &T_Int_M_to_string      },
+);
+
 ZIS_NATIVE_TYPE_DEF_XB(
     Int,
     struct zis_int_obj, _bytes_size,
-    NULL,
-    NULL,
-    NULL
+    NULL, T_Int_D_methods, NULL
 );
