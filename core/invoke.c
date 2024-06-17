@@ -39,14 +39,13 @@ zis_noinline zis_cold_fn static void
 format_error_argc(struct zis_context *z, struct zis_func_obj *fn, size_t argc) {
     const struct zis_func_obj_meta func_meta = fn->meta;
     size_t expected_argc = func_meta.na;
-    const char *expected_prefix = "";
-    if (func_meta.no) {
-        if (func_meta.no == (unsigned char)-1 || argc < func_meta.na)
-            expected_prefix = "at least ";
-        else
-            expected_argc += func_meta.no, expected_prefix = "at most ";
-    }
-    assert(argc != expected_argc);
+    const char *expected_prefix;
+    if (argc < func_meta.na)
+        expected_prefix = "at least ";
+    else if (func_meta.no > 0 && argc > func_meta.na + (uint8_t)func_meta.no)
+        expected_argc += (uint8_t)func_meta.no, expected_prefix = "at most ";
+    else
+        expected_prefix = "";
     struct zis_exception_obj *exc = zis_exception_obj_format(
         z, "type", zis_object_from(fn),
         "wrong number of arguments (given %zu, expected %s%zu)",
@@ -152,42 +151,50 @@ static bool invocation_pass_args_vec(
     struct invocation_info *info
 ) {
     const struct zis_func_obj_meta func_meta = info->func_meta;
-    assert(func_meta.nr >= 1U + func_meta.na + (func_meta.no == (unsigned char)-1 ? 1U : func_meta.no));
+    assert((unsigned)func_meta.nr >= 1U + (unsigned)func_meta.na + (unsigned)zis_func_obj_meta_no_abs(func_meta.no));
     const size_t argc_min = func_meta.na;
     assert(info->arg_shift > 0);
     struct zis_object **const arg_list = z->callstack->frame + info->arg_shift;
 
-    if (zis_likely(argc == argc_min)) {
+    if (zis_likely(!func_meta.no)) {
+        if (zis_unlikely(argc != argc_min))
+            goto argc_error;
         zis_object_vec_copy(arg_list, argv, argc);
-        if (zis_unlikely(func_meta.no)) {
-            if (func_meta.no != (unsigned char)-1)
-                zis_object_vec_fill(arg_list + argc, zis_object_from(z->globals->val_nil), func_meta.no);
-            else
-                arg_list[argc] = zis_object_from(z->globals->val_empty_tuple);
-        }
     } else {
-        if (zis_unlikely(argc < argc_min)) {
-        argc_error:
-            assert(zis_object_type_is(info->caller_frame[0], z->globals->type_Function));
-            struct zis_func_obj *func_obj = zis_object_cast(info->caller_frame[0], struct zis_func_obj);
-            format_error_argc(z, func_obj, argc);
-            return false;
-        }
-        if (func_meta.no != (unsigned char)-1) {
-            if (zis_unlikely(argc > argc_min + func_meta.no))
+        if (zis_unlikely(argc < argc_min))
+            goto argc_error;
+        size_t copy_n, fill_n;
+        if (func_meta.no > 0) {
+            const size_t argc_max = argc_min + (uint8_t)func_meta.no;
+            if (zis_unlikely(argc > argc_max))
                 goto argc_error;
-            zis_object_vec_copy(arg_list, argv, argc);
-            const size_t fill_n = argc_min + func_meta.no - argc;
-            zis_object_vec_fill(arg_list + argc, zis_object_from(z->globals->val_nil), fill_n);
+            copy_n = argc;
+            fill_n = argc_max - argc;
         } else {
-            zis_object_vec_copy(arg_list, argv, argc_min);
-            struct zis_tuple_obj *const va_list_ =
-                zis_tuple_obj_new(z, (struct zis_object **)argv + argc_min, argc - argc_min);
-            arg_list[argc_min] = zis_object_from(va_list_);
+            const size_t argc_max = // excluding variadic arguments
+                argc_min + (zis_func_obj_meta_no_neg2pos(func_meta.no) - (uint8_t)1);
+            if (argc <= argc_max) {
+                copy_n = argc;
+                fill_n = argc_max - argc;
+                arg_list[argc_max] = zis_object_from(z->globals->val_empty_tuple);
+            } else {
+                copy_n = argc_max;
+                fill_n = 0;
+                struct zis_tuple_obj *const va_list_ =
+                    zis_tuple_obj_new(z, (struct zis_object **)argv + argc_max, argc - argc_max);
+                arg_list[argc_max] = zis_object_from(va_list_);
+            }
         }
+        zis_object_vec_copy(arg_list, argv, copy_n);
+        zis_object_vec_fill(arg_list + copy_n, zis_object_from(z->globals->val_nil), fill_n);
     }
-
     return true;
+
+argc_error:
+    assert(zis_object_type_is(info->caller_frame[0], z->globals->type_Function));
+    struct zis_func_obj *func_obj = zis_object_cast(info->caller_frame[0], struct zis_func_obj);
+    format_error_argc(z, func_obj, argc);
+    return false;
 }
 
 /// Pass arguments (packed).
@@ -210,22 +217,24 @@ static bool invocation_pass_args_pac(
     assert(zis_array_slots_obj_length(zis_object_cast(packed_args, struct zis_array_slots_obj)) >= argc);
 
     const struct zis_func_obj_meta func_meta = info->func_meta;
-    if (zis_likely(argc <= func_meta.na || func_meta.no != (unsigned char)-1)) {
+    if (zis_likely(!(func_meta.no < 0 && argc >= func_meta.na + zis_func_obj_meta_no_neg2pos(func_meta.no)))) {
         // No object allocation. No need to worry about `packed_args` been moved.
         return invocation_pass_args_vec(z, argv, argc, info);
     }
 
-    const size_t argc_min = func_meta.na;
     struct zis_object **const arg_list = z->callstack->frame + 1;
-    assert(argc > argc_min || func_meta.no != (unsigned char)-1);
-    zis_object_vec_copy(arg_list, argv, argc_min);
-    const size_t rest_n = argc - argc_min;
-    arg_list[argc_min] = zis_object_from(packed_args); // Protect it!
+
+    const size_t copy_n =
+        func_meta.na + (zis_func_obj_meta_no_neg2pos(func_meta.no) - (uint8_t)1);
+    zis_object_vec_copy(arg_list, argv, copy_n);
+
+    const size_t rest_n = argc - copy_n;
+    arg_list[copy_n] = zis_object_from(packed_args); // Protect it!
     struct zis_tuple_obj *const va_list_ = zis_tuple_obj_new(z, NULL, rest_n);
-    argv = zis_object_cast(arg_list[argc_min], struct zis_tuple_obj)->_data;
-    arg_list[argc_min] = zis_object_from(va_list_);
-    zis_object_vec_copy(va_list_->_data, argv + argc_min, rest_n);
-    zis_object_write_barrier_n(va_list_, argv + argc_min, rest_n);
+    argv = zis_object_cast(arg_list[copy_n], struct zis_tuple_obj)->_data; // Retrive.
+    arg_list[copy_n] = zis_object_from(va_list_);
+    zis_object_vec_copy(va_list_->_data, argv + copy_n, rest_n);
+    zis_object_write_barrier_n(va_list_, argv + copy_n, rest_n);
 
     return true;
 }
@@ -249,45 +258,53 @@ static bool invocation_pass_args_dis(
     // Adapted from `invocation_pass_args_vec()`.
 
     const struct zis_func_obj_meta func_meta = info->func_meta;
-    assert(func_meta.nr >= 1U + func_meta.na + (func_meta.no == (unsigned char)-1 ? 1U : func_meta.no));
+    assert((unsigned)func_meta.nr >= 1U + (unsigned)func_meta.na + (unsigned)zis_func_obj_meta_no_abs(func_meta.no));
     const size_t argc_min = func_meta.na;
     assert(info->arg_shift > 0);
     struct zis_object **const arg_list = z->callstack->frame + info->arg_shift;
     struct zis_object **const caller_frame = info->caller_frame;
 
-    if (zis_likely(argc == argc_min)) {
+    if (zis_likely(!func_meta.no)) {
+        if (zis_unlikely(argc != argc_min))
+            goto argc_error;
         _invocation_pass_args_dis_copy(arg_list, caller_frame, args_prev_frame_regs, argc);
-        if (zis_unlikely(func_meta.no)) {
-            if (func_meta.no != (unsigned char)-1)
-                zis_object_vec_fill(arg_list + argc, zis_object_from(z->globals->val_nil), func_meta.no);
-            else
-                arg_list[argc] = zis_object_from(z->globals->val_empty_tuple);
-        }
     } else {
-        if (zis_unlikely(argc < argc_min)) {
-        argc_error:
-            assert(zis_object_type_is(info->caller_frame[0], z->globals->type_Function));
-            struct zis_func_obj *func_obj = zis_object_cast(info->caller_frame[0], struct zis_func_obj);
-            format_error_argc(z, func_obj, argc);
-            return false;
-        }
-        if (func_meta.no != (unsigned char)-1) {
-            if (zis_unlikely(argc > argc_min + func_meta.no))
+        if (zis_unlikely(argc < argc_min))
+            goto argc_error;
+        size_t copy_n, fill_n;
+        if (func_meta.no > 0) {
+            const size_t argc_max = argc_min + (uint8_t)func_meta.no;
+            if (zis_unlikely(argc > argc_max))
                 goto argc_error;
-            _invocation_pass_args_dis_copy(arg_list, caller_frame, args_prev_frame_regs, argc);
-            const size_t fill_n = argc_min + func_meta.no - argc;
-            zis_object_vec_fill(arg_list + argc, zis_object_from(z->globals->val_nil), fill_n);
+            copy_n = argc;
+            fill_n = argc_max - argc;
         } else {
-            _invocation_pass_args_dis_copy(arg_list, caller_frame, args_prev_frame_regs, argc_min);
-            const size_t rest_n = argc - argc_min;
-            struct zis_tuple_obj *const va_list_ = zis_tuple_obj_new(z, NULL, rest_n);
-            arg_list[argc_min] = zis_object_from(va_list_);
-            _invocation_pass_args_dis_copy(va_list_->_data, caller_frame, args_prev_frame_regs + argc_min, rest_n);
-            zis_object_assert_no_write_barrier(va_list_); // FIXME: write barrier may be needed here.
+            const size_t argc_max = // excluding variadic arguments
+                argc_min + (zis_func_obj_meta_no_neg2pos(func_meta.no) - (uint8_t)1);
+            if (argc <= argc_max) {
+                copy_n = argc;
+                fill_n = argc_max - argc;
+                arg_list[argc_max] = zis_object_from(z->globals->val_empty_tuple);
+            } else {
+                copy_n = argc_max;
+                fill_n = 0;
+                const size_t rest_n = argc - argc_max;
+                struct zis_tuple_obj *const va_list_ = zis_tuple_obj_new(z, NULL, rest_n);
+                arg_list[argc_max] = zis_object_from(va_list_);
+                _invocation_pass_args_dis_copy(va_list_->_data, caller_frame, args_prev_frame_regs + argc_max, rest_n);
+                zis_object_assert_no_write_barrier(va_list_);
+            }
         }
+        _invocation_pass_args_dis_copy(arg_list, caller_frame, args_prev_frame_regs, copy_n);
+        zis_object_vec_fill(arg_list + copy_n, zis_object_from(z->globals->val_nil), fill_n);
     }
-
     return true;
+
+argc_error:
+    assert(zis_object_type_is(info->caller_frame[0], z->globals->type_Function));
+    struct zis_func_obj *func_obj = zis_object_cast(info->caller_frame[0], struct zis_func_obj);
+    format_error_argc(z, func_obj, argc);
+    return false;
 }
 
 /// Pass arguments like `invocation_pass_args_dis()`.
@@ -298,10 +315,8 @@ static bool invocation_pass_args_dis_1(
     unsigned int argc,
     struct invocation_info *info
 ) {
-    // Adapted from `invocation_pass_args_dis()`.
-
     const struct zis_func_obj_meta func_meta = info->func_meta;
-    assert(func_meta.nr >= 1U + func_meta.na + (func_meta.no == (unsigned char)-1 ? 1U : func_meta.no));
+    assert((unsigned)func_meta.nr >= 1U + (unsigned)func_meta.na + (unsigned)zis_func_obj_meta_no_abs(func_meta.no));
     const size_t argc_min = func_meta.na;
     assert(info->arg_shift > 0);
     struct zis_object **const arg_list = z->callstack->frame + info->arg_shift;
@@ -315,25 +330,25 @@ static bool invocation_pass_args_dis_1(
                 goto bound_check_fail;
             arg_list[i] = *arg_p;
         }
-        if (zis_unlikely(func_meta.no)) {
-            if (func_meta.no != (unsigned char)-1)
-                zis_object_vec_fill(arg_list + argc, zis_object_from(z->globals->val_nil), func_meta.no);
-            else
-                arg_list[argc] = zis_object_from(z->globals->val_empty_tuple);
+
+        if (zis_likely(!func_meta.no))
+            return true;
+
+        if (func_meta.no > 0) {
+            zis_object_vec_fill(arg_list + argc_min, zis_object_from(z->globals->val_nil), (uint8_t)func_meta.no);
+            return true;
         }
-    } else {
-        unsigned int args[4];
-        assert(argc <= sizeof args / sizeof args[0]);
-        for (uint32_t i = 0; i < argc; i++) {
-            const unsigned int idx = (args_prev_frame_regs >> (7 + 6 * i)) & 63;
-            if (zis_unlikely(caller_frame + idx >= arg_list))
-                goto bound_check_fail;
-            args[i] = idx;
-        }
-        return invocation_pass_args_dis(z, args, argc, info);
     }
 
-    return true;
+    unsigned int args[4];
+    assert(argc <= sizeof args / sizeof args[0]);
+    for (uint32_t i = 0; i < argc; i++) {
+        const unsigned int idx = (args_prev_frame_regs >> (7 + 6 * i)) & 63;
+        if (zis_unlikely(caller_frame + idx >= arg_list))
+            goto bound_check_fail;
+        args[i] = idx;
+    }
+    return invocation_pass_args_dis(z, args, argc, info);
 
 bound_check_fail:
     // see: BOUND_CHECK_REG()
@@ -878,7 +893,7 @@ _interp_loop:
         BP_SP_CHANGED;
         FUNC_CHANGED_TO(zis_object_cast(ii.caller_frame[0], struct zis_func_obj));
 
-        if (zis_likely(argc <= ii.func_meta.na || ii.func_meta.no != (unsigned char)-1)) {
+        if (zis_likely(!(ii.func_meta.no < 0 && argc >= ii.func_meta.na + zis_func_obj_meta_no_neg2pos(ii.func_meta.no)))) {
             // No object allocation. No need to worry about `args` been moved.
             // See similar usage in function `invocation_pass_args_pac()`.
             if (zis_unlikely(!invocation_pass_args_vec(z, args, argc, &ii)))

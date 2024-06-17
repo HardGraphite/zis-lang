@@ -44,8 +44,8 @@ static int _print_1(zis_t z, struct zis_object *value, struct zis_stream_obj *st
     return ZIS_OK;
 }
 
-ZIS_NATIVE_FUNC_DEF(F_print, z, {0, (unsigned char)-1, 1}) {
-    /*#DOCSTR# func print(values :: Array)
+ZIS_NATIVE_FUNC_DEF(F_print, z, {0, -1, 1}) {
+    /*#DOCSTR# func print(*values)
     Prints values. */
 
     // TODO: re-write this function.

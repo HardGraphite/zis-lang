@@ -1100,7 +1100,7 @@ void zis_debug_dump_bytecode(
     };
     fprintf(fp, "# disassembly of function@%p\n", (void *)func_obj);
     fprintf(
-        fp, "# meta = {.na = %u, .no = %u, .nr = %u}\n# constants.len = %zu, symbols.len = %zu\n",
+        fp, "# meta = {.na = %u, .no = %i, .nr = %u}\n# constants.len = %zu, symbols.len = %zu\n",
         func_obj->meta.na, func_obj->meta.no, func_obj->meta.nr,
         zis_array_slots_obj_length(func_obj->_constants),
         zis_array_slots_obj_length(func_obj->_symbols)

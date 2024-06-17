@@ -20,7 +20,7 @@ bool zis_func_obj_meta_conv(
     struct zis_func_obj_meta *dst,
     struct zis_native_func_meta func_def_meta
 ) {
-    if (zis_unlikely(func_def_meta.na + (func_def_meta.no == (uint8_t)-1 ? 1 : func_def_meta.no) > func_def_meta.nl))
+    if (zis_unlikely(func_def_meta.na + zis_func_obj_meta_no_abs(func_def_meta.no) > func_def_meta.nl))
         return false;
     const struct zis_func_obj_meta func_obj_meta = {
         .na = func_def_meta.na,
@@ -111,7 +111,7 @@ size_t zis_func_obj_bytecode_length(const struct zis_func_obj *self) {
 #define assert_arg1_Function(__z) \
     (assert(zis_object_type_is((__z)->callstack->frame[1], (__z)->globals->type_Function)))
 
-ZIS_NATIVE_FUNC_DEF(T_Function_M_operator_call, z, {1, (unsigned char)-1, 2}) {
+ZIS_NATIVE_FUNC_DEF(T_Function_M_operator_call, z, {1, -1, 2}) {
     /*#DOCSTR# func Function:\'()'(*args) :: Any
     Call the function. */
     assert_arg1_Function(z);
