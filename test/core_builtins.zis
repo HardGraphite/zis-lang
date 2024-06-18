@@ -47,6 +47,17 @@ func test_Bool_to_string()
     testing.check_equal(false:to_string(), 'false')
 end
 
+## Int
+
+func test_Int_parse()
+    testing.check_equal(Int.parse('123'), 123)
+    testing.check_equal(Int.parse('-123'), -123)
+    testing.check_equal(Int.parse('0x123'), 0x123)
+    testing.check_equal(Int.parse('-0x123'), -0x123)
+    testing.check_equal(Int.parse('123', 16), 0x123)
+    testing.check_equal(Int.parse('-123', 16), -0x123)
+end
+
 ## Float
 
 func test_Float_operator_neg()

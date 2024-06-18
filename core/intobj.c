@@ -1,5 +1,6 @@
 #include "intobj.h"
 
+#include <ctype.h>
 #include <errno.h>
 #include <math.h>
 #include <stdint.h>
@@ -394,14 +395,101 @@ ZIS_NATIVE_FUNC_DEF(T_Int_M_to_string, z, {1, 1, 2}) {
     return ZIS_OK;
 }
 
+ZIS_NATIVE_FUNC_DEF(T_Int_F_parse, z, {1, 1, 2}) {
+    /*#DOCSTR# func Int.parse(s :: String, ?base :: Int) :: Int
+    Converts a string representation of a integer to its value.
+
+    Argument `s` is the string representation to parse. If `base` is omitted,
+    prefixes "0b", "0o", or "0x" are accepatable in `s` to specify the base.
+    Argument `base` is the base of the integer in range [2,36]. */
+    struct zis_object **frame = z->callstack->frame;
+    const char *str_begin, *str_end;
+    unsigned int base;
+    bool make_result_neg = false;
+    if (zis_object_type_is(frame[1], z->globals->type_String)) {
+        struct zis_string_obj *str = zis_object_cast(frame[1], struct zis_string_obj);
+        str_begin = zis_string_obj_data_utf8(str);
+        if (!str_begin) {
+        error_bad_str:
+            frame[0] = zis_object_from(zis_exception_obj_format(
+                z, "value", frame[1], "invalid %s literal", "integer"
+            ));
+            return ZIS_THR;
+        }
+        str_end = str_begin + zis_string_obj_length(str);
+    } else {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_WRONG_ARGUMENT_TYPE, "s", frame[1]
+        ));
+        return ZIS_THR;
+    }
+    if (zis_object_is_smallint(frame[2])) {
+        const zis_smallint_t smi = zis_smallint_from_ptr(frame[2]);
+        if (smi < 2 || smi > 36)
+            goto error_bad_base;
+        base = (unsigned int)smi;
+    } else if (frame[2] == zis_object_from(z->globals->val_nil)) {
+        base = 10;
+        if (str_end - str_begin >= 3) {
+            if (*str_begin == '-') {
+                make_result_neg = true;
+                str_begin++;
+            }
+            if (str_begin[0] == '0') {
+                switch (tolower(str_begin[1])) {
+                case 'b':
+                    base = 2;
+                    break;
+                case 'o':
+                    base = 8;
+                    break;
+                case 'x':
+                    base = 16;
+                    break;
+                default:
+                    break;
+                }
+                if (base != 10)
+                    str_begin += 2;
+            }
+        }
+    } else {
+    error_bad_base:
+        frame[0] = zis_object_from(zis_exception_obj_format(
+            z, "value", frame[2], "invalid base"
+        ));
+        return ZIS_THR;
+    }
+    const char *str_parse_end = str_end;
+    struct zis_object *result = zis_int_obj_or_smallint_s(z, str_begin, &str_parse_end, base);
+    if (!result || str_parse_end != str_end)
+        goto error_bad_str;
+    if (make_result_neg) {
+        if (zis_object_is_smallint(result)) {
+            result = zis_smallint_to_ptr(-zis_smallint_from_ptr(result));
+        } else {
+            assert(zis_object_type_is(result, z->globals->type_Int));
+            struct zis_int_obj *v = zis_object_cast(result, struct zis_int_obj);
+            v->negative = true;
+        }
+    }
+    frame[0] = result;
+    return ZIS_OK;
+}
+
 ZIS_NATIVE_FUNC_DEF_LIST(
     T_Int_D_methods,
     { "hash"        , &T_Int_M_hash           },
     { "to_string"   , &T_Int_M_to_string      },
 );
 
+ZIS_NATIVE_VAR_DEF_LIST(
+    T_int_D_statics,
+    { "parse"       , { '^', .F = &T_Int_F_parse    } },
+);
+
 ZIS_NATIVE_TYPE_DEF_XB(
     Int,
     struct zis_int_obj, _bytes_size,
-    NULL, T_Int_D_methods, NULL
+    NULL, T_Int_D_methods, T_int_D_statics
 );
