@@ -49,6 +49,61 @@ end
 
 ## Int
 
+func test_Int_operator_neg()
+    testing.check_equal(0, -0)
+    testing.check_equal(1, -(-1))
+    testing.check_equal(0x100000000000000000000000000000000, -(-0x100000000000000000000000000000000))
+end
+
+func test_Int_operator_add_and_sub()
+    testing.check_equal(1 + 2, 3)
+    testing.check_equal(0x3fffffff + 0x11, 0x40000010)
+    testing.check_equal(0x3fffffffffffffff + 0x11, 0x4000000000000010)
+    testing.check_equal(0x100000000000000000000000000000000 + 0x1, 0x100000000000000000000000000000001)
+    testing.check_equal(0x1 + 0x100000000000000000000000000000000, 0x100000000000000000000000000000001)
+    testing.check_equal(0x100000000000000000000000000000000 - 0x1, 0xffffffffffffffffffffffffffffffff)
+    testing.check_equal(0x1 - 0x100000000000000000000000000000000, -0xffffffffffffffffffffffffffffffff)
+    testing.check_equal(-0xffffffffffffffffffffffffffffffff - 0x1, -0x100000000000000000000000000000000)
+    testing.check_equal(0x1 - (-0xffffffffffffffffffffffffffffffff), -0x100000000000000000000000000000000)
+    testing.check_equal(-0xffffffffffffffffffffffffffffffff + 0x1, -0xfffffffffffffffffffffffffffffffe)
+    testing.check_equal(0x1 + (-0xffffffffffffffffffffffffffffffff), -0xfffffffffffffffffffffffffffffffe)
+    testing.check_equal(0x100000000000000000000000000000000 + 0x100000000000000000000000000000000, 0x200000000000000000000000000000000)
+    testing.check_equal(0x100000000000000000000000000000000 - 0x100000000000000000000000000000000, 0)
+end
+
+func test_Int_operator_mul()
+    testing.check_equal(2 * 3, 6)
+    testing.check_equal(2 * 3, 6)
+    testing.check_equal(0x40000000 * 0x40000000, 0x1000000000000000)
+    testing.check_equal(0x4000000000000000 * 0x1000, 0x4000000000000000000)
+    testing.check_equal(0x1000 * 0x4000000000000000, 0x4000000000000000000)
+    testing.check_equal(0x4000000000000000 * -0x1000, -0x4000000000000000000)
+    testing.check_equal(-0x4000000000000000 * 0x1000, -0x4000000000000000000)
+    testing.check_equal(-0x4000000000000000 * -0x1000, 0x4000000000000000000)
+end
+
+func test_Int_operator_equ()
+    testing.check_equal(0 == 0, true)
+    testing.check_equal(1 == -1, false)
+    testing.check_equal(0x100000000000000000000000000000000 == 0x100000000000000000000000000000000, true)
+    testing.check_equal(0x100000000000000000000000000000000 == 0x100000000000000000000000000000001, false)
+    testing.check_equal(0x100000000000000000000000000000000 == -0x100000000000000000000000000000000, false)
+end
+
+func test_Int_operator_cmp()
+    testing.check_equal(1 > -1, true)
+    testing.check_equal(0x100000000000000000000000000000001 > 0x100000000000000000000000000000000, true)
+    testing.check_equal(0x100000000000000000000000000000000 > -0x10000000000000000000000000000000, true)
+    testing.check_equal(-0x100000000000000000000000000000000 > -0x100000000000000000000000000000001, true)
+end
+
+func test_Int_to_string()
+    testing.check_equal(0:to_string(), '0')
+    testing.check_equal((-1):to_string(), '-1')
+    testing.check_equal(0x100000000000000000000000000000000:to_string(), '340282366920938463463374607431768211456')
+    testing.check_equal((-0x100000000000000000000000000000000):to_string(), '-340282366920938463463374607431768211456')
+end
+
 func test_Int_parse()
     testing.check_equal(Int.parse('123'), 123)
     testing.check_equal(Int.parse('-123'), -123)

@@ -251,15 +251,21 @@ static void scan_number(
         assert(consumed_size <= buf_sz);
         loc_next_char_n(l, (unsigned int)consumed_size);
         stream_buffer_ignore(input, consumed_size);
-        if (!int_obj)
+        if (zis_unlikely(!int_obj)) {
+            assert(consumed_size == 0); // Otherwise it would be a "too large" error, which is impossible for a short integer literal.
             error_unexpected_end_of(l, "number literal");
+        }
         if (has_temp_result) {
             const size_t k = consumed_size * digit_base;
             assert(k <= ZIS_SMALLINT_MAX);
             struct zis_object *prev_result = *temp_result_ref;
             *temp_result_ref = int_obj;
-            prev_result = zis_int_obj_mul_x(z, prev_result, zis_smallint_to_ptr((zis_smallint_t)k));
-            int_obj = zis_int_obj_add_x(z, *temp_result_ref /* int_obj */, prev_result);
+            prev_result = zis_int_obj_or_smallint_mul(z, prev_result, zis_smallint_to_ptr((zis_smallint_t)k));
+            if (zis_unlikely(!prev_result))
+                error(l, "the integer constant is too large");
+            int_obj = zis_int_obj_or_smallint_add(z, *temp_result_ref /* int_obj */, prev_result);
+            if (zis_unlikely(!int_obj))
+                error(l, "the integer constant is too large");
         } else {
             has_temp_result = true;
         }

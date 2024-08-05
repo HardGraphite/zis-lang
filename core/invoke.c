@@ -18,6 +18,7 @@
 #include "exceptobj.h"
 #include "floatobj.h"
 #include "funcobj.h"
+#include "intobj.h"
 #include "mapobj.h"
 #include "moduleobj.h"
 #include "symbolobj.h"
@@ -1590,8 +1591,7 @@ _interp_loop:
         if (zis_object_is_smallint(lhs_v) && zis_object_is_smallint(rhs_v)) {
             const zis_smallint_t lhs_smi = zis_smallint_from_ptr(lhs_v);
             const zis_smallint_t rhs_smi = zis_smallint_from_ptr(rhs_v);
-            *tgt_p = zis_smallint_to_ptr(lhs_smi + rhs_smi);
-            // FIXME: overflow check
+            *tgt_p = zis_smallint_add(z, lhs_smi, rhs_smi);
             IP_ADVANCE;
             OP_DISPATCH;
         }
@@ -1615,8 +1615,7 @@ _interp_loop:
         if (zis_object_is_smallint(lhs_v) && zis_object_is_smallint(rhs_v)) {
             const zis_smallint_t lhs_smi = zis_smallint_from_ptr(lhs_v);
             const zis_smallint_t rhs_smi = zis_smallint_from_ptr(rhs_v);
-            *tgt_p = zis_smallint_to_ptr(lhs_smi - rhs_smi);
-            // FIXME: overflow check
+            *tgt_p = zis_smallint_sub(z, lhs_smi, rhs_smi);
             IP_ADVANCE;
             OP_DISPATCH;
         }
@@ -1640,8 +1639,7 @@ _interp_loop:
         if (zis_object_is_smallint(lhs_v) && zis_object_is_smallint(rhs_v)) {
             const zis_smallint_t lhs_smi = zis_smallint_from_ptr(lhs_v);
             const zis_smallint_t rhs_smi = zis_smallint_from_ptr(rhs_v);
-            *tgt_p = zis_smallint_to_ptr(lhs_smi * rhs_smi);
-            // FIXME: overflow check
+            *tgt_p = zis_smallint_mul(z, lhs_smi, rhs_smi);
             IP_ADVANCE;
             OP_DISPATCH;
         }

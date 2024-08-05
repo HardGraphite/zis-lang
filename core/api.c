@@ -274,7 +274,7 @@ ZIS_API int zis_make_int_s(zis_t z, unsigned int reg, const char *str, size_t st
         return ZIS_E_ARG;
     const char *const str_end = str + str_sz, *str_end_1 = str_end;
     struct zis_object *obj = zis_int_obj_or_smallint_s(z, str, &str_end_1, base);
-    if (zis_unlikely(str_end != str_end_1))
+    if (zis_unlikely(!obj || str_end != str_end_1))
         return ZIS_E_ARG;
     *obj_ref = obj;
     return ZIS_OK;

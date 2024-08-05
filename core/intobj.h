@@ -5,9 +5,11 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "attributes.h"
 #include "smallint.h"
 
 struct zis_context;
+struct zis_float_obj;
 
 /// `Int` object. Arbitrary precision integer (aka big integer).
 struct zis_int_obj;
@@ -16,7 +18,10 @@ struct zis_int_obj;
 struct zis_object *zis_int_obj_or_smallint(struct zis_context *z, int64_t val);
 
 /// Create a small int or an `Int` object from string. Underscores ('_') are ignored.
-/// `base` must be in range [2,36]. Returns NULL if no valid character is given.
+/// Parameter `base` must be in range [2,36].
+/// `*str_end_p` will be pointed to the char after the last read one.
+/// If no valid character is given, sets `*str_end_p` to `str` and returns NULL.
+/// If the integer is too large, returns NULL.
 struct zis_object *zis_int_obj_or_smallint_s(
     struct zis_context *z,
     const char *restrict str, const char **restrict str_end_p,
@@ -45,5 +50,62 @@ size_t zis_int_obj_value_s(const struct zis_int_obj *self, char *restrict buf, s
 /// See `zis_int_obj_value_s()`.
 size_t zis_smallint_to_str(zis_smallint_t i, char *restrict buf, size_t buf_sz, int base);
 
-struct zis_object *zis_int_obj_add_x(struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs);
-struct zis_object *zis_int_obj_mul_x(struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs);
+/// Small integer arithmetic: `lhs + rhs`.
+zis_static_force_inline struct zis_object *zis_smallint_add(
+    struct zis_context *z, zis_smallint_t lhs, zis_smallint_t rhs
+) {
+    _Static_assert(ZIS_SMALLINT_MAX + ZIS_SMALLINT_MAX <= INTPTR_MAX, "");
+    _Static_assert(ZIS_SMALLINT_MIN + ZIS_SMALLINT_MIN >= INTPTR_MIN, "");
+    zis_smallint_t x = lhs + rhs;
+    struct zis_object *p = zis_smallint_try_to_ptr(x);
+    if (p)
+        return p;
+    return zis_int_obj_or_smallint(z, x);
+}
+
+/// Small integer arithmetic: `lhs - rhs`.
+zis_static_force_inline struct zis_object *zis_smallint_sub(
+    struct zis_context *z, zis_smallint_t lhs, zis_smallint_t rhs
+) {
+    _Static_assert(ZIS_SMALLINT_MAX - ZIS_SMALLINT_MIN <= INTPTR_MAX, "");
+    _Static_assert(ZIS_SMALLINT_MIN - ZIS_SMALLINT_MAX >= INTPTR_MIN, "");
+    zis_smallint_t x = lhs - rhs;
+    struct zis_object *p = zis_smallint_try_to_ptr(x);
+    if (p)
+        return p;
+    return zis_int_obj_or_smallint(z, x);
+}
+
+/// Small integer arithmetic: `lhs * rhs`.
+struct zis_object *zis_smallint_mul(
+    struct zis_context *z, zis_smallint_t lhs, zis_smallint_t rhs
+);
+
+/// Integral arithmetic: `lhs + rhs`.
+/// If the integer is too large, returns NULL.
+struct zis_object *zis_int_obj_or_smallint_add(
+    struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs
+);
+
+/// Integral arithmetic: `lhs - rhs`.
+/// If the integer is too large, returns NULL.
+struct zis_object *zis_int_obj_or_smallint_sub(
+    struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs
+);
+
+/// Integral arithmetic: `lhs * rhs`.
+/// If the integer is too large, returns NULL.
+struct zis_object *zis_int_obj_or_smallint_mul(
+    struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs
+);
+
+/// Integral arithmetic: `lhs / rhs`. Returns a floating point number as result.
+struct zis_float_obj *zis_int_obj_or_smallint_div(
+    struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs
+);
+
+/// Compare two integral values.
+int zis_int_obj_or_smallint_compare(struct zis_object *lhs, struct zis_object *rhs);
+
+/// Check whether two integral values equal.
+bool zis_int_obj_or_smallint_equals(struct zis_object *lhs, struct zis_object *rhs);
