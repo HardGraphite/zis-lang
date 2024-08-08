@@ -66,13 +66,13 @@ static void do_test_path_len(const zis_path_char_t *path, size_t len) {
     zis_test_assert_eq(n, len);
 }
 
-zis_test0_define(test_path_len) {
+zis_test0_define(path_len) {
     do_test_path_len(ZIS_PATH_STR(""), 0);
     do_test_path_len(ZIS_PATH_STR("foo"), 3);
     do_test_path_len(ZIS_PATH_STR("foo/bar"), 7);
 }
 
-zis_test0_define(test_path_dup) {
+zis_test0_define(path_dup) {
     const zis_path_char_t *a = ZIS_PATH_STR("foo/bar");
     zis_path_char_t *a1 = zis_path_dup(a), *a2 = zis_path_dup_n(a, 7);
     zis_test_assert(path_eq(a, a1));
@@ -92,14 +92,14 @@ static int do_test_path_str_conv_2(const char *a, void *b) {
     return 0;
 }
 
-zis_test0_define(test_path_str_conv) {
+zis_test0_define(path_str_conv) {
     const zis_path_char_t *p = ZIS_PATH_STR("foo/bar");
     const char *s = "foo/bar";
     zis_path_with_temp_path_from_str(s, do_test_path_str_conv_1, (void *)p);
     zis_path_with_temp_str_from_path(p, do_test_path_str_conv_2, (void *)s);
 }
 
-zis_test0_define(test_path_copy) {
+zis_test0_define(path_copy) {
     zis_path_char_t buffer[32];
     const zis_path_char_t *a = ZIS_PATH_STR("foo/bar");
     memset(buffer, 0xff, sizeof buffer);
@@ -110,7 +110,7 @@ zis_test0_define(test_path_copy) {
     zis_test_assert(path_eq(a, buffer));
 }
 
-zis_test0_define(test_path_concat) {
+zis_test0_define(path_concat) {
     zis_path_char_t buffer[32];
     const zis_path_char_t *a = ZIS_PATH_STR("foo");
     const zis_path_char_t *b = ZIS_PATH_STR("bar");
@@ -123,7 +123,7 @@ zis_test0_define(test_path_concat) {
     zis_test_assert(path_eq(ab, buffer));
 }
 
-zis_test0_define(test_path_join) {
+zis_test0_define(path_join) {
     zis_path_char_t buffer[32];
     const zis_path_char_t *a = ZIS_PATH_STR("foo");
     const zis_path_char_t *b = ZIS_PATH_STR("bar");
@@ -137,7 +137,7 @@ zis_test0_define(test_path_join) {
     zis_test_assert(path_eq(ab, buffer));
 }
 
-zis_test0_define(test_path_filename) {
+zis_test0_define(path_filename) {
 #define DO_TEST(X, Y) \
     do_test_path_func_1("zis_path_filename", zis_path_filename, ZIS_PATH_STR( X ), ZIS_PATH_STR( Y ))
 
@@ -154,7 +154,7 @@ zis_test0_define(test_path_filename) {
 #undef DO_TEST
 }
 
-zis_test0_define(test_path_stem) {
+zis_test0_define(path_stem) {
 #define DO_TEST(X, Y) \
     do_test_path_func_1("zis_path_stem", zis_path_stem, ZIS_PATH_STR( X ), ZIS_PATH_STR( Y ))
 
@@ -165,7 +165,7 @@ zis_test0_define(test_path_stem) {
 #undef DO_TEST
 }
 
-zis_test0_define(test_path_extension) {
+zis_test0_define(path_extension) {
 #define DO_TEST(X, Y) \
     do_test_path_func_1("zis_path_extension", zis_path_extension, ZIS_PATH_STR( X ), ZIS_PATH_STR( Y ))
 
@@ -183,7 +183,7 @@ zis_test0_define(test_path_extension) {
 #undef DO_TEST
 }
 
-zis_test0_define(test_path_parent) {
+zis_test0_define(path_parent) {
 #define DO_TEST(X, Y) \
     do_test_path_func_1("zis_path_parent", zis_path_parent, ZIS_PATH_STR( X ), ZIS_PATH_STR( Y ))
 
@@ -196,7 +196,7 @@ zis_test0_define(test_path_parent) {
 #undef DO_TEST
 }
 
-zis_test0_define(test_path_with_extension) {
+zis_test0_define(path_with_extension) {
 #define DO_TEST1(X, Z) \
     do_test_path_func_2("zis_path_with_extension", zis_path_with_extension, \
         ZIS_PATH_STR( X ), NULL, ZIS_PATH_STR( Z ))
@@ -214,15 +214,16 @@ zis_test0_define(test_path_with_extension) {
 }
 
 zis_test0_list(
-    test_path_len,
-    test_path_dup,
-    test_path_str_conv,
-    test_path_copy,
-    test_path_concat,
-    test_path_join,
-    test_path_filename,
-    test_path_stem,
-    test_path_extension,
-    test_path_parent,
-    test_path_with_extension,
+    main,
+    path_len,
+    path_dup,
+    path_str_conv,
+    path_copy,
+    path_concat,
+    path_join,
+    path_filename,
+    path_stem,
+    path_extension,
+    path_parent,
+    path_with_extension,
 )

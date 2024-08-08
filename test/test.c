@@ -50,6 +50,8 @@ static const char *const logging_level_name[] = {
 };
 
 static void init_logging_level(void) {
+    if (logging_file)
+        return;
     logging_file = stderr;
     const char *conf = getenv(LOGGING_LEVEL_ENV);
     if (conf) {
@@ -74,18 +76,6 @@ static bool check_logging_level(enum zis_test_log_level level) {
     return (int)level <= (int)logging_level;
 }
 
-/* ----- exported functions ------------------------------------------------- */
-
-void __zis_test_init(void) {
-    init_logging_level();
-}
-
-int __zis_test_list_block(zis_t z, void *_arg) {
-    for (zis_test_func_t *f = _arg; *f; f++)
-        (*f)(z);
-    return 0;
-}
-
 void __zis_test_log(
     int level, const char *file, unsigned int line, const char *func,
     const char *restrict zis_printf_fn_arg_fmtstr(fmt), ...
@@ -106,9 +96,37 @@ void __zis_test_log(
     );
 }
 
+/* ----- assertions --------------------------------------------------------- */
+
 zis_noreturn void __zis_test_assertion_fail(
     const char *file, unsigned int line, const char *func, const char *expr
 ) {
     __zis_test_log(ZIS_TEST_LOG_ERROR, file, line, func, "assertion ``%s'' failed", expr);
     breakpoint_or_abort();
+}
+
+/* ----- test-case definitions ---------------------------------------------- */
+
+int __zis_test_fn(zis_t z, void *_state) {
+    struct __zis_test_fn_state *const state = _state;
+    init_logging_level();
+    unsigned int failure_count = 0;
+    for (const struct __zis_test_entry *e = state->entries; e->name && e->func; e++) {
+        e->func(z);
+    }
+    state->failures = failure_count;
+    return failure_count ? EXIT_FAILURE : EXIT_SUCCESS;
+}
+
+int __zis_test0_run(
+    const struct __zis_test0_entry *entries,
+    int argc, char * argv[]
+) {
+    zis_unused_var(argc), zis_unused_var(argv);
+    init_logging_level();
+    int failure_count = 0;
+    for (const struct __zis_test0_entry *e = entries; e->name && e->func; e++) {
+        e->func();
+    }
+    return failure_count ? EXIT_FAILURE : EXIT_SUCCESS;
 }

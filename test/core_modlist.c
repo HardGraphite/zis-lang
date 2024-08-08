@@ -14,7 +14,7 @@ static const char *const mod_name_list[] = {
 
 static const size_t mod_name_count = sizeof mod_name_list / sizeof mod_name_list[0];
 
-zis_test0_define(test_mod_list_order) {
+zis_test0_define(mod_list_order) {
 #if ZIS_EMBEDDED_MODULE_LIST_SORTED
 
     for (size_t i = 1; i < mod_name_count; i++) {
@@ -57,7 +57,7 @@ static size_t strings_seq_search(
     return SIZE_MAX;
 }
 
-zis_test0_define(test_mod_list_search) {
+zis_test0_define(mod_list_search) {
     for (size_t i = 1; i < mod_name_count; i++) {
         const char *name = mod_name_list[i];
         zis_test_assert_eq(strings_seq_search(mod_name_list, mod_name_count, name), i);
@@ -73,12 +73,16 @@ zis_test0_define(test_mod_list_search) {
 }
 
 zis_test0_list(
-    test_mod_list_order,
-    test_mod_list_search,
+    core_modlist,
+    mod_list_order,
+    mod_list_search,
 )
 
 #else // ZIS_EMBEDDED_MODULE_LIST_EMPTY
 
-int main(void) { }
+zis_test_list(
+    core_modlist,
+    0,
+)
 
 #endif // !ZIS_EMBEDDED_MODULE_LIST_EMPTY

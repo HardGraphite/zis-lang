@@ -60,14 +60,14 @@ static const struct clopts_program program = {
     .rest_args = rest_args_handler,
 };
 
-zis_test0_define(test_help) {
+zis_test0_define(help) {
     int argc = 2;
     const char *argv[] = {"test", "-h", 0};
     const int n = clopts_parse(&program, NULL, stderr, argc, (char **)argv);
     zis_test_assert_eq(n, 1);
 }
 
-zis_test0_define(test_opt_with_arg) {
+zis_test0_define(opt_with_arg) {
     int argc = 5;
     const char *argv[] = {"test", "-a", "123", "-b", "*", 0};
     struct data data;
@@ -78,7 +78,7 @@ zis_test0_define(test_opt_with_arg) {
     zis_test_assert_eq(data.b, '*');
 }
 
-zis_test0_define(test_opt_with_arg_2) {
+zis_test0_define(opt_with_arg_2) {
     int argc = 3;
     const char *argv[] = {"test", "-a456", "-b+", 0};
     struct data data;
@@ -89,7 +89,7 @@ zis_test0_define(test_opt_with_arg_2) {
     zis_test_assert_eq(data.b, '+');
 }
 
-zis_test0_define(test_opt_with_arg_3) {
+zis_test0_define(opt_with_arg_3) {
     int argc = 3;
     const char *argv[] = {"test", "-a", "-24", 0};
     struct data data;
@@ -99,7 +99,7 @@ zis_test0_define(test_opt_with_arg_3) {
     zis_test_assert_eq(data.a, -24);
 }
 
-zis_test0_define(test_rest_args) {
+zis_test0_define(rest_args) {
     int argc = 3;
     const char *argv[] = {"test", "A", "B", 0};
     struct data data;
@@ -110,7 +110,7 @@ zis_test0_define(test_rest_args) {
     zis_test_assert_eq(data.rest, argv + 1);
 }
 
-zis_test0_define(test_rest_args_2) {
+zis_test0_define(rest_args_2) {
     int argc = 3;
     const char *argv[] = {"test", "-", "B", 0};
     struct data data;
@@ -121,7 +121,7 @@ zis_test0_define(test_rest_args_2) {
     zis_test_assert_eq(data.rest, argv + 1);
 }
 
-zis_test0_define(test_rest_args_3) {
+zis_test0_define(rest_args_3) {
     int argc = 3;
     const char *argv[] = {"test", "--", "B", 0};
     struct data data;
@@ -132,7 +132,7 @@ zis_test0_define(test_rest_args_3) {
     zis_test_assert_eq(data.rest, argv + 2);
 }
 
-zis_test0_define(test_bad_arg) {
+zis_test0_define(bad_arg) {
     int argc = 3;
     const char *argv[] = {"test", "-b", "xxx", 0};
     struct data data;
@@ -140,7 +140,7 @@ zis_test0_define(test_bad_arg) {
     zis_test_assert_eq(n, -1);
 }
 
-zis_test0_define(test_too_few_arg) {
+zis_test0_define(too_few_arg) {
     int argc = 2;
     const char *argv[] = {"test", "-a", 0};
     struct data data;
@@ -148,7 +148,7 @@ zis_test0_define(test_too_few_arg) {
     zis_test_assert_eq(n, -1);
 }
 
-zis_test0_define(test_too_few_arg_2) {
+zis_test0_define(too_few_arg_2) {
     int argc = 3;
     const char *argv[] = {"test", "-a", "-b", 0};
     struct data data;
@@ -156,7 +156,7 @@ zis_test0_define(test_too_few_arg_2) {
     zis_test_assert_eq(n, -1);
 }
 
-zis_test0_define(test_bad_opt) {
+zis_test0_define(bad_opt) {
     int argc = 2;
     const char *argv[] = {"test", "-x", 0};
     const int n = clopts_parse(&program, NULL, stderr, argc, (char **)argv);
@@ -164,15 +164,16 @@ zis_test0_define(test_bad_opt) {
 }
 
 zis_test0_list(
-    test_help,
-    test_opt_with_arg,
-    test_opt_with_arg_2,
-    test_opt_with_arg_3,
-    test_rest_args,
-    test_rest_args_2,
-    test_rest_args_3,
-    test_bad_arg,
-    test_too_few_arg,
-    test_too_few_arg_2,
-    test_bad_opt,
+    start_cliutil,
+    help,
+    opt_with_arg,
+    opt_with_arg_2,
+    opt_with_arg_3,
+    rest_args,
+    rest_args_2,
+    rest_args_3,
+    bad_arg,
+    too_few_arg,
+    too_few_arg_2,
+    bad_opt,
 )

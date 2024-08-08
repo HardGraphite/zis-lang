@@ -7,7 +7,7 @@
 
 #include "../core/bits.h"
 
-zis_test0_define(test_bits_count_tz_u32) {
+zis_test0_define(bits_count_tz_u32) {
     for (unsigned int i = 1; i < 32; i++) {
         unsigned int result;
         result = zis_bits_count_tz(UINT32_C(1) << i);
@@ -17,7 +17,7 @@ zis_test0_define(test_bits_count_tz_u32) {
     }
 }
 
-zis_test0_define(test_bits_count_tz_u64) {
+zis_test0_define(bits_count_tz_u64) {
     for (unsigned int i = 1; i < 64; i++) {
         unsigned int result;
         result = zis_bits_count_tz(UINT64_C(1) << i);
@@ -61,7 +61,7 @@ static bool num_in_array(size_t num, const size_t array[], size_t array_len) {
     return false;
 }
 
-zis_test0_define(test_bitset_clear) {
+zis_test0_define(bitset_clear) {
     char data[zis_bitset_required_size(256) * 2];
     const size_t data_size = sizeof data;
     const size_t half_data_size = data_size / 2;
@@ -75,7 +75,7 @@ zis_test0_define(test_bitset_clear) {
     zis_test_assert(mem_all_one(data + half_data_size, half_data_size)); // Second half is untouched.
 }
 
-zis_test0_define(test_bitset_read_and_modify) {
+zis_test0_define(bitset_read_and_modify) {
     char data[3][zis_bitset_required_size(256)];
     struct zis_bitset *const bitset = (struct zis_bitset *)data[1];
     const size_t bitset_length = 256;
@@ -108,7 +108,7 @@ zis_test0_define(test_bitset_read_and_modify) {
     }
 }
 
-zis_test0_define(test_bitset_foreach) {
+zis_test0_define(bitset_foreach) {
     char data[zis_bitset_required_size(256)];
     struct zis_bitset *const bitset = (struct zis_bitset *)data;
     const size_t bitset_size = sizeof data;
@@ -129,9 +129,10 @@ zis_test0_define(test_bitset_foreach) {
 }
 
 zis_test0_list(
-    test_bits_count_tz_u32,
-    test_bits_count_tz_u64,
-    test_bitset_clear,
-    test_bitset_read_and_modify,
-    test_bitset_foreach,
+    core_bits,
+    bits_count_tz_u32,
+    bits_count_tz_u64,
+    bitset_clear,
+    bitset_read_and_modify,
+    bitset_foreach,
 )

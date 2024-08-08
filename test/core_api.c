@@ -21,7 +21,7 @@ static void panic_sov_handler(zis_t z, int c) {
     longjmp(test_at_panic_jb, 1);
 }
 
-zis_test_define(test_at_panic, z) {
+zis_test_define(at_panic, z) {
     bool panicked = false;
     zis_at_panic(z, panic_sov_handler);
     if (!setjmp(test_at_panic_jb)) {
@@ -60,7 +60,7 @@ static int do_test_native_block(zis_t z, void *arg) {
     return TEST_NATIVE_BLOCK_RET;
 }
 
-zis_test_define(test_native_block, z) {
+zis_test_define(native_block, z) {
     int64_t v_i64 = 0;
     // Write REG-0.
     zis_make_int(z, 0, TEST_NATIVE_BLOCK_R0I);
@@ -78,7 +78,7 @@ zis_test_define(test_native_block, z) {
 
 // zis-api-values //
 
-zis_test_define(test_nil, z) {
+zis_test_define(nil, z) {
     int status;
     status = zis_load_nil(z, 0, 1);
     zis_test_assert_eq(status, ZIS_OK);
@@ -100,7 +100,7 @@ static void do_test_bool(zis_t z, bool v) {
     zis_test_assert_eq(value, v);
 }
 
-zis_test_define(test_bool, z) {
+zis_test_define(bool_, z) {
     do_test_bool(z, true);
     do_test_bool(z, false);
 }
@@ -159,7 +159,7 @@ static void do_test_int_str_3(zis_t z, const char *s, int base, int64_t val) {
     zis_test_assert_eq(val, val_out);
 }
 
-zis_test_define(test_int, z) {
+zis_test_define(int_, z) {
     for (int64_t i = INT8_MIN; i <= INT8_MAX; i++) {
         do_test_int64(z, i);
         do_test_int_str(z, i);
@@ -191,7 +191,7 @@ static void do_test_float(zis_t z, double v) {
     zis_test_assert_eq(value, v);
 }
 
-zis_test_define(test_float, z) {
+zis_test_define(float_, z) {
     do_test_float(z, 0.0);
     do_test_float(z, 0.1);
     do_test_float(z, 1.0);
@@ -248,7 +248,7 @@ static void do_test_bad_string(zis_t z, const char *s, size_t n) {
     zis_test_assert_eq(status, ZIS_E_ARG);
 }
 
-zis_test_define(test_string, z) {
+zis_test_define(string, z) {
     do_test_string(z, "Hello, World!");
     do_test_string(z, u8"你好，世界！"); // U+4F60 U+597D U+FF0C U+4E16 U+754C U+FF01
     do_test_string(z, u8"Olá, mundo!"); // U+004F U+006C U+00E1 U+002C U+0020 U+006D U+0075 U+006E U+0064 U+006F
@@ -273,7 +273,7 @@ static void do_test_symbol(zis_t z, const char *str_in) {
     zis_test_assert_eq(memcmp(str_in, buffer, str_in_sz), 0);
 }
 
-zis_test_define(test_symbol, z) {
+zis_test_define(symbol, z) {
     do_test_symbol(z, "Hello, World!");
     do_test_symbol(z, "12345678");
     do_test_symbol(z, "");
@@ -294,13 +294,13 @@ static void do_test_bytes(zis_t z, const void *data, size_t size) {
     zis_test_assert_eq(memcmp(data, buffer, size), 0);
 }
 
-zis_test_define(test_bytes, z) {
+zis_test_define(bytes, z) {
     do_test_bytes(z, "", 0);
     do_test_bytes(z, "1234", 4);
     do_test_bytes(z, "\0\0\0\0", 4);
 }
 
-zis_test_define(test_exception, z) {
+zis_test_define(exception, z) {
     int status;
     const char *type = "test";
     const char *what = "Hello!";
@@ -340,7 +340,7 @@ zis_test_define(test_exception, z) {
     zis_load_nil(z, REG_MAX - 2, 3);
 }
 
-zis_test_define(test_file_stream, z) {
+zis_test_define(file_stream, z) {
     const char *const this_file = __FILE__;
     int status;
 
@@ -507,7 +507,7 @@ static void do_test_make_values__nested_collections(zis_t z) {
     zis_test_assert_eq(status, ZIS_E_ARG);
 }
 
-zis_test_define(test_make_values, z) {
+zis_test_define(make_values, z) {
     do_test_make_values__basic(z);
     do_test_make_values__insufficient_regs(z);
     do_test_make_values__nested_collections(z);
@@ -580,7 +580,7 @@ static void do_test_read_values__ignore_type_err(zis_t z) {
     zis_test_assert_eq(status, ZIS_E_TYPE);
 }
 
-zis_test_define(test_read_values, z) {
+zis_test_define(read_values, z) {
     do_test_read_values__basic(z);
     do_test_read_values__ignore_type_err(z);
 }
@@ -676,12 +676,12 @@ static void do_test_function__not_callable(zis_t z) {
     zis_test_assert_eq(status, ZIS_THR);
 }
 
-zis_test_define(test_function, z) {
+zis_test_define(function, z) {
     do_test_function__F_add_int(z);
     do_test_function__not_callable(z);
 }
 
-zis_test_define(test_type, z) {
+zis_test_define(type, z) {
     int status;
 
     const char *const type_fields[] = {
@@ -709,7 +709,7 @@ zis_test_define(test_type, z) {
     // TODO: access the statics; create an instance and access the fields and methods.
 }
 
-zis_test_define(test_module, z) {
+zis_test_define(module, z) {
     int status;
 
     // Create a module.
@@ -778,7 +778,7 @@ ZIS_NATIVE_FUNC_DEF(F_test_load_store_global, z, {0, 0, 10}) {
     return ZIS_OK;
 }
 
-zis_test_define(test_load_store_global, z) {
+zis_test_define(load_store_global, z) {
     zis_make_function(
         z, 0,
         &F_test_load_store_global,
@@ -849,7 +849,7 @@ static void do_test_load_element__bad_type(zis_t z) {
     zis_test_assert_eq(status, ZIS_THR);
 }
 
-zis_test_define(test_load_element, z) {
+zis_test_define(load_element, z) {
     do_test_load_element__array_and_tuple(z);
     do_test_load_element__map(z);
     do_test_load_element__bad_type(z);
@@ -927,7 +927,7 @@ static void do_test_store_element__bad_type(zis_t z) {
     zis_test_assert_eq(status, ZIS_THR);
 }
 
-zis_test_define(test_store_element, z) {
+zis_test_define(store_element, z) {
     do_test_store_element__array_and_tuple(z);
     do_test_store_element__map(z);
     do_test_store_element__bad_type(z);
@@ -973,7 +973,7 @@ static void do_test_insert_element__array(zis_t z) {
     }
 }
 
-zis_test_define(test_insert_element, z) {
+zis_test_define(insert_element, z) {
     do_test_insert_element__array(z);
 }
 
@@ -1052,7 +1052,7 @@ static void do_test_remove_element__map(zis_t z) {
     }
 }
 
-zis_test_define(test_remove_element, z) {
+zis_test_define(remove_element, z) {
     do_test_remove_element__array(z);
     do_test_remove_element__map(z);
 }
@@ -1060,31 +1060,32 @@ zis_test_define(test_remove_element, z) {
 // main
 
 zis_test_list(
+    core_api,
     REG_MAX,
     // zis-api-context //
-    test_at_panic,
+    at_panic,
     // zis-api-native //
-    test_native_block,
+    native_block,
     // zis-api-values //
-    test_nil,
-    test_bool,
-    test_int,
-    test_float,
-    test_string,
-    test_symbol,
-    test_bytes,
-    test_exception,
-    test_file_stream,
-    test_make_values,
-    test_read_values,
+    nil,
+    bool_,
+    int_,
+    float_,
+    string,
+    symbol,
+    bytes,
+    exception,
+    file_stream,
+    make_values,
+    read_values,
     // zis-api-code //
-    test_function,
-    test_type,
-    test_module,
+    function,
+    type,
+    module,
     // zis-api-variables //
-    test_load_store_global,
-    test_load_element,
-    test_store_element,
-    test_insert_element,
-    test_remove_element,
+    load_store_global,
+    load_element,
+    store_element,
+    insert_element,
+    remove_element,
 )
