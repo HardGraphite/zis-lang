@@ -119,12 +119,74 @@ static void breakpoint(void) {
 #endif
 }
 
-zis_noreturn void __zis_test_assertion_fail(
-    const char *file, unsigned int line, const char *func, const char *expr
-) {
-    __zis_test_log(ZIS_TEST_LOG_ERROR, file, line, func, "assertion ``%s'' failed", expr);
+zis_noreturn void __zis_test_post_failure(void) {
     breakpoint();
     test_state_longjmp();
+}
+
+zis_noreturn void __zis_test_assert_fail(
+    const char *file, unsigned int line, const char *func,
+    const char *restrict expr
+) {
+    __zis_test_log(ZIS_TEST_LOG_ERROR, file, line, func, "not true: %s", expr);
+    __zis_test_post_failure();
+}
+
+zis_noreturn void __zis_test_assert_eq_fail_b(
+    const char *file, unsigned int line, const char *func,
+    const char *lhs_expr, const char *rhs_expr, bool _lhs, bool _rhs
+) {
+    const char *lhs = _lhs ? "true" : "false";
+    const char *rhs = _rhs ? "true" : "false";
+    __zis_test_log(
+        ZIS_TEST_LOG_ERROR, file, line, func,
+        "not equal: ``%s``(%s) and ``%s``(%s)", lhs_expr, lhs, rhs_expr, rhs
+    );
+    __zis_test_post_failure();
+}
+
+zis_noreturn void __zis_test_assert_eq_fail_i(
+    const char *file, unsigned int line, const char *func,
+    const char *lhs_expr, const char *rhs_expr, intmax_t lhs, intmax_t rhs
+) {
+    __zis_test_log(
+        ZIS_TEST_LOG_ERROR, file, line, func,
+        "not equal: ``%s``(%ji) and ``%s``(%ji)", lhs_expr, lhs, rhs_expr, rhs
+    );
+    __zis_test_post_failure();
+}
+
+zis_noreturn void __zis_test_assert_eq_fail_u(
+    const char *file, unsigned int line, const char *func,
+    const char *lhs_expr, const char *rhs_expr, uintmax_t lhs, uintmax_t rhs
+) {
+    __zis_test_log(
+        ZIS_TEST_LOG_ERROR, file, line, func,
+        "not equal: ``%s``(%ju) and ``%s``(%ju)", lhs_expr, lhs, rhs_expr, rhs
+    );
+    __zis_test_post_failure();
+}
+
+zis_noreturn void __zis_test_assert_eq_fail_f(
+    const char *file, unsigned int line, const char *func,
+    const char *lhs_expr, const char *rhs_expr, double lhs, double rhs
+) {
+    __zis_test_log(
+        ZIS_TEST_LOG_ERROR, file, line, func,
+        "not equal: ``%s``(%lf) and ``%s``(%lf)", lhs_expr, lhs, rhs_expr, rhs
+    );
+    __zis_test_post_failure();
+}
+
+zis_noreturn void __zis_test_assert_eq_fail_p(
+    const char *file, unsigned int line, const char *func,
+    const char *lhs_expr, const char *rhs_expr, const void *lhs, const void * rhs
+) {
+    __zis_test_log(
+        ZIS_TEST_LOG_ERROR, file, line, func,
+        "not equal: ``%s``(%p) and ``%s``(%p)", lhs_expr, lhs, rhs_expr, rhs
+    );
+    __zis_test_post_failure();
 }
 
 /* ----- test-case definitions ---------------------------------------------- */

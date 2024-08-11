@@ -83,22 +83,60 @@ zis_printf_fn_attrs(5, 6) void __zis_test_log(
 
 /* ----- assertions --------------------------------------------------------- */
 
+/// Always fail.
+#define zis_test_fail(...) \
+do { \
+    zis_test_log(ZIS_TEST_LOG_ERROR, __VA_ARGS__); \
+    __zis_test_post_failure(); \
+} while (0)
+
 /// Assertion.
 #define zis_test_assert(__expr) \
-    do {                        \
-        if (!(__expr))          \
-            __zis_test_assertion_fail(__FILE__, __LINE__, __func__, #__expr); \
-    } while (0)                 \
-// ^^^ zis_test_assert() ^^^
+do { \
+    if (!(__expr)) \
+        __zis_test_assert_fail(__FILE__, __LINE__, __func__, #__expr); \
+} while (0)
+
+#if (!__STDC__ || __STDC_VERSION__ < 201112L)
 
 /// Assertion: equal.
 #define zis_test_assert_eq(__lhs, __rhs) \
     zis_test_assert((__lhs) == (__rhs))
 
-/// Assertion: not equal.
-#define zis_test_assert_ne(__lhs, __rhs) \
-    zis_test_assert((__lhs) != (__rhs))
+#else // C11
 
-zis_noreturn void __zis_test_assertion_fail(
-    const char *file, unsigned int line, const char *func, const char *expr
-);
+/// Assertion: equal.
+#define zis_test_assert_eq(__lhs, __rhs) \
+do { \
+    if ((__lhs) == (__rhs)) \
+        break; \
+    _Generic( \
+        (__lhs), \
+        bool              : __zis_test_assert_eq_fail_b, \
+        char              : __zis_test_assert_eq_fail_i, \
+        signed char       : __zis_test_assert_eq_fail_i, \
+        unsigned char     : __zis_test_assert_eq_fail_i, \
+        signed short      : __zis_test_assert_eq_fail_i, \
+        unsigned short    : __zis_test_assert_eq_fail_i, \
+        signed int        : __zis_test_assert_eq_fail_i, \
+        unsigned int      : __zis_test_assert_eq_fail_i, \
+        signed long       : __zis_test_assert_eq_fail_i, \
+        unsigned long     : __zis_test_assert_eq_fail_i, \
+        signed long long  : __zis_test_assert_eq_fail_i, \
+        unsigned long long: __zis_test_assert_eq_fail_i, \
+        float             : __zis_test_assert_eq_fail_f, \
+        double            : __zis_test_assert_eq_fail_f, \
+        void *            : __zis_test_assert_eq_fail_p, \
+        default           : __zis_test_assert_eq_fail_p  \
+    )(__FILE__, __LINE__, __func__, #__lhs, #__rhs, (__lhs), (__rhs)); \
+} while (0)
+
+#endif // C11
+
+zis_noreturn void __zis_test_post_failure(void);
+zis_noreturn void __zis_test_assert_fail(const char *, unsigned int, const char *, const char *restrict);
+zis_noreturn void __zis_test_assert_eq_fail_b(const char *, unsigned int, const char *, const char *, const char *, bool, bool);
+zis_noreturn void __zis_test_assert_eq_fail_i(const char *, unsigned int, const char *, const char *, const char *, intmax_t, intmax_t);
+zis_noreturn void __zis_test_assert_eq_fail_u(const char *, unsigned int, const char *, const char *, const char *, uintmax_t, uintmax_t);
+zis_noreturn void __zis_test_assert_eq_fail_f(const char *, unsigned int, const char *, const char *, const char *, double, double);
+zis_noreturn void __zis_test_assert_eq_fail_p(const char *, unsigned int, const char *, const char *, const char *, const void *, const void *);
