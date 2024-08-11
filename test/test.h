@@ -20,7 +20,7 @@
 #define zis_test_list(__name, __reg_max, ...) \
     static const struct __zis_test_entry __test_##__name##_entries[] = { __VA_ARGS__ {NULL, NULL} }; \
     int __name(int argc, char *argv[]) {      \
-        struct __zis_test_fn_state state = { argc, argv, __test_##__name##_entries, 0 }; \
+        struct __zis_test_fn_state state = { argc, argv, __test_##__name##_entries }; \
         zis_t z = zis_create();               \
         int exit_status = zis_native_block(z, (__reg_max), __zis_test_fn, &state); \
         zis_destroy(z);                       \
@@ -37,7 +37,6 @@ struct __zis_test_fn_state {
     int argc;
     char **argv;
     const struct __zis_test_entry *entries;
-    unsigned int failures;
 };
 
 int __zis_test_fn(zis_t, void *);
