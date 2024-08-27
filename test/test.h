@@ -115,15 +115,15 @@ do { \
         bool              : __zis_test_assert_eq_fail_b, \
         char              : __zis_test_assert_eq_fail_i, \
         signed char       : __zis_test_assert_eq_fail_i, \
-        unsigned char     : __zis_test_assert_eq_fail_i, \
+        unsigned char     : __zis_test_assert_eq_fail_u, \
         signed short      : __zis_test_assert_eq_fail_i, \
-        unsigned short    : __zis_test_assert_eq_fail_i, \
+        unsigned short    : __zis_test_assert_eq_fail_u, \
         signed int        : __zis_test_assert_eq_fail_i, \
-        unsigned int      : __zis_test_assert_eq_fail_i, \
+        unsigned int      : __zis_test_assert_eq_fail_u, \
         signed long       : __zis_test_assert_eq_fail_i, \
-        unsigned long     : __zis_test_assert_eq_fail_i, \
+        unsigned long     : __zis_test_assert_eq_fail_u, \
         signed long long  : __zis_test_assert_eq_fail_i, \
-        unsigned long long: __zis_test_assert_eq_fail_i, \
+        unsigned long long: __zis_test_assert_eq_fail_u, \
         float             : __zis_test_assert_eq_fail_f, \
         double            : __zis_test_assert_eq_fail_f, \
         void *            : __zis_test_assert_eq_fail_p, \
