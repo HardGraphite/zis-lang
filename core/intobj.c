@@ -31,10 +31,10 @@ typedef uint32_t bigint_cell_t;
 typedef uint64_t bigint_2cell_t;
 
 #define BIGINT_CELL_MAX    UINT32_MAX
-#define BIGINT_CELL_C(X)   UINT32_C((X))
+#define BIGINT_CELL_C(X)   UINT32_C(X)
 #define BIGINT_CELL_WIDTH  32
 #define BIGINT_2CELL_MAX    UINT64_MAX
-#define BIGINT_2CELL_C(X)   UINT64_C((X))
+#define BIGINT_2CELL_C(X)   UINT64_C(X)
 #define BIGINT_2CELL_WIDTH  64
 
 static_assert(BIGINT_CELL_WIDTH == sizeof(bigint_cell_t) * 8, "");
@@ -160,28 +160,24 @@ zis_nodiscard static bool bigint_sub(
         }
     }
 
-#if ZIS_USE_GNUC_OVERFLOW_ARITH && defined __GNUC__
-    bigint_cell_t
-#else
-    bigint_2cell_t
-#endif
-    carry = 0;
+    bigint_cell_t borrow = 0;
     for (unsigned int i = 0; i < y_len; i++) {
         bigint_cell_t a, b, s;
         a = i < a_len ? a_vec[i] : 0;
         b = i < b_len ? b_vec[i] : 0;
 #if ZIS_USE_GNUC_OVERFLOW_ARITH && defined __GNUC__
         bigint_cell_t c1 = __builtin_sub_overflow(a, b, &s);
-        bigint_cell_t c2 = __builtin_sub_overflow(s, carry, &s);
-        carry = c1 | c2;
+        bigint_cell_t c2 = __builtin_sub_overflow(s, borrow, &s);
+        borrow = c1 | c2;
 #else
-        bigint_2cell_t s_and_c = (bigint_2cell_t)a - (bigint_2cell_t)b + carry;
-        s = (bigint_cell_t)s_and_c;
-        carry = s_and_c >> BIGINT_CELL_WIDTH;
+        bigint_2cell_t s_and_b =
+            (((bigint_2cell_t)BIGINT_CELL_MAX << BIGINT_CELL_WIDTH) | a) - b - borrow;
+        s = (bigint_cell_t)s_and_b;
+        borrow = BIGINT_CELL_MAX - (bigint_cell_t)(s_and_b >> BIGINT_CELL_WIDTH);
 #endif
         y_vec[i] = s;
     }
-    assert(!carry);
+    assert(!borrow);
     return result_neg;
 }
 
