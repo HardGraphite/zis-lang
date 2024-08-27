@@ -114,8 +114,8 @@ do { \
         (__lhs), \
         bool              : __zis_test_assert_eq_fail_b, \
         char              : __zis_test_assert_eq_fail_i, \
-        signed char       : __zis_test_assert_eq_fail_i, \
-        unsigned char     : __zis_test_assert_eq_fail_u, \
+        /* signed char  : __zis_test_assert_eq_fail_i, */\
+        /* unsigned char: __zis_test_assert_eq_fail_u, */\
         signed short      : __zis_test_assert_eq_fail_i, \
         unsigned short    : __zis_test_assert_eq_fail_u, \
         signed int        : __zis_test_assert_eq_fail_i, \
