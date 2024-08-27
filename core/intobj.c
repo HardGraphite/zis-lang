@@ -544,8 +544,10 @@ size_t zis_int_obj_value_s(const struct zis_int_obj *self, char *restrict buf, s
     memcpy(cell_dup, self->cells, sizeof(bigint_cell_t) * cell_count);
     char *p = buf + buf_sz;
     for (unsigned int reset_cell_count = cell_count; reset_cell_count; ) {
-        if (p <= buf)
+        if (p <= buf) {
+            zis_mem_free(cell_dup);
             return (size_t)-1;
+        }
         const bigint_cell_t r = bigint_self_div_1(cell_dup, cell_count, base);
         assert(r <= 36);
         *--p = digits[r];
