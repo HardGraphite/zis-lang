@@ -27,6 +27,22 @@ zis_test0_define(bits_count_tz_u64) {
     }
 }
 
+zis_test0_define(bits_count_lz_u32) {
+    for (unsigned int i = 0; i < 32; i++) {
+        unsigned int result;
+        result = zis_bits_count_lz(UINT32_MAX >> i);
+        zis_test_assert_eq(result, i);
+    }
+}
+
+zis_test0_define(bits_count_lz_u64) {
+    for (unsigned int i = 0; i < 64; i++) {
+        unsigned int result;
+        result = zis_bits_count_lz(UINT64_MAX >> i);
+        zis_test_assert_eq(result, i);
+    }
+}
+
 static void mem_fill_zero(void *mem, size_t mem_len) {
     memset(mem, 0, mem_len);
 }
@@ -132,6 +148,8 @@ zis_test0_list(
     core_bits,
     zis_test0_case(bits_count_tz_u32),
     zis_test0_case(bits_count_tz_u64),
+    zis_test0_case(bits_count_lz_u32),
+    zis_test0_case(bits_count_lz_u64),
     zis_test0_case(bitset_clear),
     zis_test0_case(bitset_read_and_modify),
     zis_test0_case(bitset_foreach),
