@@ -130,9 +130,9 @@ zis_test0_define(bitset_foreach) {
 
 zis_test0_list(
     core_bits,
-    bits_count_tz_u32,
-    bits_count_tz_u64,
-    bitset_clear,
-    bitset_read_and_modify,
-    bitset_foreach,
+    zis_test0_case(bits_count_tz_u32),
+    zis_test0_case(bits_count_tz_u64),
+    zis_test0_case(bitset_clear),
+    zis_test0_case(bitset_read_and_modify),
+    zis_test0_case(bitset_foreach),
 )

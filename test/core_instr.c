@@ -122,13 +122,13 @@ zis_test0_define(make_and_extract_ABsCs) {
 
 zis_test0_list(
     core_instr,
-    check_num_min_and_max,
-    make_and_extract_Aw,
-    make_and_extract_Asw,
-    make_and_extract_ABw,
-    make_and_extract_AsBw,
-    make_and_extract_ABsw,
-    make_and_extract_ABC,
-    make_and_extract_AsBC,
-    make_and_extract_ABsCs,
+    zis_test0_case(check_num_min_and_max),
+    zis_test0_case(make_and_extract_Aw),
+    zis_test0_case(make_and_extract_Asw),
+    zis_test0_case(make_and_extract_ABw),
+    zis_test0_case(make_and_extract_AsBw),
+    zis_test0_case(make_and_extract_ABsw),
+    zis_test0_case(make_and_extract_ABC),
+    zis_test0_case(make_and_extract_AsBC),
+    zis_test0_case(make_and_extract_ABsCs),
 )

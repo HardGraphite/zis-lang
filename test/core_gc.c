@@ -265,10 +265,10 @@ zis_test_define(complex_references, z) {
 zis_test_list(
     core_gc,
     REG_MAX,
-    self_check,
-    all_garbage,
-    massive_garbage,
-    massive_survivors,
-    large_object,
-    complex_references,
+    zis_test_case(self_check),
+    zis_test_case(all_garbage),
+    zis_test_case(massive_garbage),
+    zis_test_case(massive_survivors),
+    zis_test_case(large_object),
+    zis_test_case(complex_references),
 )

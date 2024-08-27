@@ -9,16 +9,22 @@
 
 /* ----- test-case definitions ---------------------------------------------- */
 
+/// Test function identifier.
+#define zis_test_func_name(__name) \
+    __test_case_##__name##_func
+
 /// Define a test function.
-#define zis_test_define(__name, __zis_context_var)  \
-    static void __test_case_##__name##_func(struct zis_context *); \
-    static const struct __zis_test_entry __name = { #__name, __test_case_##__name##_func }; \
-    static void __test_case_##__name##_func(struct zis_context * __zis_context_var)
+#define zis_test_define(__name, __zis_context_var) \
+    static void zis_test_func_name(__name)(struct zis_context * __zis_context_var)
 // ^^^ zis_test_define() ^^^
 
-/// Enumerate test functions defined by `zis_test_define()`.
+#define zis_test_case(__name) \
+    { #__name, zis_test_func_name(__name) }
+
+/// Enumerate test cases. See `zis_test_case()`.
 #define zis_test_list(__name, __reg_max, ...) \
-    static const struct __zis_test_entry __test_##__name##_entries[] = { __VA_ARGS__ {NULL, NULL} }; \
+    static const struct __zis_test_entry      \
+    __test_##__name##_entries[] = { __VA_ARGS__ {NULL, NULL} }; \
     int __name(int argc, char *argv[]) {      \
         struct __zis_test_fn_state state = { argc, argv, __test_##__name##_entries }; \
         zis_t z = zis_create();               \
@@ -41,19 +47,25 @@ struct __zis_test_fn_state {
 
 int __zis_test_fn(zis_t, void *);
 
+/// Test function identifier.
+#define zis_test0_func_name(__name) \
+    __test0_case_##__name##_func
+
 /// Define a test function.
-#define zis_test0_define(__name)  \
-    static void __test_case_##__name##_func(void); \
-    static const struct __zis_test0_entry __name = { #__name, __test_case_##__name##_func }; \
-    static void __test_case_##__name##_func(void)
+#define zis_test0_define(__name) \
+    static void zis_test0_func_name(__name)(void)
 // ^^^ zis_test_define() ^^^
 
-/// Enumerate test functions defined by `zis_test0_define()`.
-#define zis_test0_list(__name, ...)  \
-    static const struct __zis_test0_entry __test_##__name##_entries[] = { __VA_ARGS__ {NULL, NULL} }; \
-    int __name(int argc, char *argv[]) { \
+#define zis_test0_case(__name) \
+    { #__name, zis_test0_func_name(__name) }
+
+/// Enumerate test cases. See `zis_test0_case()`.
+#define zis_test0_list(__name, ...)       \
+    static const struct __zis_test0_entry \
+    __test_##__name##_entries[] = { __VA_ARGS__ {NULL, NULL} }; \
+    int __name(int argc, char *argv[]) {  \
         return __zis_test0_run(__test_##__name##_entries, argc, argv); \
-    }                                \
+    }                                     \
 // ^^^ zis_test_list() ^^^
 
 struct __zis_test0_entry {

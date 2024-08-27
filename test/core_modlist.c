@@ -74,8 +74,8 @@ zis_test0_define(mod_list_search) {
 
 zis_test0_list(
     core_modlist,
-    mod_list_order,
-    mod_list_search,
+    zis_test0_case(mod_list_order),
+    zis_test0_case(mod_list_search),
 )
 
 #else // ZIS_EMBEDDED_MODULE_LIST_EMPTY

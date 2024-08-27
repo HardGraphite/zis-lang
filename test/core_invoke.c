@@ -248,8 +248,8 @@ zis_test_define(test_F_a2o2v, z) {
 zis_test_list(
     core_invoke,
     REG_MAX,
-    test_F_a3,
-    test_F_a2o2,
-    test_F_a2v,
-    test_F_a2o2v,
+    zis_test_case(test_F_a3),
+    zis_test_case(test_F_a2o2),
+    zis_test_case(test_F_a2v),
+    zis_test_case(test_F_a2o2v),
 )
