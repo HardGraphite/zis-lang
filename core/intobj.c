@@ -22,8 +22,7 @@
 #include "floatobj.h"
 #include "stringobj.h"
 
-// Use GCC's built-in arithmetic functions with overflow checking if possible
-#define ZIS_USE_GNUC_OVERFLOW_ARITH 1
+#include "zis_config.h" // ZIS_USE_GNUC_OVERFLOW_ARITH
 
 /* ----- big int arithmetics ------------------------------------------------ */
 
@@ -114,7 +113,7 @@ static void bigint_add(
         bigint_cell_t a, b, s;
         a = i < a_len ? a_vec[i] : 0;
         b = i < b_len ? b_vec[i] : 0;
-#if ZIS_USE_GNUC_OVERFLOW_ARITH && defined __GNUC__
+#if ZIS_USE_GNUC_OVERFLOW_ARITH
         bigint_cell_t c1 = __builtin_add_overflow(a, b, &s);
         bigint_cell_t c2 = __builtin_add_overflow(s, carry, &s);
         carry = c1 | c2;
@@ -165,7 +164,7 @@ zis_nodiscard static bool bigint_sub(
         bigint_cell_t a, b, s;
         a = i < a_len ? a_vec[i] : 0;
         b = i < b_len ? b_vec[i] : 0;
-#if ZIS_USE_GNUC_OVERFLOW_ARITH && defined __GNUC__
+#if ZIS_USE_GNUC_OVERFLOW_ARITH
         bigint_cell_t c1 = __builtin_sub_overflow(a, b, &s);
         bigint_cell_t c2 = __builtin_sub_overflow(s, borrow, &s);
         borrow = c1 | c2;
@@ -217,7 +216,7 @@ static void bigint_mul(
             const bigint_2cell_t yw2 = (bigint_2cell_t)y + (bigint_2cell_t)carry;
             bigint_2cell_t yw;
             bool overflow;
-#if ZIS_USE_GNUC_OVERFLOW_ARITH && defined __GNUC__
+#if ZIS_USE_GNUC_OVERFLOW_ARITH
             overflow = __builtin_add_overflow(yw1, yw2, &yw);
 #else
             yw = yw1 + yw2;
@@ -234,7 +233,7 @@ static void bigint_mul(
             assert(i < y_len);
             bigint_cell_t y = y_vec[i];
             bool overflow;
-#if ZIS_USE_GNUC_OVERFLOW_ARITH && defined __GNUC__
+#if ZIS_USE_GNUC_OVERFLOW_ARITH
             overflow = __builtin_add_overflow(carry, y, &y);
 #else
             y += carry;
@@ -616,7 +615,7 @@ struct zis_object *_smallint_try_mul(
 ) {
     bool overflow;
     int64_t result;
-#if ZIS_USE_GNUC_OVERFLOW_ARITH && defined __GNUC__
+#if ZIS_USE_GNUC_OVERFLOW_ARITH
     overflow = __builtin_mul_overflow(lhs, rhs, &result);
 #else
     result = lhs * rhs;

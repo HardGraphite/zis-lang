@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.19)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
+include(CheckSupport)
 include(ZisVersion)
 
 project(
@@ -11,8 +12,13 @@ project(
     LANGUAGES C CXX
 )
 
-option(ZIS_BUILD_IPO     "Enable inter-procedural optimization."             ON)
-option(ZIS_BUILD_CGOTO   "Use the computed goto statements if possible."     ON)
+check_support(
+    CheckIPOSupported check_ipo_supported
+    "interprocedural optimization"
+    CACHE _ZIS_SUPPORT_INTERPROCEDURAL_OPTIMIZATION
+)
+
+option(ZIS_BUILD_IPO     "Enable inter-procedural optimization."           ${_ZIS_SUPPORT_INTERPROCEDURAL_OPTIMIZATION})
 option(ZIS_BUILD_SHARED  "Build and link shared library (static otherwise)" OFF)
 option(ZIS_BUILD_CORE    "Build `core', the ZIS library"                     ON)
 option(ZIS_BUILD_START   "Build `start', an executable entry"                ON)
@@ -43,37 +49,10 @@ if(NOT CMAKE_BUILD_TYPE AND NOT DEFINED CMAKE_CONFIGURATION_TYPES)
     message(STATUS "Set build type to ${CMAKE_BUILD_TYPE}")
 endif()
 
-if(ZIS_BUILD_IPO)
-    if(NOT DEFINED CACHE{CMAKE_INTERPROCEDURAL_OPTIMIZATION})
-        include(CheckIPOSupported)
-        message(STATUS "Testing inter-procedural optimization support")
-        check_ipo_supported(RESULT res LANGUAGES C)
-        set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ${res} CACHE BOOL "")
-        mark_as_advanced(CMAKE_INTERPROCEDURAL_OPTIMIZATION)
-        if(NOT res)
-            message(WARNING "IPO is not supported")
-        endif()
-    endif()
-else()
-    unset(CMAKE_INTERPROCEDURAL_OPTIMIZATION CACHE)
-    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION OFF)
-endif()
-
-if(ZIS_BUILD_CGOTO)
-    if(NOT DEFINED CACHE{ZIS_USE_COMPUTED_GOTO})
-        include(CheckCGotoSupported)
-        message(STATUS "Testing computed goto statement support")
-        check_computed_goto_supported(RESULT res)
-        set(ZIS_USE_COMPUTED_GOTO ${res} CACHE BOOL "")
-        mark_as_advanced(ZIS_USE_COMPUTED_GOTO)
-        if(NOT res)
-            message(WARNING "Computed goto is not supported")
-        endif()
-    endif()
-else()
-    unset(ZIS_USE_COMPUTED_GOTO CACHE)
-    set(ZIS_USE_COMPUTED_GOTO OFF)
-endif()
+disable_if_unsupported(
+    ZIS_BUILD_IPO _ZIS_SUPPORT_INTERPROCEDURAL_OPTIMIZATION
+    "interprocedural optimization"
+)
 
 if(MSVC)
     add_compile_options(
