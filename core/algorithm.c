@@ -10,10 +10,41 @@
 #include "platform.h"
 #include "smallint.h"
 
+#include "zis_config.h" // ZIS_USE_GNUC_OVERFLOW_ARITH
+
 /* ----- numbers ------------------------------------------------------------ */
 
 double zis_math_log(double a, double x) {
     return log(x) / log(a);
+}
+
+zis_static_force_inline bool uint32_mul_overflow(uint32_t a, uint32_t b, uint32_t *res) {
+#if ZIS_USE_GNUC_OVERFLOW_ARITH
+    return __builtin_mul_overflow(a, b, res);
+#else // !ZIS_USE_GNUC_OVERFLOW_ARITH
+    uint64_t prod = (uint64_t)a * (uint64_t)b;
+    *res = (uint32_t)prod;
+    return prod >> 32;
+#endif // ZIS_USE_GNUC_OVERFLOW_ARITH
+}
+
+uint32_t zis_math_pow_u32(uint32_t base, uint32_t exponent) {
+    if (zis_unlikely(exponent == 0))
+        return 1;
+
+    uint32_t result = 1;
+    while (true) {
+        if (exponent & 1) {
+            if (zis_unlikely(uint32_mul_overflow(result, base, &result)))
+                return 0;
+            if (zis_unlikely(exponent == 1))
+                break;
+        }
+        if (zis_unlikely(uint32_mul_overflow(base, base, &base)))
+            return 0;
+        exponent >>= 1;
+    }
+    return result;
 }
 
 /* ----- hash functions ----------------------------------------------------- */

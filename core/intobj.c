@@ -377,6 +377,14 @@ static struct zis_object *int_obj_shrink(struct zis_context *z, struct zis_int_o
     return zis_object_from(x);
 }
 
+/// Convert an int-obj or small-int to double.
+static double int_obj_or_smallint_to_double(struct zis_object *x) {
+    if (zis_object_is_smallint(x))
+        return (double)zis_smallint_from_ptr(x);
+    else
+        return zis_int_obj_value_f(zis_object_cast(x, struct zis_int_obj));
+}
+
 zis_noinline struct zis_object *zis_int_obj_or_smallint(
     struct zis_context *z, int64_t val
 ) {
@@ -795,6 +803,83 @@ struct zis_float_obj *zis_int_obj_or_smallint_div(
     return zis_float_obj_new(z, lhs_as_f / rhs_as_f);
 }
 
+struct zis_object *zis_int_obj_or_smallint_pow(
+    struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs
+) {
+    do {
+        if (!zis_object_is_smallint(lhs) || !zis_object_is_smallint(rhs))
+            break;
+        zis_smallint_t lhs_smi = zis_smallint_from_ptr(lhs);
+        zis_smallint_t rhs_smi = zis_smallint_from_ptr(rhs);
+        if (zis_unlikely(lhs_smi == 1 || rhs_smi == 0))
+            return zis_smallint_to_ptr(1);
+        if (zis_unlikely(lhs_smi == 0))
+            return zis_smallint_to_ptr(0);
+
+        bool lhs_neg = lhs_smi < 0;
+#if ZIS_SMALLINT_MAX > UINT32_MAX
+        if (lhs_smi > UINT32_MAX || lhs_smi < -(zis_smallint_t)UINT32_MAX)
+            break;
+#endif
+        uint32_t lhs_abs = lhs_neg ? ((zis_smallint_unsigned_t)0 - (zis_smallint_unsigned_t)lhs_smi) : (uint32_t)lhs_smi;
+
+        if (rhs_smi < 0)
+            break;
+#if ZIS_SMALLINT_MAX > UINT32_MAX
+        if (rhs_smi > UINT32_MAX)
+            break;
+#endif
+        uint32_t rhs_v = (uint32_t)rhs_smi;
+
+        int64_t result = zis_math_pow_u32(lhs_abs, rhs_v);
+        if (result == 0 && lhs_abs != 0)
+            break;
+        if (lhs_neg && (rhs_v & 1))
+            result = -result;
+        return zis_int_obj_or_smallint(z, result);
+    } while (0);
+
+    if (zis_object_is_smallint(rhs) ?
+            zis_smallint_from_ptr(rhs) < 0 :
+            zis_int_obj_sign((struct zis_int_obj *)rhs)
+    ) {
+        const double result = pow(
+            int_obj_or_smallint_to_double(lhs),
+            int_obj_or_smallint_to_double(rhs)
+        );
+        return zis_object_from(zis_float_obj_new(z, result));
+    }
+
+    zis_smallint_unsigned_t exponent =
+        (zis_smallint_unsigned_t)zis_smallint_from_ptr(rhs);
+    zis_locals_decl(
+        z, var,
+        struct zis_object *base;
+        struct zis_object *result;
+    );
+    var.base = lhs;
+    var.result = zis_smallint_to_ptr(1);
+
+    // See `zis_math_pow_u32()`.
+    assert(exponent >= 1);
+    while (true) {
+        if (exponent & 1) {
+            var.result = zis_int_obj_or_smallint_mul(z, var.result, var.base);
+            if (zis_unlikely(!var.result))
+                break;
+            if (zis_unlikely(exponent == 1))
+                break;
+        }
+        var.base = zis_int_obj_or_smallint_mul(z, var.base, var.base);
+        if (zis_unlikely(!var.result))
+            break;
+        exponent >>= 1;
+    }
+
+    zis_locals_drop(z, var);
+    return var.result;
+}
+
 int zis_int_obj_or_smallint_compare(struct zis_object *lhs, struct zis_object *rhs) {
     if (lhs == rhs)
         return 0;
@@ -837,14 +922,6 @@ do {                                \
     zis_unused_var(x);              \
     assert(zis_object_is_smallint(x) || zis_object_type_is(x, (__z)->globals->type_Int)); \
 } while (0)
-
-/// Convert an int-obj or small-int to double.
-static double int_obj_or_smallint_to_double(struct zis_object *x) {
-    if (zis_object_is_smallint(x))
-        return (double)zis_smallint_from_ptr(x);
-    else
-        return zis_int_obj_value_f(zis_object_cast(x, struct zis_int_obj));
-}
 
 zis_cold_fn zis_noinline
 static int int_obj_bin_op_unsupported_error(struct zis_context *z, const char *restrict op) {
@@ -1002,6 +1079,31 @@ ZIS_NATIVE_FUNC_DEF(T_Int_M_operator_div, z, {2, 0, 2}) {
     else
         return int_obj_bin_op_unsupported_error(z, "+");
     frame[0] = zis_object_from(result);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Int_M_operator_pow, z, {2, 0, 2}) {
+    /*#DOCSTR# func Int:\'**'(other :: Int|Float) :: Int|Float
+    Operator **. */
+    assert_arg1_smi_or_Int(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+
+    struct zis_object *result;
+    struct zis_object *self_v = frame[1], *other_v = frame[2];
+    struct zis_type_obj *other_type = zis_object_type_1(other_v);
+    if (!other_type || other_type == g->type_Int) {
+        result = zis_int_obj_or_smallint_pow(z, self_v, other_v);
+        if (zis_unlikely(!result))
+            return int_obj_too_large_error(z);
+    } else if (other_type == g->type_Float) {
+        double self_as_f = int_obj_or_smallint_to_double(self_v);
+        double other_f = zis_float_obj_value(zis_object_cast(other_v, struct zis_float_obj));
+        result = zis_object_from(zis_float_obj_new(z, pow(self_as_f, other_f)));
+    } else {
+        return int_obj_bin_op_unsupported_error(z, "**");
+    }
+    frame[0] = result;
     return ZIS_OK;
 }
 
@@ -1186,6 +1288,7 @@ ZIS_NATIVE_FUNC_DEF_LIST(
     { "-"           , &T_Int_M_operator_sub   },
     { "*"           , &T_Int_M_operator_mul   },
     { "/"           , &T_Int_M_operator_div   },
+    { "**"          , &T_Int_M_operator_pow   },
     { "=="          , &T_Int_M_operator_equ   },
     { "<=>"         , &T_Int_M_operator_cmp   },
     { "hash"        , &T_Int_M_hash           },

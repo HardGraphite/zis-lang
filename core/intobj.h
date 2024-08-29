@@ -104,6 +104,13 @@ struct zis_float_obj *zis_int_obj_or_smallint_div(
     struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs
 );
 
+/// Integral arithmetic: `lhs ** rhs` (power).
+/// If `rhs` is negative, returns a floating point number as the result.
+/// If the integer is too large, returns NULL.
+struct zis_object *zis_int_obj_or_smallint_pow(
+    struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs
+);
+
 /// Compare two integral values.
 int zis_int_obj_or_smallint_compare(struct zis_object *lhs, struct zis_object *rhs);
 

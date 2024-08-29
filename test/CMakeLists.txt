@@ -18,7 +18,7 @@ function(_zis_bundled_c_tests_setup)
     target_include_directories(${bundle_tgt_name} PRIVATE ${_zis_bundled_c_test_incdir})
 endfunction()
 
-## zis_add_bundled_c_test("filename")
+## zis_add_bundled_c_test("filename" [INCLUDE_DIR ...])
 ## Call `zis_add_bundled_c_tests_main()` at the end.
 function(zis_add_bundled_c_test filename)
     set(bundle_tgt_name "zis_test_bundle")
@@ -83,6 +83,7 @@ function(zis_add_script_test filename)
 endfunction()
 
 if(ZIS_BUILD_CORE)
+    zis_add_bundled_c_test(core_algorithm.c  INCLUDE_DIR ${zis_core_conf_header_dir})
     zis_add_bundled_c_test(core_bits.c       )
     zis_add_simple_c_test (core_fsutil.c     )
     zis_add_bundled_c_test(core_instr.c      )
