@@ -256,11 +256,15 @@ static void scan_number(
             error_unexpected_end_of(l, "number literal");
         }
         if (has_temp_result) {
-            const size_t k = consumed_size * digit_base;
-            assert(k <= ZIS_SMALLINT_MAX);
             struct zis_object *prev_result = *temp_result_ref;
             *temp_result_ref = int_obj;
-            prev_result = zis_int_obj_or_smallint_mul(z, prev_result, zis_smallint_to_ptr((zis_smallint_t)k));
+            assert(consumed_size <= ZIS_SMALLINT_MAX);
+            struct zis_object *const weight = zis_int_obj_or_smallint_pow(
+                z,
+                zis_smallint_to_ptr(digit_base),
+                zis_smallint_to_ptr((zis_smallint_t)consumed_size)
+            );
+            prev_result = zis_int_obj_or_smallint_mul(z, prev_result, weight);
             if (zis_unlikely(!prev_result))
                 error(l, "the integer constant is too large");
             int_obj = zis_int_obj_or_smallint_add(z, *temp_result_ref /* int_obj */, prev_result);
