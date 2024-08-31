@@ -907,7 +907,7 @@ int zis_int_obj_or_smallint_compare(struct zis_object *lhs, struct zis_object *r
 bool zis_int_obj_or_smallint_equals(struct zis_object *lhs, struct zis_object *rhs) {
     if (lhs == rhs)
         return true;
-    if (zis_object_is_smallint(lhs) && zis_object_is_smallint(rhs))
+    if (zis_object_is_smallint(lhs) || zis_object_is_smallint(rhs))
         return false;
     const struct zis_int_obj *lhs_int_obj = zis_object_cast(lhs, struct zis_int_obj);
     const struct zis_int_obj *rhs_int_obj = zis_object_cast(rhs, struct zis_int_obj);

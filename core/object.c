@@ -56,16 +56,11 @@ enum zis_object_ordering zis_object_compare(
     if (lhs == rhs)
         return ZIS_OBJECT_EQ;
 
-    if (zis_object_is_smallint(lhs)) {
-        if (zis_object_is_smallint(rhs)) {
-            const zis_smallint_t lhs_v = zis_smallint_from_ptr(lhs);
-            const zis_smallint_t rhs_v = zis_smallint_from_ptr(rhs);
-            assert(lhs_v != rhs_v);
-            return lhs_v <  rhs_v ? ZIS_OBJECT_LT : ZIS_OBJECT_GT;
-        }
-
-        // TODO: call smallint's comparison method
-        zis_context_panic(z, ZIS_CONTEXT_PANIC_IMPL);
+    if (zis_object_is_smallint(lhs) && zis_object_is_smallint(rhs)) {
+        const zis_smallint_t lhs_v = zis_smallint_from_ptr(lhs);
+        const zis_smallint_t rhs_v = zis_smallint_from_ptr(rhs);
+        assert(lhs_v != rhs_v);
+        return lhs_v <  rhs_v ? ZIS_OBJECT_LT : ZIS_OBJECT_GT;
     }
 
     struct zis_object *ret;
