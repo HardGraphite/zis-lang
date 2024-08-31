@@ -673,14 +673,17 @@ static struct zis_object *_int_obj_or_smallint_add_or_sub_slow(
     );
 
     if (zis_object_is_smallint(lhs)) {
+        assert(zis_object_type_is(rhs, z->globals->type_Int));
         dummy_int_obj_for_smi_init(&_dummy_int, zis_smallint_from_ptr(lhs));
         var.lhs_int_obj = &_dummy_int.int_obj;
         var.rhs_int_obj = zis_object_cast(rhs, struct zis_int_obj);
     } else if (zis_object_is_smallint(rhs)) {
+        assert(zis_object_type_is(lhs, z->globals->type_Int));
         dummy_int_obj_for_smi_init(&_dummy_int, zis_smallint_from_ptr(rhs));
         var.lhs_int_obj = zis_object_cast(lhs, struct zis_int_obj);
         var.rhs_int_obj = &_dummy_int.int_obj;
     } else {
+        assert(zis_object_type_is(lhs, z->globals->type_Int) && zis_object_type_is(rhs, z->globals->type_Int));
         var.lhs_int_obj = zis_object_cast(lhs, struct zis_int_obj);
         var.rhs_int_obj = zis_object_cast(rhs, struct zis_int_obj);
     }
@@ -769,12 +772,14 @@ struct zis_object *zis_int_obj_or_smallint_mul(
         dummy_int_obj_for_smi_init(&_dummy_int_l, zis_smallint_from_ptr(lhs));
         var.lhs_int_obj = &_dummy_int_l.int_obj;
     } else {
+        assert(zis_object_type_is(lhs, z->globals->type_Int));
         var.lhs_int_obj = zis_object_cast(lhs, struct zis_int_obj);
     }
     if (zis_object_is_smallint(rhs)) {
         dummy_int_obj_for_smi_init(&_dummy_int_r, zis_smallint_from_ptr(rhs));
         var.rhs_int_obj = &_dummy_int_r.int_obj;
     } else {
+        assert(zis_object_type_is(rhs, z->globals->type_Int));
         var.rhs_int_obj = zis_object_cast(rhs, struct zis_int_obj);
     }
 
@@ -953,14 +958,17 @@ static struct zis_object *_int_obj_or_smallint_bitwise_op_slow(
     zis_locals_zero(var);
 
     if (zis_object_is_smallint(_lhs)) {
+        assert(zis_object_type_is(_rhs, z->globals->type_Int));
         dummy_int_obj_for_smi_init(&_dummy_int, zis_smallint_from_ptr(_lhs));
         var.lhs_int_obj = &_dummy_int.int_obj;
         var.rhs_int_obj = zis_object_cast(_rhs, struct zis_int_obj);
     } else if (zis_object_is_smallint(_rhs)) {
+        assert(zis_object_type_is(_lhs, z->globals->type_Int));
         dummy_int_obj_for_smi_init(&_dummy_int, zis_smallint_from_ptr(_rhs));
         var.lhs_int_obj = zis_object_cast(_lhs, struct zis_int_obj);
         var.rhs_int_obj = &_dummy_int.int_obj;
     } else {
+        assert(zis_object_type_is(_lhs, z->globals->type_Int) && zis_object_type_is(_rhs, z->globals->type_Int));
         var.lhs_int_obj = zis_object_cast(_lhs, struct zis_int_obj);
         var.rhs_int_obj = zis_object_cast(_rhs, struct zis_int_obj);
     }
