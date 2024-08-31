@@ -80,6 +80,8 @@ func test_Int_operator_mul()
     testing.check_equal(0x4000000000000000 * -0x1000, -0x4000000000000000000)
     testing.check_equal(-0x4000000000000000 * 0x1000, -0x4000000000000000000)
     testing.check_equal(-0x4000000000000000 * -0x1000, 0x4000000000000000000)
+    testing.check_equal(0x4000000000000000 * -123, -0x1ec000000000000000)
+    testing.check_equal(-0x4000000000000000 * 123, -0x1ec000000000000000)
 end
 
 func test_Int_operator_pow()

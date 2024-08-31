@@ -43,6 +43,32 @@ zis_test0_define(bits_count_lz_u64) {
     }
 }
 
+zis_test0_define(bits_popcount_u32) {
+    zis_test_assert_eq(zis_bits_popcount((uint32_t)0), 0);
+    for (unsigned int i = 1; i < 32; i++) {
+        const uint32_t bits = UINT32_MAX >> (32 - i);
+        for (unsigned int j = 0; j < 32 - i; j++) {
+            uint32_t value = bits << j;
+            unsigned int result;
+            result = zis_bits_popcount(value);
+            zis_test_assert_eq(result, i);
+        }
+    }
+}
+
+zis_test0_define(bits_popcount_u64) {
+    zis_test_assert_eq(zis_bits_popcount((uint64_t)0), 0);
+    for (unsigned int i = 1; i < 32; i++) {
+        const uint64_t bits = UINT64_MAX >> (64 - i);
+        for (unsigned int j = 0; j < 64 -i; j++) {
+            uint64_t value = bits << j;
+            unsigned int result;
+            result = zis_bits_popcount(value);
+            zis_test_assert_eq(result, i);
+        }
+    }
+}
+
 static void mem_fill_zero(void *mem, size_t mem_len) {
     memset(mem, 0, mem_len);
 }
@@ -150,6 +176,8 @@ zis_test0_list(
     zis_test0_case(bits_count_tz_u64),
     zis_test0_case(bits_count_lz_u32),
     zis_test0_case(bits_count_lz_u64),
+    zis_test0_case(bits_popcount_u32),
+    zis_test0_case(bits_popcount_u64),
     zis_test0_case(bitset_clear),
     zis_test0_case(bitset_read_and_modify),
     zis_test0_case(bitset_foreach),

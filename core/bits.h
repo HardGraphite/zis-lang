@@ -30,6 +30,14 @@
     ) ((X)) \
 // ^^^ zis_bits_count_lz() ^^^
 
+#define zis_bits_popcount(X) \
+    (unsigned int) _Generic((X), \
+        unsigned long long : __builtin_popcountll, \
+        unsigned long      : __builtin_popcountl , \
+        unsigned int       : __builtin_popcount    \
+    ) ((X)) \
+// ^^^ zis_bits_popcount() ^^
+
 #elif defined _MSC_VER
 
 #define zis_bits_count_tz(X) \
@@ -47,6 +55,16 @@
         unsigned int       : _zis_bits_count_lz_u32_msvc  \
     ) ((X)) \
 // ^^^ zis_bits_count_lz() ^^^
+
+#define zis_bits_popcount(X) \
+    _Generic((X),             \
+        unsigned long long : __popcnt64, \
+        unsigned long      : __popcnt,   \
+        unsigned int       : __popcnt    \
+    ) ((X)) \
+// ^^^ zis_bits_popcount() ^^^
+
+#include <intrin.h>
 
 #ifdef _WIN32
 

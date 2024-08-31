@@ -409,6 +409,19 @@ static unsigned int int_obj_width(const struct zis_int_obj *self) {
     return cell_count * BIGINT_CELL_WIDTH - zis_bits_count_lz(self->cells[cell_count - 1]);
 }
 
+// Checks if it is an integral power of two (has single bit).
+static bool int_obj_is_pow2(const struct zis_int_obj *self) {
+    const unsigned int cell_count = self->cell_count;
+    const bigint_cell_t *const cells = self->cells;
+    if (zis_bits_popcount(cells[cell_count - 1]) != 1)
+        return false;
+    for (unsigned int i = cell_count - 2; i != (unsigned int)-1; i++) {
+        if (cells[i])
+            return false;
+    }
+    return true;
+}
+
 /// Make a copy of an int object.
 static struct zis_int_obj *int_obj_clone(struct zis_context *z, struct zis_int_obj *x) {
     struct zis_int_obj *new_x = int_obj_alloc(z, x->cell_count);
@@ -835,6 +848,29 @@ struct zis_object *zis_int_obj_or_smallint_sub(
     return _int_obj_or_smallint_add_or_sub_slow(z, lhs, rhs, true);
 }
 
+/// Do multiplication using shift-left operation.
+/// `rhs` must be a power of 2.
+static struct zis_object *_int_obj_mul_using_shl(
+    struct zis_context *z,
+    struct zis_int_obj *lhs, struct zis_int_obj *rhs
+) {
+    assert(int_obj_is_pow2(rhs));
+    const bool rhs_neg = rhs->negative;
+    unsigned int shift_n = int_obj_width(rhs) - 1;
+    struct zis_object *res =
+        zis_int_obj_or_smallint_shl(z, zis_object_from(lhs), shift_n);
+    if (rhs_neg) {
+        if (zis_object_is_smallint(res)) {
+            res = zis_int_obj_or_smallint(z, -zis_smallint_from_ptr(res));
+        } else {
+            struct zis_int_obj *res_v = zis_object_cast(res, struct zis_int_obj);
+            assert(res_v != lhs && res_v != rhs);
+            res_v->negative = !res_v->negative;
+        }
+    }
+    return res;
+}
+
 struct zis_object *zis_int_obj_or_smallint_mul(
     struct zis_context *z,
     struct zis_object *lhs, struct zis_object *rhs
@@ -866,6 +902,18 @@ struct zis_object *zis_int_obj_or_smallint_mul(
         assert(zis_object_type_is(rhs, z->globals->type_Int));
         var.rhs_int_obj = zis_object_cast(rhs, struct zis_int_obj);
     }
+
+    do {
+        struct zis_object *res;
+        if (int_obj_is_pow2(var.rhs_int_obj))
+            res = _int_obj_mul_using_shl(z, var.lhs_int_obj, var.rhs_int_obj);
+        else if (int_obj_is_pow2(var.lhs_int_obj))
+            res = _int_obj_mul_using_shl(z, var.rhs_int_obj, var.lhs_int_obj);
+        else
+            break;
+        zis_locals_drop(z, var);
+        return res;
+    } while (0);
 
     struct zis_int_obj *res_int_obj =
         int_obj_alloc(z, var.lhs_int_obj->cell_count + var.rhs_int_obj->cell_count);
