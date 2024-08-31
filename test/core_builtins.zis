@@ -122,6 +122,8 @@ func test_Int_operator_shl()
     testing.check_equal(0x20000000000000000 << -1, 0x10000000000000000)
     testing.check_equal(0xa01b23c45d67e89f << 13, 0x140364788bacfd13e000)
     testing.check_equal(0xa01b23c45d67e89f << 16, 0xa01b23c45d67e89f0000)
+    testing.check_equal(1 << 32, 0x100000000)
+    testing.check_equal(1 << 64, 0x10000000000000000)
 end
 
 func test_Int_operator_shr()
@@ -137,6 +139,8 @@ func test_Int_operator_shr()
     testing.check_equal(-0x20000000000000000 >> 100, -1)
     testing.check_equal(0xa01b23c45d67e89f >> 13, 0x500d91e22eb3f)
     testing.check_equal(0xa01b23c45d67e89f >> 16, 0xa01b23c45d67)
+    testing.check_equal(1 >> 32, 0)
+    testing.check_equal(1 >> 64, 0)
 end
 
 func test_Int_operator_not()

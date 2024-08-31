@@ -1042,9 +1042,11 @@ struct zis_object *zis_int_obj_or_smallint_shl(
 
     if (zis_object_is_smallint(lhs)) {
         const int64_t lhs_as_i64 = zis_smallint_from_ptr(lhs);
-        const int64_t res = lhs_as_i64 << rhs;
-        if (res >> rhs == lhs_as_i64)
-            return zis_int_obj_or_smallint(z, res);
+        if (zis_likely(rhs < sizeof(lhs_as_i64) * 8)) {
+            const int64_t res = lhs_as_i64 << rhs;
+            if (res >> rhs == lhs_as_i64)
+                return zis_int_obj_or_smallint(z, res);
+        } // else: UB if do `lhs_as_i64 << rhs`.
         dummy_int_obj_for_smi_init(&_dummy_int_lhs, zis_smallint_from_ptr(lhs));
         lhs_v = &_dummy_int_lhs.int_obj;
         lhs = zis_object_from(lhs_v);
@@ -1086,8 +1088,17 @@ struct zis_object *zis_int_obj_or_smallint_shr(
     if (zis_unlikely(!rhs))
         return lhs;
 
-    if (zis_object_is_smallint(lhs))
-        return zis_smallint_to_ptr(zis_smallint_from_ptr(lhs) >> rhs);
+    if (zis_object_is_smallint(lhs)) {
+        const zis_smallint_t lhs_smi = zis_smallint_from_ptr(lhs);
+        if (zis_unlikely(rhs >= sizeof(lhs_smi) * 8))
+            return zis_smallint_to_ptr(0); // UB if do `lhs_smi >> rhs`.
+#if 0 // The standard says it is implementation-defined whether to perform a arithmetic right shift.
+        if (lhs_smi < 0)
+            return zis_smallint_to_ptr(-(-lhs_smi >> rhs));
+        else
+#endif
+        return zis_smallint_to_ptr(lhs_smi >> rhs);
+    }
 
     assert(zis_object_type_is(lhs, z->globals->type_Int));
     struct zis_int_obj *const lhs_v = zis_object_cast(lhs, struct zis_int_obj);
