@@ -104,3 +104,23 @@ endif()
 if(ZIS_MOD_TESTING)
     zis_add_script_test   (core_builtins.zis )
 endif()
+
+# For platforms where RPATH is not supported, add the directory of the shared
+# core library to the test's PATH environment variable.
+if(ZIS_BUILD_CORE AND ZIS_BUILD_SHARED)
+    if(WIN32)
+        set(environ_path "PATH")
+    else()
+        unset(environ_path)
+    endif()
+    if(environ_path)
+        get_directory_property(tests TESTS)
+        set_tests_properties(
+            ${tests} PROPERTIES
+            ENVIRONMENT_MODIFICATION
+            "${environ_path}=path_list_append:$<TARGET_FILE_DIR:${zis_core_tgt}>"
+        )
+        unset(tests)
+        unset(environ_path)
+    endif()
+endif()
