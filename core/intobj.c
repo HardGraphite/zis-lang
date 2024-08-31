@@ -246,6 +246,20 @@ static void bigint_mul(
     }
 }
 
+/// Compute two's complement of a_vec.
+static void bigint_complement(
+    const bigint_cell_t *a_vec, unsigned int a_len,
+    bigint_cell_t *y_vec
+) {
+    bigint_2cell_t carry = 1;
+    for (unsigned int i = 0; i < a_len; ++i) {
+        carry += ~a_vec[i];
+        y_vec[i] = (bigint_cell_t)carry;
+        carry >>= BIGINT_CELL_WIDTH;
+    }
+    assert(!carry);
+}
+
 /* ----- int object --------------------------------------------------------- */
 
 typedef uint16_t int_obj_cell_count_t;
@@ -916,6 +930,157 @@ bool zis_int_obj_or_smallint_equals(struct zis_object *lhs, struct zis_object *r
     return memcmp(lhs_int_obj->cells, rhs_int_obj->cells, lhs_int_obj->cell_count * sizeof(bigint_cell_t)) == 0;
 }
 
+/// See `_int_obj_or_smallint_bitwise_op_slow()`.
+enum _bitwise_op {
+    BITWISE_OP_AND,
+    BITWISE_OP_OR,
+    BITWISE_OP_XOR,
+};
+
+/// Do small-int or int-obj bitwise and/or/xor. Two operands cannot be both small-ints.
+static struct zis_object *_int_obj_or_smallint_bitwise_op_slow(
+    struct zis_context *z,
+    struct zis_object *_lhs, struct zis_object *_rhs,
+    enum _bitwise_op op
+) {
+    assert(!(zis_object_is_smallint(_lhs) && zis_object_is_smallint(_rhs)));
+
+    dummy_int_obj_for_smi _dummy_int;
+    zis_locals_decl(
+        z, var,
+        struct zis_int_obj *lhs_int_obj, *rhs_int_obj, *res_int_obj;
+    );
+    zis_locals_zero(var);
+
+    if (zis_object_is_smallint(_lhs)) {
+        dummy_int_obj_for_smi_init(&_dummy_int, zis_smallint_from_ptr(_lhs));
+        var.lhs_int_obj = &_dummy_int.int_obj;
+        var.rhs_int_obj = zis_object_cast(_rhs, struct zis_int_obj);
+    } else if (zis_object_is_smallint(_rhs)) {
+        dummy_int_obj_for_smi_init(&_dummy_int, zis_smallint_from_ptr(_rhs));
+        var.lhs_int_obj = zis_object_cast(_lhs, struct zis_int_obj);
+        var.rhs_int_obj = &_dummy_int.int_obj;
+    } else {
+        var.lhs_int_obj = zis_object_cast(_lhs, struct zis_int_obj);
+        var.rhs_int_obj = zis_object_cast(_rhs, struct zis_int_obj);
+    }
+
+    // Make sure lhs is not shorter than rhs.
+    if (var.lhs_int_obj->cell_count < var.rhs_int_obj->cell_count) {
+        struct zis_int_obj *tmp = var.lhs_int_obj;
+        var.lhs_int_obj = var.rhs_int_obj;
+        var.rhs_int_obj = tmp;
+    }
+
+    // Use two's complement if negative.
+    if (var.lhs_int_obj->negative)
+        bigint_complement(var.lhs_int_obj->cells, var.lhs_int_obj->cell_count, var.lhs_int_obj->cells);
+    if (var.rhs_int_obj->negative)
+        bigint_complement(var.rhs_int_obj->cells, var.rhs_int_obj->cell_count, var.rhs_int_obj->cells);
+
+    switch (op) {
+    case BITWISE_OP_AND:
+        var.res_int_obj = int_obj_alloc(z, var.rhs_int_obj->negative ? var.lhs_int_obj->cell_count : var.rhs_int_obj->cell_count);
+        var.res_int_obj->negative = var.lhs_int_obj->negative && var.rhs_int_obj->negative;
+        for (size_t i = 0, n = var.rhs_int_obj->cell_count; i < n; i++)
+            var.res_int_obj->cells[i] = var.lhs_int_obj->cells[i] & var.rhs_int_obj->cells[i];
+        break;
+
+    case BITWISE_OP_OR:
+        var.res_int_obj = int_obj_alloc(z, var.rhs_int_obj->negative ? var.rhs_int_obj->cell_count : var.lhs_int_obj->cell_count);
+        var.res_int_obj->negative = var.lhs_int_obj->negative || var.rhs_int_obj->negative;
+        for (size_t i = 0, n = var.rhs_int_obj->cell_count; i < n; i++)
+            var.res_int_obj->cells[i] = var.lhs_int_obj->cells[i] | var.rhs_int_obj->cells[i];
+        break;
+
+    case BITWISE_OP_XOR:
+        var.res_int_obj = int_obj_alloc(z, var.lhs_int_obj->cell_count);
+        var.res_int_obj->negative = var.lhs_int_obj->negative != var.rhs_int_obj->negative;
+        for (size_t i = 0, n = var.rhs_int_obj->cell_count; i < n; i++)
+            var.res_int_obj->cells[i] = var.lhs_int_obj->cells[i] ^ var.rhs_int_obj->cells[i];
+        if (var.rhs_int_obj->negative) {
+            for (size_t i = var.rhs_int_obj->cell_count, i_end = var.lhs_int_obj->cell_count; i < i_end; i++)
+                var.res_int_obj->cells[i] = ~var.lhs_int_obj->cells[i];
+            goto skip_copying_rest_cells;
+        }
+        break;
+
+    default:
+        zis_unreachable();
+    }
+    if (var.res_int_obj->cell_count > var.rhs_int_obj->cell_count) {
+        const size_t copied_count = var.rhs_int_obj->cell_count;
+        const size_t rest_count = var.res_int_obj->cell_count - copied_count;
+        memcpy(
+            var.res_int_obj->cells + copied_count,
+            var.lhs_int_obj->cells + copied_count,
+            rest_count * sizeof(bigint_cell_t)
+        );
+    }
+skip_copying_rest_cells:;
+    if (var.res_int_obj->negative) {
+        bigint_complement(var.res_int_obj->cells, var.res_int_obj->cell_count, var.res_int_obj->cells);
+    }
+
+    // Undo two's complement if negative.
+    if (var.lhs_int_obj->negative)
+        bigint_complement(var.lhs_int_obj->cells, var.lhs_int_obj->cell_count, var.lhs_int_obj->cells);
+    if (var.rhs_int_obj->negative && var.rhs_int_obj != &_dummy_int.int_obj)
+        bigint_complement(var.rhs_int_obj->cells, var.rhs_int_obj->cell_count, var.rhs_int_obj->cells);
+
+    zis_locals_drop(z, var);
+    return int_obj_shrink(z, var.res_int_obj);
+}
+
+struct zis_object *zis_int_obj_or_smallint_not(
+    struct zis_context *z, struct zis_object *val
+) {
+    if (zis_object_is_smallint(val)) {
+        const zis_smallint_t v = zis_smallint_from_ptr(val);
+        return zis_smallint_to_ptr(~v);
+    }
+
+    struct zis_object *const result =
+        zis_int_obj_or_smallint_add(z, val, zis_smallint_to_ptr(1));
+    assert(zis_object_type_is(result, z->globals->type_Int));
+    struct zis_int_obj *res_int = zis_object_cast(result, struct zis_int_obj);
+    res_int->negative = !res_int->negative;
+    return result;
+}
+
+struct zis_object *zis_int_obj_or_smallint_and(
+    struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs
+) {
+    if (zis_object_is_smallint(lhs) && zis_object_is_smallint(rhs)) {
+        const zis_smallint_t lhs_v = zis_smallint_from_ptr(lhs), rhs_v = zis_smallint_from_ptr(rhs);
+        return zis_smallint_to_ptr(lhs_v & rhs_v);
+    }
+
+    return _int_obj_or_smallint_bitwise_op_slow(z, lhs, rhs, BITWISE_OP_AND);
+}
+
+struct zis_object *zis_int_obj_or_smallint_or(
+    struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs
+) {
+    if (zis_object_is_smallint(lhs) && zis_object_is_smallint(rhs)) {
+        const zis_smallint_t lhs_v = zis_smallint_from_ptr(lhs), rhs_v = zis_smallint_from_ptr(rhs);
+        return zis_smallint_to_ptr(lhs_v | rhs_v);
+    }
+
+    return _int_obj_or_smallint_bitwise_op_slow(z, lhs, rhs, BITWISE_OP_OR);
+}
+
+struct zis_object *zis_int_obj_or_smallint_xor(
+    struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs
+) {
+    if (zis_object_is_smallint(lhs) && zis_object_is_smallint(rhs)) {
+        const zis_smallint_t lhs_v = zis_smallint_from_ptr(lhs), rhs_v = zis_smallint_from_ptr(rhs);
+        return zis_smallint_to_ptr(lhs_v ^ rhs_v);
+    }
+
+    return _int_obj_or_smallint_bitwise_op_slow(z, lhs, rhs, BITWISE_OP_XOR);
+}
+
 #define assert_arg1_smi_or_Int(__z) \
 do {                                \
     struct zis_object *x = (__z)->callstack->frame[1]; \
@@ -1107,6 +1272,55 @@ ZIS_NATIVE_FUNC_DEF(T_Int_M_operator_pow, z, {2, 0, 2}) {
     return ZIS_OK;
 }
 
+ZIS_NATIVE_FUNC_DEF(T_Int_M_operator_not, z, {1, 0, 1}) {
+    /*#DOCSTR# func Int:\'|'() :: Int
+    Operator ~. */
+    assert_arg1_smi_or_Int(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_object *self_v = frame[1];
+    frame[0] = zis_int_obj_or_smallint_not(z, self_v);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Int_M_operator_and, z, {2, 0, 2}) {
+    /*#DOCSTR# func Int:\'&'(other :: Int) :: Int
+    Operator &. */
+    assert_arg1_smi_or_Int(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_object *self_v = frame[1], *other_v = frame[2];
+    if (!(zis_object_is_smallint(other_v) || zis_object_type(other_v) == g->type_Int))
+        return int_obj_bin_op_unsupported_error(z, "&");
+    frame[0] = zis_int_obj_or_smallint_and(z, self_v, other_v);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Int_M_operator_or, z, {2, 0, 2}) {
+    /*#DOCSTR# func Int:\'|'(other :: Int) :: Int
+    Operator |. */
+    assert_arg1_smi_or_Int(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_object *self_v = frame[1], *other_v = frame[2];
+    if (!(zis_object_is_smallint(other_v) || zis_object_type(other_v) == g->type_Int))
+        return int_obj_bin_op_unsupported_error(z, "|");
+    frame[0] = zis_int_obj_or_smallint_or(z, self_v, other_v);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Int_M_operator_xor, z, {2, 0, 2}) {
+    /*#DOCSTR# func Int:\'^'(other :: Int) :: Int
+    Operator ^. */
+    assert_arg1_smi_or_Int(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_object *self_v = frame[1], *other_v = frame[2];
+    if (!(zis_object_is_smallint(other_v) || zis_object_type(other_v) == g->type_Int))
+        return int_obj_bin_op_unsupported_error(z, "^");
+    frame[0] = zis_int_obj_or_smallint_xor(z, self_v, other_v);
+    return ZIS_OK;
+}
+
 ZIS_NATIVE_FUNC_DEF(T_Int_M_operator_equ, z, {2, 0, 2}) {
     /*#DOCSTR# func Int:\'=='(other :: Int|Float) :: Bool
     Operator ==. */
@@ -1289,6 +1503,10 @@ ZIS_NATIVE_FUNC_DEF_LIST(
     { "*"           , &T_Int_M_operator_mul   },
     { "/"           , &T_Int_M_operator_div   },
     { "**"          , &T_Int_M_operator_pow   },
+    { "~"           , &T_Int_M_operator_not   },
+    { "&"           , &T_Int_M_operator_and   },
+    { "|"           , &T_Int_M_operator_or    },
+    { "^"           , &T_Int_M_operator_xor   },
     { "=="          , &T_Int_M_operator_equ   },
     { "<=>"         , &T_Int_M_operator_cmp   },
     { "hash"        , &T_Int_M_hash           },

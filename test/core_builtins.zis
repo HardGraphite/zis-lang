@@ -111,6 +111,42 @@ func test_Int_operator_pow()
     testing.check_equal((2 ** 64) ** 2, 0x100000000000000000000000000000000)
 end
 
+func test_Int_operator_not()
+    testing.check_equal(~1, -2)
+    testing.check_equal(~0x12345678, -0x12345679)
+    testing.check_equal(~0xa01b23c45d67e89f, -0xa01b23c45d67e8a0)
+end
+
+func test_Int_operator_and()
+    testing.check_equal(1 & 1, 1)
+    testing.check_equal(0x12345678 & 0xabcdef, 0x204468)
+    testing.check_equal(0x12345678 & -0xabcdef, 0x12141210)
+    testing.check_equal(0xa01b23c45d67e89f & 0xabcdef, 0x23c88f)
+    testing.check_equal(0xa01b23c45d67e89f & -0xabcdef, 0xa01b23c45d442011)
+    testing.check_equal(0xabcdef & 0xa01b23c45d67e89f, 0x23c88f)
+    testing.check_equal(-0xabcdef & -0xa01b23c45d67e89f, -0xa01b23c45defedff)
+end
+
+func test_Int_operator_or()
+    testing.check_equal(1 | 1, 1)
+    testing.check_equal(0x12345678 | 0xabcde, 0x123efefe)
+    testing.check_equal(0x12345678 | -0xabcd, -0xa985)
+    testing.check_equal(0xa01b23c45d67e89f | 0xabcd, 0xa01b23c45d67ebdf)
+    testing.check_equal(0xa01b23c45d67e89f | -0xabcd, -0x341)
+    testing.check_equal(0xabcdef | 0xa01b23c45d67e8, 0xa01b23c4ffefef)
+    testing.check_equal(-0xabcdef | -0xa01b23c45d67e8, -0x945e7)
+end
+
+func test_Int_operator_and()
+    testing.check_equal(1 ^ 1, 0)
+    testing.check_equal(0x12345678 ^ 0xabcde, 0x123eeaa6)
+    testing.check_equal(0x12345678 ^ -0xabcd, -0x1234fdb5)
+    testing.check_equal(0xa01b23c45d67e89f ^ 0xabcd, 0xa01b23c45d674352)
+    testing.check_equal(0xa01b23c45d67e89f ^ -0xabcd, -0xa01b23c45d674354)
+    testing.check_equal(0xabcdef ^ 0xa01b23c45d67e8, 0xa01b23c4f6aa07)
+    testing.check_equal(-0xabcdef ^ -0xa01b23c45d67e8, 0xa01b23c4f6aa09)
+end
+
 func test_Int_operator_equ()
     testing.check_equal(0 == 0, true)
     testing.check_equal(1 == -1, false)

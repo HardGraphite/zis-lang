@@ -116,3 +116,23 @@ int zis_int_obj_or_smallint_compare(struct zis_object *lhs, struct zis_object *r
 
 /// Check whether two integral values equal.
 bool zis_int_obj_or_smallint_equals(struct zis_object *lhs, struct zis_object *rhs);
+
+/// Integral bitwise operation: `~val`.
+struct zis_object *zis_int_obj_or_smallint_not(
+    struct zis_context *z, struct zis_object *val
+);
+
+/// Integral bitwise operation: `lhs & rhs`.
+struct zis_object *zis_int_obj_or_smallint_and(
+    struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs
+);
+
+/// Integral bitwise operation: `lhs | rhs`.
+struct zis_object *zis_int_obj_or_smallint_or(
+    struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs
+);
+
+/// Integral bitwise operation: `lhs & rhs`.
+struct zis_object *zis_int_obj_or_smallint_xor(
+    struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs
+);
