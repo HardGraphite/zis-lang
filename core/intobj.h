@@ -111,6 +111,17 @@ struct zis_object *zis_int_obj_or_smallint_pow(
     struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs
 );
 
+/// Integral arithmetic: `lhs << rhs`.
+/// If the integer is too large, returns NULL.
+struct zis_object *zis_int_obj_or_smallint_shl(
+    struct zis_context *z, struct zis_object *lhs, unsigned int rhs
+);
+
+/// Integral arithmetic: `lhs >> rhs`.
+struct zis_object *zis_int_obj_or_smallint_shr(
+    struct zis_context *z, struct zis_object *lhs, unsigned int rhs
+);
+
 /// Compare two integral values.
 int zis_int_obj_or_smallint_compare(struct zis_object *lhs, struct zis_object *rhs);
 

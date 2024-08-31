@@ -2,6 +2,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <limits.h>
 #include <math.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -260,6 +261,77 @@ static void bigint_complement(
     assert(!carry);
 }
 
+/// y_vec[y_len] = a_vec[a_len] << n.
+/// Assume that y_len is big enough.
+static void bigint_shl(
+    const bigint_cell_t *restrict a_vec, unsigned int a_len,
+    unsigned int n,
+    bigint_cell_t *restrict y_vec, unsigned int y_len
+) {
+    const unsigned int cell_offset = n / BIGINT_CELL_WIDTH;
+    const unsigned int bit_offset  = n % BIGINT_CELL_WIDTH;
+
+    unsigned int y_len_min;
+    if (!bit_offset) {
+        memmove(y_vec + cell_offset, a_vec, a_len * sizeof y_vec[0]);
+        y_len_min = a_len + cell_offset;
+    } else {
+        bigint_cell_t carry = 0;
+        for (unsigned int i = 0; i < a_len; i++) {
+            const bigint_2cell_t s = (bigint_2cell_t)a_vec[i] << bit_offset;
+            y_vec[i + cell_offset] = (bigint_cell_t)s | carry;
+            carry = (bigint_cell_t)(s >> BIGINT_CELL_WIDTH);
+        }
+        y_len_min = a_len + cell_offset;
+        if (carry) {
+            y_vec[a_len + cell_offset] = carry;
+            y_len_min++;
+        }
+    }
+
+    assert(y_len >= y_len_min);
+    memset(y_vec, 0, cell_offset * sizeof y_vec[0]);
+    memset(y_vec + y_len_min, 0, (y_len - y_len_min) * sizeof y_vec[0]);
+}
+
+/// y_vec[y_len] = a_vec[a_len] >> n.
+/// Assume that y_len is big enough.
+static void bigint_shr(
+    const bigint_cell_t *restrict a_vec, unsigned int a_len,
+    unsigned int n,
+    bigint_cell_t *restrict y_vec, unsigned int y_len
+) {
+    const unsigned int cell_offset = n / BIGINT_CELL_WIDTH;
+    const unsigned int bit_offset  = n % BIGINT_CELL_WIDTH;
+
+    if (cell_offset >= a_len) {
+        memset(y_vec, 0, y_len * sizeof y_vec[0]);
+        return;
+    }
+
+    unsigned int y_len_min = a_len - cell_offset;
+    if (!bit_offset) {
+        memmove(y_vec, a_vec + cell_offset, y_len_min * sizeof y_vec[0]);
+    } else {
+        bigint_cell_t carry = 0;
+        unsigned int i = a_len - 1;
+        if (!(a_vec[i] >> bit_offset)) {
+            carry = a_vec[i] << (BIGINT_CELL_WIDTH - bit_offset);
+            assert(y_len_min > 0 && i > 0);
+            y_len_min--;
+            i--;
+        }
+        for (; i != cell_offset - 1; i--) {
+            const bigint_2cell_t s = (bigint_2cell_t)a_vec[i] << (BIGINT_CELL_WIDTH - bit_offset);
+            y_vec[i - cell_offset] = (bigint_cell_t)(s >> BIGINT_CELL_WIDTH) | carry;
+            carry = (bigint_cell_t)s;
+        }
+    }
+
+    assert(y_len >= y_len_min);
+    memset(y_vec + y_len_min, 0, (y_len - y_len_min) * sizeof y_vec[0]);
+}
+
 /* ----- int object --------------------------------------------------------- */
 
 typedef uint16_t int_obj_cell_count_t;
@@ -312,7 +384,7 @@ static void dummy_int_obj_for_smi_init(dummy_int_obj_for_smi *restrict di, zis_s
 }
 
 /// Allocate but do not initialize. If `cell_count` is too large, returns NULL.
-struct zis_int_obj *int_obj_alloc(struct zis_context *z, size_t cell_count) {
+static struct zis_int_obj *int_obj_alloc(struct zis_context *z, size_t cell_count) {
     if (zis_unlikely(cell_count > INT_OBJ_CELL_COUNT_MAX))
         return NULL;
 
@@ -326,9 +398,23 @@ struct zis_int_obj *int_obj_alloc(struct zis_context *z, size_t cell_count) {
 }
 
 /// Maximum number of cells in this object.
-zis_unused_fn static size_t int_obj_cells_capacity(const struct zis_int_obj *self) {
+static size_t int_obj_cells_capacity(const struct zis_int_obj *self) {
     assert(self->_bytes_size >= INT_OBJ_BYTES_FIXED_SIZE);
     return (self->_bytes_size - INT_OBJ_BYTES_FIXED_SIZE) / sizeof(bigint_cell_t);
+}
+
+/// Number of used bits, aka bit width.
+static unsigned int int_obj_width(const struct zis_int_obj *self) {
+    const unsigned int cell_count = self->cell_count;
+    return cell_count * BIGINT_CELL_WIDTH - zis_bits_count_lz(self->cells[cell_count - 1]);
+}
+
+/// Make a copy of an int object.
+static struct zis_int_obj *int_obj_clone(struct zis_context *z, struct zis_int_obj *x) {
+    struct zis_int_obj *new_x = int_obj_alloc(z, x->cell_count);
+    new_x->negative = x->negative;
+    memcpy(new_x->cells, x->cells, x->cell_count * sizeof x->cells[0]);
+    return new_x;
 }
 
 /// Trim leading zero cells. The object `x` itself may be modified.
@@ -546,9 +632,7 @@ size_t zis_int_obj_value_s(const struct zis_int_obj *self, char *restrict buf, s
     assert(self->cells[self->cell_count - 1]);
 
     if (!buf) {
-        const unsigned int num_width =
-            self->cell_count * BIGINT_CELL_WIDTH
-            - zis_bits_count_lz(self->cells[self->cell_count - 1]);
+        const unsigned int num_width = int_obj_width(self);
         assert(num_width);
         const unsigned int n_digits = (unsigned int)((double)num_width / log2(base)) + 1;
         assert(n_digits);
@@ -897,6 +981,93 @@ struct zis_object *zis_int_obj_or_smallint_pow(
 
     zis_locals_drop(z, var);
     return var.result;
+}
+
+struct zis_object *zis_int_obj_or_smallint_shl(
+    struct zis_context *z, struct zis_object *lhs, unsigned int rhs
+) {
+    if (zis_unlikely(!rhs))
+        return lhs;
+
+    dummy_int_obj_for_smi _dummy_int_lhs;
+    struct zis_int_obj *lhs_v;
+
+    if (zis_object_is_smallint(lhs)) {
+        const int64_t lhs_as_i64 = zis_smallint_from_ptr(lhs);
+        const int64_t res = lhs_as_i64 << rhs;
+        if (res >> rhs == lhs_as_i64)
+            return zis_int_obj_or_smallint(z, res);
+        dummy_int_obj_for_smi_init(&_dummy_int_lhs, zis_smallint_from_ptr(lhs));
+        lhs_v = &_dummy_int_lhs.int_obj;
+        lhs = zis_object_from(lhs_v);
+    } else {
+        assert(zis_object_type_is(lhs, z->globals->type_Int));
+        lhs_v = zis_object_cast(lhs, struct zis_int_obj);
+    }
+
+    const unsigned int lhs_width = int_obj_width(lhs_v);
+    if (UINT_MAX - rhs < lhs_width || lhs_width + rhs > INT_OBJ_CELL_COUNT_MAX)
+        return NULL;
+
+    const unsigned int res_width = lhs_width + rhs;
+    if (res_width <= BIGINT_CELL_WIDTH * DUMMY_INT_OBJ_FOR_SMI_CELL_COUNT) {
+        dummy_int_obj_for_smi _dummy_int;
+        _dummy_int.int_obj.negative = lhs_v->negative;
+        _dummy_int.int_obj.cell_count = DUMMY_INT_OBJ_FOR_SMI_CELL_COUNT;
+        bigint_shl(lhs_v->cells, lhs_v->cell_count, rhs, _dummy_int.int_obj.cells, _dummy_int.int_obj.cell_count);
+        struct zis_object *res = int_obj_shrink(z, &_dummy_int.int_obj);
+        return (void *)res == (void *)&_dummy_int.int_obj ?
+            zis_object_from(int_obj_clone(z, &_dummy_int.int_obj)) : res;
+    } else {
+        zis_locals_decl_1(z, var, struct zis_int_obj *lhs);
+        var.lhs = lhs_v;
+        const unsigned int res_cell_count =
+            zis_round_up_to_n_pow2(BIGINT_CELL_WIDTH, res_width) / BIGINT_CELL_WIDTH;
+        struct zis_int_obj *res = int_obj_alloc(z, res_cell_count);
+        res->negative = var.lhs->negative;
+        bigint_shl(lhs_v->cells, lhs_v->cell_count, rhs, res->cells, res->cell_count);
+        zis_locals_drop(z, var);
+        assert(res->cells[res->cell_count - 1]); // `int_obj_shrink()` is not needed.
+        return zis_object_from(res);
+    }
+}
+
+struct zis_object *zis_int_obj_or_smallint_shr(
+    struct zis_context *z, struct zis_object *lhs, unsigned int rhs
+) {
+    if (zis_unlikely(!rhs))
+        return lhs;
+
+    if (zis_object_is_smallint(lhs))
+        return zis_smallint_to_ptr(zis_smallint_from_ptr(lhs) >> rhs);
+
+    assert(zis_object_type_is(lhs, z->globals->type_Int));
+    struct zis_int_obj *const lhs_v = zis_object_cast(lhs, struct zis_int_obj);
+    const unsigned int lhs_width = int_obj_width(lhs_v);
+    if (rhs >= lhs_width)
+        return lhs_v->negative ? zis_smallint_to_ptr(-1) : zis_smallint_to_ptr(0);
+
+    const unsigned int res_width = lhs_width - rhs;
+    if (res_width <= BIGINT_CELL_WIDTH * DUMMY_INT_OBJ_FOR_SMI_CELL_COUNT) {
+        dummy_int_obj_for_smi _dummy_int;
+        _dummy_int.int_obj.negative = lhs_v->negative;
+        _dummy_int.int_obj.cell_count = DUMMY_INT_OBJ_FOR_SMI_CELL_COUNT;
+        bigint_shr(lhs_v->cells, lhs_v->cell_count, rhs, _dummy_int.int_obj.cells, _dummy_int.int_obj.cell_count);
+        struct zis_object *res = int_obj_shrink(z, &_dummy_int.int_obj);
+        return (void *)res == (void *)&_dummy_int.int_obj ?
+            zis_object_from(int_obj_clone(z, &_dummy_int.int_obj)) : res;
+    } else {
+        zis_locals_decl_1(z, var, struct zis_int_obj *lhs);
+        var.lhs = lhs_v;
+        const unsigned int res_cell_count =
+            zis_round_up_to_n_pow2(BIGINT_CELL_WIDTH, res_width) / BIGINT_CELL_WIDTH;
+        struct zis_int_obj *res = int_obj_alloc(z, res_cell_count);
+        res->negative = var.lhs->negative;
+        bigint_shr(lhs_v->cells, lhs_v->cell_count, rhs, res->cells, res->cell_count);
+        zis_locals_drop(z, var);
+        assert(res->cells[res->cell_count - 1]); // `int_obj_shrink()` is not needed.
+        return zis_object_from(res);
+    }
 }
 
 int zis_int_obj_or_smallint_compare(struct zis_object *lhs, struct zis_object *rhs) {
@@ -1280,6 +1451,88 @@ ZIS_NATIVE_FUNC_DEF(T_Int_M_operator_pow, z, {2, 0, 2}) {
     return ZIS_OK;
 }
 
+ZIS_NATIVE_FUNC_DEF(T_Int_M_operator_shl, z, {2, 0, 2}) {
+    /*#DOCSTR# func Int:\'<<'(other :: Int) :: Int
+    Operator <<. */
+    assert_arg1_smi_or_Int(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_object *self_v = frame[1], *other_v = frame[2];
+    struct zis_type_obj *other_type = zis_object_type_1(other_v);
+    if (!other_type) {
+        const zis_smallint_t x = zis_smallint_from_ptr(other_v);
+        if (x >= 0) {
+#if ZIS_SMALLINT_MAX > UINT_MAX
+            if (x > UINT_MAX)
+                return int_obj_too_large_error(z);
+#endif
+            const unsigned int n = (unsigned int)(zis_smallint_unsigned_t)x;
+            struct zis_object *res = zis_int_obj_or_smallint_shl(z, self_v, n);
+            if (!res)
+                return int_obj_too_large_error(z);
+            frame[0] = res;
+        } else {
+            unsigned int n;
+#if ZIS_SMALLINT_MAX > UINT_MAX
+            if (x == ZIS_SMALLINT_MIN || -x > UINT_MAX) {
+                static_assert(UINT_MAX > INT_OBJ_CELL_COUNT_MAX * BIGINT_CELL_WIDTH, "");
+                n = UINT_MAX;
+            } else
+#endif
+            n = (unsigned int)(zis_smallint_unsigned_t)-x;
+            frame[0] = zis_int_obj_or_smallint_shr(z, self_v, n);
+        }
+    } else if (other_type == g->type_Int) {
+        if (!zis_object_cast(other_v, struct zis_int_obj)->negative)
+            return int_obj_too_large_error(z);
+        frame[0] = zis_smallint_to_ptr(0);
+    } else {
+        return int_obj_bin_op_unsupported_error(z, "<<");
+    }
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Int_M_operator_shr, z, {2, 0, 2}) {
+    /*#DOCSTR# func Int:\'>>'(other :: Int) :: Int
+    Operator >>. */
+    assert_arg1_smi_or_Int(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_object *self_v = frame[1], *other_v = frame[2];
+    struct zis_type_obj *other_type = zis_object_type_1(other_v);
+    if (!other_type) {
+        const zis_smallint_t x = zis_smallint_from_ptr(other_v);
+        if (x >= 0) {
+            unsigned int n;
+#if ZIS_SMALLINT_MAX > UINT_MAX
+            if (x > UINT_MAX) {
+                static_assert(UINT_MAX > INT_OBJ_CELL_COUNT_MAX * BIGINT_CELL_WIDTH, "");
+                n = UINT_MAX;
+            } else
+#endif
+            n = (unsigned int)(zis_smallint_unsigned_t)x;
+            frame[0] = zis_int_obj_or_smallint_shr(z, self_v, n);
+        } else {
+#if ZIS_SMALLINT_MAX > UINT_MAX
+            if (x == ZIS_SMALLINT_MIN || -x > UINT_MAX)
+                return int_obj_too_large_error(z);
+#endif
+            const unsigned int n = (unsigned int)(zis_smallint_unsigned_t)-x;
+            struct zis_object *res = zis_int_obj_or_smallint_shl(z, self_v, n);
+            if (!res)
+                return int_obj_too_large_error(z);
+            frame[0] = res;
+        }
+    } else if (other_type == g->type_Int) {
+        if (zis_object_cast(other_v, struct zis_int_obj)->negative)
+            return int_obj_too_large_error(z);
+        frame[0] = zis_smallint_to_ptr(0);
+    } else {
+        return int_obj_bin_op_unsupported_error(z, ">>");
+    }
+    return ZIS_OK;
+}
+
 ZIS_NATIVE_FUNC_DEF(T_Int_M_operator_not, z, {1, 0, 1}) {
     /*#DOCSTR# func Int:\'|'() :: Int
     Operator ~. */
@@ -1511,6 +1764,8 @@ ZIS_NATIVE_FUNC_DEF_LIST(
     { "*"           , &T_Int_M_operator_mul   },
     { "/"           , &T_Int_M_operator_div   },
     { "**"          , &T_Int_M_operator_pow   },
+    { "<<"          , &T_Int_M_operator_shl   },
+    { ">>"          , &T_Int_M_operator_shr   },
     { "~"           , &T_Int_M_operator_not   },
     { "&"           , &T_Int_M_operator_and   },
     { "|"           , &T_Int_M_operator_or    },
