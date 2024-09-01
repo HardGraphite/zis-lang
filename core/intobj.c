@@ -90,12 +90,11 @@ zis_nodiscard static int bigint_cmp(
     if (a_len != b_len)
         return a_len < b_len ? -1 : 1;
 
-    unsigned int i = a_len;
-    do {
+    for (unsigned int i = a_len - 1; i != (unsigned int)-1; i--) {
         const bigint_cell_t a_i = a_vec[i], b_i = b_vec[i];
         if (a_i != b_i)
             return a_i < b_i ? -1 : 1;
-    } while (--i);
+    }
 
     return 0;
 }
@@ -468,7 +467,7 @@ static struct zis_object *int_obj_shrink(struct zis_context *z, struct zis_int_o
         static_assert(sizeof(bigint_cell_t) * 2 == sizeof(int64_t), "");
         uint64_t c01 = ((uint64_t)cells[1] << BIGINT_CELL_WIDTH) | (uint64_t)cells[0];
         bool neg = x->negative;
-        if (c01 <= (!neg ? (bigint_cell_t)ZIS_SMALLINT_MAX : -(bigint_cell_t)ZIS_SMALLINT_MIN)) {
+        if (c01 <= (!neg ? (uint64_t)ZIS_SMALLINT_MAX : UINT64_C(0)-(uint64_t)ZIS_SMALLINT_MIN)) {
             zis_smallint_t v = (zis_smallint_t)c01;
             if (x->negative)
                 v = -v;
@@ -583,7 +582,7 @@ struct zis_object *zis_int_obj_or_smallint_s(
                 bigint_self_mul_add_1(cells, cell_count, base, zis_char_digit(c));
             assert(!carry), zis_unused_var(carry);
         }
-        return zis_object_from(self);
+        return int_obj_shrink(z, self);
     }
 }
 
