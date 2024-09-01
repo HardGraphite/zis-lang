@@ -100,8 +100,16 @@ struct zis_object *zis_int_obj_or_smallint_mul(
 );
 
 /// Integral arithmetic: `lhs / rhs`. Returns a floating point number as result.
-struct zis_float_obj *zis_int_obj_or_smallint_div(
+struct zis_float_obj *zis_int_obj_or_smallint_fdiv(
     struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs
+);
+
+/// Integral arithmetic: `quot = lhs / rhs` and `rem = lhs % rhs`.
+/// Generates two integers (quotient and remainder) as results.
+/// If `rhs` is zero, returns false; otherwise writes the results into `quot_and_rem` and returns true.
+zis_nodiscard bool zis_int_obj_or_smallint_divmod(
+    struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs,
+    struct zis_object **quot, struct zis_object **rem
 );
 
 /// Integral arithmetic: `lhs ** rhs` (power).

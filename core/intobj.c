@@ -22,6 +22,7 @@
 #include "exceptobj.h"
 #include "floatobj.h"
 #include "stringobj.h"
+#include "tupleobj.h"
 
 #include "zis_config.h" // ZIS_USE_GNUC_OVERFLOW_ARITH
 
@@ -180,6 +181,36 @@ zis_nodiscard static bool bigint_sub(
     return result_neg;
 }
 
+/// a_vec[a_len] -= b_vec[b_len]. The result must be positive.
+/// Assume that a >= b.
+static void bigint_self_sub(
+    bigint_cell_t *restrict a_vec, unsigned int a_len,
+    const bigint_cell_t *restrict b_vec, unsigned int b_len
+) {
+    assert(a_len > 0 && b_len > 0);
+    assert((a_len > b_len) || (a_len == b_len && a_vec[a_len - 1] >= b_vec[b_len - 1]));
+
+    // Adapted from `bigint_sub()`.
+    bigint_cell_t borrow = 0;
+    for (unsigned int i = 0; i < a_len; i++) {
+        bigint_cell_t a, b, s;
+        a = a_vec[i];
+        b = i < b_len ? b_vec[i] : 0;
+#if ZIS_USE_GNUC_OVERFLOW_ARITH
+        bigint_cell_t c1 = __builtin_sub_overflow(a, b, &s);
+        bigint_cell_t c2 = __builtin_sub_overflow(s, borrow, &s);
+        borrow = c1 | c2;
+#else
+        bigint_2cell_t s_and_b =
+            (((bigint_2cell_t)BIGINT_CELL_MAX << BIGINT_CELL_WIDTH) | a) - b - borrow;
+        s = (bigint_cell_t)s_and_b;
+        borrow = BIGINT_CELL_MAX - (bigint_cell_t)(s_and_b >> BIGINT_CELL_WIDTH);
+#endif
+        a_vec[i] = s;
+    }
+    assert(!borrow);
+}
+
 zis_cold_fn zis_noinline static void _bigint_mul_unexpected_overflow(void) {
     // FIXME: Unfortunately it overflows. Don't know how to handle it right now.
     zis_context_panic(NULL, ZIS_CONTEXT_PANIC_IMPL);
@@ -243,6 +274,58 @@ static void bigint_mul(
                 _bigint_mul_unexpected_overflow();
             y_vec[i] = y;
         }
+    }
+}
+
+/// q_vec[a_len] = a_vec[a_len] / b_vec[b_len] ... r_vec[a_len] .
+/// Assume that b is not zero.
+static void bigint_div(
+    const bigint_cell_t *restrict a_vec, unsigned int a_len,
+    const bigint_cell_t *restrict b_vec, unsigned int b_len,
+    bigint_cell_t *restrict q_vec,
+    bigint_cell_t *restrict r_vec
+) {
+    const unsigned int q_len = a_len, r_len = a_len;
+
+    assert(a_len > 0 && b_len > 0);
+    assert(!(b_len == 1 && b_vec[0] == 0)); // b != 0
+
+    if (a_len < b_len) {
+        memcpy(r_vec, a_vec, a_len * sizeof a_vec[0]);
+        return;
+    }
+
+    /*
+     *                   q1    q0
+     *         -------------------
+     *  b1  b0 )   a2    a1    a0
+     *           b1q1  b0q1
+     *          ------------------
+     *            ..    ..     a0
+     *                 b1q1  b0q1
+     *          ------------------
+     *                   r1    r0
+     */
+
+    // TODO: This implementation is terribly slow! Speed it up.
+
+    memset(q_vec, 0, q_len * sizeof q_vec[0]);
+    memcpy(r_vec, a_vec, a_len * sizeof a_vec[0]);
+
+    for (unsigned int i = a_len - b_len; i != (unsigned int)-1; i--) {
+        bigint_cell_t *const r_vec_x = r_vec + i;
+        unsigned int r_len_x = r_len - i;
+        bigint_cell_t q = 0;
+        while (true) {
+            while (!r_vec_x[r_len_x - 1])
+                assert(r_len_x), r_len_x--; // `bigint_cmp()` does not allow leading zeros.
+            if (bigint_cmp(r_vec_x, r_len_x, b_vec, b_len) < 0)
+                break;
+            bigint_self_sub(r_vec_x, r_len_x, b_vec, b_len);
+            assert(q != BIGINT_CELL_MAX);
+            q++;
+        }
+        q_vec[i] = q;
     }
 }
 
@@ -931,7 +1014,7 @@ struct zis_object *zis_int_obj_or_smallint_mul(
     return int_obj_shrink(z, res_int_obj);
 }
 
-struct zis_float_obj *zis_int_obj_or_smallint_div(
+struct zis_float_obj *zis_int_obj_or_smallint_fdiv(
     struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs
 ) {
     double lhs_as_f, rhs_as_f;
@@ -951,6 +1034,131 @@ struct zis_float_obj *zis_int_obj_or_smallint_div(
     }
     // WARNING: division by zero is not specially handled.
     return zis_float_obj_new(z, lhs_as_f / rhs_as_f);
+}
+
+/// Do division using shift-right operation.
+/// `rhs` must be a power of 2. `*quot_p` and `*rem_p` must be GC-safe.
+static void _int_obj_divmod_using_shr(
+    struct zis_context *z,
+    struct zis_int_obj *lhs, struct zis_int_obj *rhs,
+    struct zis_object **quot_p, struct zis_object **rem_p
+) {
+    assert(int_obj_is_pow2(rhs));
+
+    if (bigint_cmp(lhs->cells, lhs->cell_count, rhs->cells, rhs->cell_count) <= 0) {
+        *quot_p = zis_smallint_to_ptr(0);
+        *rem_p = int_obj_shrink(z, lhs);
+        return;
+    }
+
+    const bool rhs_neg = rhs->negative;
+    unsigned int shift_n = int_obj_width(rhs) - 1;
+    *rem_p = zis_object_from(lhs); // Protect it.
+    struct zis_object *quot =
+        zis_int_obj_or_smallint_shr(z, zis_object_from(lhs), shift_n);
+    if (rhs_neg) {
+        if (zis_object_is_smallint(quot)) {
+            quot = zis_int_obj_or_smallint(z, -zis_smallint_from_ptr(quot));
+        } else {
+            struct zis_int_obj *res_v = zis_object_cast(quot, struct zis_int_obj);
+            assert(res_v != lhs && res_v != rhs);
+            res_v->negative = !res_v->negative;
+        }
+    }
+    *quot_p = quot;
+    struct zis_object *q_x_b = zis_int_obj_or_smallint_shl(z, quot, shift_n);
+    lhs = zis_object_cast(*rem_p, struct zis_int_obj);
+    *rem_p = zis_int_obj_or_smallint_sub(z, zis_object_from(lhs), q_x_b);
+}
+
+zis_nodiscard bool zis_int_obj_or_smallint_divmod(
+    struct zis_context *z, struct zis_object *lhs, struct zis_object *rhs,
+    struct zis_object **quot, struct zis_object **rem
+) {
+    if (zis_unlikely(rhs == zis_smallint_to_ptr(0)))
+        return false;
+
+    if (zis_object_is_smallint(lhs) && zis_object_is_smallint(rhs)) {
+        const zis_smallint_t lhs_v = zis_smallint_from_ptr(lhs), rhs_v = zis_smallint_from_ptr(rhs);
+        // Generic selection expressions does not support statements or standalone
+        // types in the association list, so I have to use conditional preprocessing blocks.
+#if ZIS_SMALLINT_MAX == INT_MAX / 2
+        const div_t div_res
+#elif ZIS_SMALLINT_MAX == LONG_MAX / 2
+        const ldiv_t div_res
+#elif ZIS_SMALLINT_MAX == LLONG_MAX / 2
+        const lldiv_t div_res
+#else
+#    error "???"
+#endif
+        = _Generic(lhs_v, int: div, long: ldiv, long long: lldiv)(lhs_v, rhs_v);
+        if (quot)
+            *quot = zis_smallint_to_ptr(div_res.quot);
+        if (rem)
+            *rem = zis_smallint_to_ptr(div_res.rem);
+        return true;
+    }
+
+    dummy_int_obj_for_smi _dummy_int_l, _dummy_int_r;
+    zis_locals_decl(
+        z, var,
+        struct zis_int_obj *lhs_int_obj, *rhs_int_obj, *res_quot, *res_rem;
+        struct zis_object *res_tmp;
+    );
+    zis_locals_zero(var);
+
+    if (zis_object_is_smallint(lhs)) {
+        dummy_int_obj_for_smi_init(&_dummy_int_l, zis_smallint_from_ptr(lhs));
+        var.lhs_int_obj = &_dummy_int_l.int_obj;
+    } else {
+        assert(zis_object_type_is(lhs, z->globals->type_Int));
+        var.lhs_int_obj = zis_object_cast(lhs, struct zis_int_obj);
+    }
+    if (zis_object_is_smallint(rhs)) {
+        dummy_int_obj_for_smi_init(&_dummy_int_r, zis_smallint_from_ptr(rhs));
+        var.rhs_int_obj = &_dummy_int_r.int_obj;
+    } else {
+        assert(zis_object_type_is(rhs, z->globals->type_Int));
+        var.rhs_int_obj = zis_object_cast(rhs, struct zis_int_obj);
+    }
+
+    if (int_obj_is_pow2(var.rhs_int_obj)) {
+        _int_obj_divmod_using_shr(z, var.lhs_int_obj, var.rhs_int_obj, quot, rem);
+        zis_locals_drop(z, var);
+        return true;
+    }
+
+    var.res_quot = int_obj_alloc(z, var.lhs_int_obj->cell_count);
+    var.res_rem  = int_obj_alloc(z, var.lhs_int_obj->cell_count);
+    var.res_quot->negative = var.lhs_int_obj->negative != var.rhs_int_obj->negative;
+    var.res_rem->negative  = var.res_quot->negative;
+
+    if (var.rhs_int_obj->cell_count == 1) {
+        memcpy(
+            var.res_quot->cells, var.lhs_int_obj->cells,
+            var.lhs_int_obj->cell_count * sizeof(bigint_cell_t)
+        );
+        var.res_rem->cell_count = 1;
+        var.res_rem->cells[0] = bigint_self_div_1(
+            var.res_quot->cells, var.res_quot->cell_count,
+            var.rhs_int_obj->cells[0]
+        );
+    } else {
+        bigint_div(
+            var.lhs_int_obj->cells, var.lhs_int_obj->cell_count,
+            var.rhs_int_obj->cells, var.rhs_int_obj->cell_count,
+            var.res_quot->cells, var.res_rem->cells
+        );
+    }
+
+    var.res_tmp = int_obj_shrink(z, var.res_rem);
+    if (quot)
+        *quot = int_obj_shrink(z, var.res_quot);
+    if (rem)
+        *rem = var.res_tmp; // rem
+
+    zis_locals_drop(z, var);
+    return true;
 }
 
 struct zis_object *zis_int_obj_or_smallint_pow(
@@ -1471,7 +1679,7 @@ ZIS_NATIVE_FUNC_DEF(T_Int_M_operator_div, z, {2, 0, 2}) {
     struct zis_object *self_v = frame[1], *other_v = frame[2];
     struct zis_type_obj *other_type = zis_object_type_1(other_v);
     if (!other_type || other_type == g->type_Int)
-        result = zis_int_obj_or_smallint_div(z, self_v, other_v);
+        result = zis_int_obj_or_smallint_fdiv(z, self_v, other_v);
     else if (other_type == g->type_Float)
         result = zis_float_obj_new(
             z,
@@ -1731,6 +1939,29 @@ ZIS_NATIVE_FUNC_DEF(T_Int_M_to_string, z, {1, 1, 2}) {
     return ZIS_OK;
 }
 
+ZIS_NATIVE_FUNC_DEF(T_Int_M_div, z, {2, 0, 2}) {
+    /*#DOCSTR# func Int:div(d :: Int) :: Tuple[Int, Int]
+    Computes the quotient and the remainder of the division of self by d. */
+    assert_arg1_smi_or_Int(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_object *self_v = frame[1], *d_v = frame[2];
+    if (!(zis_object_is_smallint(d_v) || zis_object_type(d_v) == g->type_Int)) {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_WRONG_ARGUMENT_TYPE, "d", d_v
+        ));
+        return ZIS_THR;
+    }
+    if (!zis_int_obj_or_smallint_divmod(z, self_v, d_v, frame + 1, frame + 2)) {
+        frame[0] = zis_object_from(zis_exception_obj_format(
+            z, "value", NULL, "division by zero"
+        ));
+        return ZIS_THR;
+    }
+    frame[0] = zis_object_from(zis_tuple_obj_new(z, frame + 1, 2));
+    return ZIS_OK;
+}
+
 ZIS_NATIVE_FUNC_DEF(T_Int_F_parse, z, {1, 1, 2}) {
     /*#DOCSTR# func Int.parse(s :: String, ?base :: Int) :: Int
     Converts a string representation of a integer to its value.
@@ -1832,6 +2063,7 @@ ZIS_NATIVE_FUNC_DEF_LIST(
     { "<=>"         , &T_Int_M_operator_cmp   },
     { "hash"        , &T_Int_M_hash           },
     { "to_string"   , &T_Int_M_to_string      },
+    { "div"         , &T_Int_M_div            },
 );
 
 ZIS_NATIVE_VAR_DEF_LIST(
