@@ -1462,7 +1462,7 @@ static int api_import_call_main(zis_t z, struct zis_object **res_ref) {
                 const zis_smallint_t x = zis_smallint_from_ptr(func_ret_val);
                 status = (int)((zis_smallint_unsigned_t)x & 0xff);
             } else if (zis_object_type(func_ret_val) == z->globals->type_Int) {
-                const int64_t x = zis_int_obj_value_trunc(zis_object_cast(func_ret_val, struct zis_int_obj));
+                const int64_t x = zis_int_obj_value_trunc_i(zis_object_cast(func_ret_val, struct zis_int_obj));
                 status = (int)((uint64_t)x) & 0xff;
             }
         }

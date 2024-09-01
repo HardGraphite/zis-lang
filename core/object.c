@@ -38,7 +38,7 @@ bool zis_object_hash(
     }
     if (zis_object_type(ret) == z->globals->type_Int) {
         const int64_t h =
-            zis_int_obj_value_trunc(zis_object_cast(ret, struct zis_int_obj));
+            zis_int_obj_value_trunc_i(zis_object_cast(ret, struct zis_int_obj));
         *hash_code = (size_t)(h >= INT64_C(0) ? h : -h);
         return true;
     }

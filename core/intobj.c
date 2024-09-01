@@ -421,6 +421,26 @@ static void bigint_shr(
     bigint_zero(y_vec + y_len_min, y_len - y_len_min);
 }
 
+/// Truncate bigint to n-bits. Assume that y_len is big enough.
+static void bigint_trunc(
+    const bigint_cell_t *restrict a_vec,
+    unsigned int n,
+    bigint_cell_t *restrict y_vec, unsigned int y_len
+) {
+    const unsigned int cell_count = n / BIGINT_CELL_WIDTH;
+    const unsigned int bit_count  = n - cell_count;
+    assert(y_len >= cell_count + (bit_count ? 1 : 0));
+    if (bit_count) {
+        const unsigned int copy_count = cell_count + 1;
+        bigint_copy(y_vec, a_vec, copy_count);
+        bigint_zero(y_vec + copy_count, y_len - copy_count);
+        y_vec[cell_count] &= BIGINT_CELL_MAX >> (BIGINT_CELL_WIDTH - bit_count);
+    } else {
+        bigint_copy(y_vec, a_vec, cell_count);
+        bigint_zero(y_vec + cell_count, y_len - cell_count);
+    }
+}
+
 /* ----- int object --------------------------------------------------------- */
 
 typedef uint16_t int_obj_cell_count_t;
@@ -699,7 +719,7 @@ int64_t zis_int_obj_value_i(const struct zis_int_obj *self) {
     return INT64_MIN;
 }
 
-int64_t zis_int_obj_value_trunc(const struct zis_int_obj *self) {
+int64_t zis_int_obj_value_trunc_i(const struct zis_int_obj *self) {
     const size_t cell_count = self->cell_count;
     assert(cell_count);
     if (cell_count == 1) {
@@ -815,6 +835,34 @@ size_t zis_smallint_to_str(zis_smallint_t i, char *restrict buf, size_t buf_sz, 
     if (p != buf)
         memmove(buf, p, written_size);
     return written_size;
+}
+
+struct zis_object *zis_int_obj_trunc(
+    struct zis_context *z,
+    const struct zis_int_obj *num, unsigned int n_bits
+) {
+    const unsigned int num_width = int_obj_width(num);
+    if (n_bits >= num_width)
+        return zis_object_from(num);
+
+    const unsigned int res_cell_count =
+        zis_round_up_to_n_pow2(BIGINT_CELL_WIDTH, n_bits) / BIGINT_CELL_WIDTH;
+
+    if (res_cell_count <= DUMMY_INT_OBJ_FOR_SMI_CELL_COUNT) {
+        dummy_int_obj_for_smi small_res;
+        dummy_int_obj_for_smi_init(&small_res, 0);
+        small_res.int_obj.negative = num->negative;
+        bigint_trunc(num->cells, n_bits, small_res.int_obj.cells, small_res.int_obj.cell_count);
+        return int_obj_shrink(z, &small_res.int_obj);
+    }
+
+    zis_locals_decl_1(z, var, const struct zis_int_obj *num);
+    var.num = num;
+    struct zis_int_obj *res = int_obj_alloc(z, res_cell_count);
+    bigint_trunc(var.num->cells, n_bits, res->cells, res->cell_count);
+    zis_locals_drop(z, var);
+    assert(int_obj_shrink(z, res) == zis_object_from(res));
+    return zis_object_from(res);
 }
 
 /// Try to do simple small-int multiplication.
@@ -1074,9 +1122,8 @@ static void _int_obj_divmod_using_shr(
         }
     }
     *quot_p = quot;
-    struct zis_object *q_x_b = zis_int_obj_or_smallint_shl(z, quot, shift_n);
     lhs = zis_object_cast(*rem_p, struct zis_int_obj);
-    *rem_p = zis_int_obj_or_smallint_sub(z, zis_object_from(lhs), q_x_b);
+    *rem_p = zis_int_obj_trunc(z, lhs, shift_n);
 }
 
 zis_nodiscard bool zis_int_obj_or_smallint_divmod(

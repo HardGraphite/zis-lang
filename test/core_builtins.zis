@@ -206,6 +206,7 @@ end
 func test_Int_div()
     testing.check_equal(5:div(2), (2, 1))
     testing.check_equal(0xa01b23c45d67e89f:div(16), (0xa01b23c45d67e89, 15))
+    testing.check_equal(0xf01b23c45d67e89a0000:div(0x80000000000000000000), (1, 0x701b23c45d67e89a0000))
     testing.check_equal(0xa01b23c45d67e89f:div(101), (0x195d0321a4576e5, 70))
     testing.check_equal(0xf01b23c45d67e89a0000:div(0xa01b23c45d67e89f), (98282, 0x3072e42c12997daa))
 end

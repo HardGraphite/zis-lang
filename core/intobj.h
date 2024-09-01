@@ -36,7 +36,7 @@ bool zis_int_obj_sign(const struct zis_int_obj *self);
 int64_t zis_int_obj_value_i(const struct zis_int_obj *self);
 
 /// Get the lower 63 bits of the integer and return an int64.
-int64_t zis_int_obj_value_trunc(const struct zis_int_obj *self);
+int64_t zis_int_obj_value_trunc_i(const struct zis_int_obj *self);
 
 /// Get value as `double`. The result may be inaccurate. If the value falls
 /// out of range of type `double`, `errno` is set to `ERANGE` and `HUGE_VAL` is returned.
@@ -49,6 +49,12 @@ size_t zis_int_obj_value_s(const struct zis_int_obj *self, char *restrict buf, s
 
 /// See `zis_int_obj_value_s()`.
 size_t zis_smallint_to_str(zis_smallint_t i, char *restrict buf, size_t buf_sz, int base);
+
+/// Get the lower `n_bits` bits of the integer.
+struct zis_object *zis_int_obj_trunc(
+    struct zis_context *z,
+    const struct zis_int_obj *num, unsigned int n_bits
+);
 
 /// Small integer arithmetic: `lhs + rhs`.
 zis_static_force_inline struct zis_object *zis_smallint_add(
