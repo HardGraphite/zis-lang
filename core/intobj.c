@@ -45,6 +45,13 @@ static void bigint_zero(bigint_cell_t *restrict a_v, unsigned int a_len) {
     memset(a_v, 0, sizeof a_v[0] * a_len);
 }
 
+/// dst_v[len] = src_v[len]
+static void bigint_copy(
+    bigint_cell_t *restrict dst_v, const bigint_cell_t *restrict src_v, unsigned int len
+) {
+    memcpy(dst_v, src_v, sizeof src_v[0] * len);
+}
+
 /// a_v[a_len] = a_v[a_len] * b + c ... carry
 static bigint_cell_t bigint_self_mul_add_1(
     bigint_cell_t *restrict a_v, unsigned int a_len,
@@ -155,7 +162,7 @@ zis_nodiscard static bool bigint_sub(
             b_len = tmp_len;
             result_neg = true;
         } else {
-            memset(y_vec, 0, y_len * sizeof y_vec[0]);
+            bigint_zero(y_vec, y_len);
             return false;
         }
     }
@@ -235,7 +242,7 @@ static void bigint_mul(
      *   y4    y3    y2    y1    y0
      */
 
-    memset(y_vec, 0, sizeof y_vec[0] * y_len);
+    bigint_zero(y_vec, y_len);
 
     for (unsigned int k = 0; k < b_len; k++) {
         const bigint_cell_t b = b_vec[k];
@@ -291,7 +298,7 @@ static void bigint_div(
     assert(!(b_len == 1 && b_vec[0] == 0)); // b != 0
 
     if (a_len < b_len) {
-        memcpy(r_vec, a_vec, a_len * sizeof a_vec[0]);
+        bigint_copy(r_vec, a_vec, a_len);
         return;
     }
 
@@ -309,8 +316,8 @@ static void bigint_div(
 
     // TODO: This implementation is terribly slow! Speed it up.
 
-    memset(q_vec, 0, q_len * sizeof q_vec[0]);
-    memcpy(r_vec, a_vec, a_len * sizeof a_vec[0]);
+    bigint_zero(q_vec, q_len);
+    bigint_copy(r_vec, a_vec, a_len);
 
     for (unsigned int i = a_len - b_len; i != (unsigned int)-1; i--) {
         bigint_cell_t *const r_vec_x = r_vec + i;
@@ -372,8 +379,8 @@ static void bigint_shl(
     }
 
     assert(y_len >= y_len_min);
-    memset(y_vec, 0, cell_offset * sizeof y_vec[0]);
-    memset(y_vec + y_len_min, 0, (y_len - y_len_min) * sizeof y_vec[0]);
+    bigint_zero(y_vec, cell_offset);
+    bigint_zero(y_vec + y_len_min, y_len - y_len_min);
 }
 
 /// y_vec[y_len] = a_vec[a_len] >> n.
@@ -387,7 +394,7 @@ static void bigint_shr(
     const unsigned int bit_offset  = n % BIGINT_CELL_WIDTH;
 
     if (cell_offset >= a_len) {
-        memset(y_vec, 0, y_len * sizeof y_vec[0]);
+        bigint_zero(y_vec, y_len);
         return;
     }
 
@@ -411,7 +418,7 @@ static void bigint_shr(
     }
 
     assert(y_len >= y_len_min);
-    memset(y_vec + y_len_min, 0, (y_len - y_len_min) * sizeof y_vec[0]);
+    bigint_zero(y_vec + y_len_min, y_len - y_len_min);
 }
 
 /* ----- int object --------------------------------------------------------- */
@@ -507,8 +514,9 @@ static bool int_obj_is_pow2(const struct zis_int_obj *self) {
 /// Make a copy of an int object.
 static struct zis_int_obj *int_obj_clone(struct zis_context *z, struct zis_int_obj *x) {
     struct zis_int_obj *new_x = int_obj_alloc(z, x->cell_count);
+    assert(new_x);
     new_x->negative = x->negative;
-    memcpy(new_x->cells, x->cells, x->cell_count * sizeof x->cells[0]);
+    bigint_copy(new_x->cells, x->cells, x->cell_count);
     return new_x;
 }
 
@@ -564,7 +572,7 @@ static struct zis_object *int_obj_shrink(struct zis_context *z, struct zis_int_o
         struct zis_int_obj *obj = int_obj_alloc(z, cell_count);
         assert(obj);
         obj->negative = x->negative;
-        memcpy(obj->cells, x->cells, cell_count * sizeof(bigint_cell_t));
+        bigint_copy(obj->cells, x->cells, cell_count);
         return zis_object_from(obj);
     }
 
@@ -737,7 +745,7 @@ size_t zis_int_obj_value_s(const struct zis_int_obj *self, char *restrict buf, s
     const char *const digits = uppercase ? digits_upper : digits_lower;
     const unsigned int cell_count = self->cell_count;
     bigint_cell_t *cell_dup = zis_mem_alloc(sizeof(bigint_cell_t) * cell_count);
-    memcpy(cell_dup, self->cells, sizeof(bigint_cell_t) * cell_count);
+    bigint_copy(cell_dup, self->cells, cell_count);
     char *p = buf + buf_sz;
     for (unsigned int reset_cell_count = cell_count; reset_cell_count; ) {
         if (p <= buf) {
@@ -1134,9 +1142,9 @@ zis_nodiscard bool zis_int_obj_or_smallint_divmod(
     var.res_rem->negative  = var.res_quot->negative;
 
     if (var.rhs_int_obj->cell_count == 1) {
-        memcpy(
+        bigint_copy(
             var.res_quot->cells, var.lhs_int_obj->cells,
-            var.lhs_int_obj->cell_count * sizeof(bigint_cell_t)
+            var.lhs_int_obj->cell_count
         );
         var.res_rem->cell_count = 1;
         var.res_rem->cells[0] = bigint_self_div_1(
@@ -1456,10 +1464,10 @@ static struct zis_object *_int_obj_or_smallint_bitwise_op_slow(
     if (var.res_int_obj->cell_count > var.rhs_int_obj->cell_count) {
         const size_t copied_count = var.rhs_int_obj->cell_count;
         const size_t rest_count = var.res_int_obj->cell_count - copied_count;
-        memcpy(
+        bigint_copy(
             var.res_int_obj->cells + copied_count,
             var.lhs_int_obj->cells + copied_count,
-            rest_count * sizeof(bigint_cell_t)
+            rest_count
         );
     }
 skip_copying_rest_cells:;
@@ -1577,10 +1585,8 @@ ZIS_NATIVE_FUNC_DEF(T_Int_M_operator_neg, z, {1, 0, 1}) {
         }
     } else {
         struct zis_int_obj *self_int_obj = zis_object_cast(self, struct zis_int_obj);
-        struct zis_int_obj *res_int_obj = int_obj_alloc(z, self_int_obj->cell_count);
-        assert(res_int_obj);
+        struct zis_int_obj *res_int_obj = int_obj_clone(z, self_int_obj);
         res_int_obj->negative = !self_int_obj->negative;
-        memcpy(res_int_obj->cells, self_int_obj->cells, self_int_obj->cell_count * sizeof(bigint_cell_t));
         result = zis_object_from(res_int_obj);
     }
     frame[0] = result;
