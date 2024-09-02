@@ -14,7 +14,7 @@ function(_zis_bundled_c_tests_setup)
     set(bundle_tgt_name "zis_test_bundle")
     create_test_sourcelist(src_list "${bundle_tgt_name}_main.c" ${_zis_bundled_c_tests})
     add_executable(${bundle_tgt_name} ${src_list})
-    target_link_libraries(${bundle_tgt_name} PRIVATE zis_test_util ${zis_core_tgt})
+    target_link_libraries(${bundle_tgt_name} PRIVATE zis_test_util ${zis_core_tgt} "$<$<BOOL:${UNIX}>:m>")
     target_include_directories(${bundle_tgt_name} PRIVATE ${_zis_bundled_c_test_incdir})
 endfunction()
 
