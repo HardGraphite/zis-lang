@@ -469,6 +469,12 @@ typedef union dummy_int_obj_for_smi {
 
 static_assert(DUMMY_INT_OBJ_FOR_SMI_CELL_COUNT > 0, "");
 
+#define assert_obj_is_int_or_dummy_int(z, obj_ptr) \
+    (assert(!zis_object_is_smallint((obj_ptr)) && (zis_object_type((obj_ptr)) == NULL || zis_object_type((obj_ptr)) == (z)->globals->type_Int)))
+
+#define assert_obj_is_not_dummy_int(obj_ptr) \
+    (assert(zis_object_is_smallint((obj_ptr)) || zis_object_type((obj_ptr)) != NULL))
+
 /// Initialize a dummy int object on stack.
 static void dummy_int_obj_for_smi_init(dummy_int_obj_for_smi *restrict di, zis_smallint_t val) {
     // See `zis_int_obj_or_smallint()`.
@@ -477,6 +483,7 @@ static void dummy_int_obj_for_smi_init(dummy_int_obj_for_smi *restrict di, zis_s
     const uint64_t val_abs = val_neg ? (uint64_t)-val : (uint64_t)val;
 
     struct zis_int_obj *self = &di->int_obj;
+    zis_object_meta_init(self->_meta, 0, 0, 0);
     if (val_abs <= BIGINT_CELL_MAX) {
         static_assert(DUMMY_INT_OBJ_FOR_SMI_CELL_COUNT >= 1, "");
         self->negative = val_neg;
@@ -597,6 +604,7 @@ static struct zis_object *int_obj_shrink(struct zis_context *z, struct zis_int_o
     }
 
     // use the original
+    assert_obj_is_not_dummy_int(zis_object_from(x));
     return zis_object_from(x);
 }
 
@@ -1313,7 +1321,8 @@ struct zis_object *zis_int_obj_or_smallint_shl(
         lhs_v = &_dummy_int_lhs.int_obj;
         lhs = zis_object_from(lhs_v);
     } else {
-        assert(zis_object_type_is(lhs, z->globals->type_Int));
+        // assert(zis_object_type_is(lhs, z->globals->type_Int));
+        assert_obj_is_int_or_dummy_int(z, lhs); // Being used in `_int_obj_mul_using_shl()`, `lhs` may be a dummy int.
         lhs_v = zis_object_cast(lhs, struct zis_int_obj);
     }
 
