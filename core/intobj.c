@@ -1287,13 +1287,15 @@ struct zis_object *zis_int_obj_or_smallint_pow(
         if (exponent & 1) {
             var.result = zis_int_obj_or_smallint_mul(z, var.result, var.base);
             if (zis_unlikely(!var.result))
-                break;
+                break; // Too large.
             if (zis_unlikely(exponent == 1))
-                break;
+                break; // Done.
         }
         var.base = zis_int_obj_or_smallint_mul(z, var.base, var.base);
-        if (zis_unlikely(!var.result))
-            break;
+        if (zis_unlikely(!var.base)) {
+            var.result = NULL;
+            break; // Too large.
+        }
         exponent >>= 1;
     }
 
@@ -1611,7 +1613,7 @@ zis_cold_fn zis_noinline
 static int int_obj_too_large_error(struct zis_context *z) {
     struct zis_object **frame = z->callstack->frame;
     frame[0] = zis_object_from(zis_exception_obj_format(
-        z, "value", NULL, "the integer constant is too large"
+        z, "value", NULL, "the integer is too large"
     ));
     return ZIS_THR;
 }
