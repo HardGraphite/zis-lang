@@ -29,12 +29,12 @@ struct zis_string_obj {
 /* ----- internal implementation -------------------------------------------- */
 
 enum string_obj_char_type {
-    STR_OBJ_C1 = 0, // U+0000 ~ U+00FF
+    STR_OBJ_C1 = 0, // U+0000 ~ U+007F
     STR_OBJ_C2 = 1, // U+0000 ~ U+FFFF
     STR_OBJ_C4 = 3, // U+0000 ~ U+10FFFF
 };
 
-#define STR_OBJ_C1_CODE_MAX  0x00ff
+#define STR_OBJ_C1_CODE_MAX  0x007f
 #define STR_OBJ_C2_CODE_MAX  0xffff
 
 typedef uint8_t  string_obj_c1_t;
@@ -304,6 +304,7 @@ size_t zis_string_obj_value(const struct zis_string_obj *self, char *buf, size_t
 }
 
 const char *zis_string_obj_data_utf8(const struct zis_string_obj *self) {
+    static_assert(STR_OBJ_C1_CODE_MAX <= 0x7f, "");
     if (string_obj_char_type(self) == STR_OBJ_C1)
         return self->_data;
     return NULL;
