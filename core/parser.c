@@ -1271,7 +1271,7 @@ static void _parser_dump_obj(
         fprintf(fp, "%*c%.*s\n", level_m1, ' ', n, s);
     } else if (obj_type == g->type_String) {
         char buffer[64]; size_t size = sizeof buffer;
-        size = zis_string_obj_value(zis_object_cast(obj, struct zis_string_obj), buffer, size);
+        size = zis_string_obj_to_u8str(zis_object_cast(obj, struct zis_string_obj), buffer, size);
         if (size != (size_t)-1)
             fprintf(fp, "%*c<![CDATA[%.*s]]>\n", level_m1, ' ', (int)size, buffer);
         else

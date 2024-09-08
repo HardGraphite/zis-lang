@@ -248,7 +248,7 @@ size_t zis_string_obj_length(const struct zis_string_obj *self) {
     return string_obj_length(self);
 }
 
-size_t zis_string_obj_value(const struct zis_string_obj *self, char *buf, size_t buf_sz) {
+size_t zis_string_obj_to_u8str(const struct zis_string_obj *self, char *buf, size_t buf_sz) {
     const enum string_obj_char_type char_type  = string_obj_char_type(self);
     const size_t char_count = string_obj_length(self);
 
@@ -303,10 +303,13 @@ size_t zis_string_obj_value(const struct zis_string_obj *self, char *buf, size_t
     }
 }
 
-const char *zis_string_obj_data_utf8(const struct zis_string_obj *self) {
+const char *zis_string_obj_as_ascii(const struct zis_string_obj *self, size_t *len) {
     static_assert(STR_OBJ_C1_CODE_MAX <= 0x7f, "");
-    if (string_obj_char_type(self) == STR_OBJ_C1)
+    if (string_obj_char_type(self) == STR_OBJ_C1) {
+        if (len)
+            *len = string_obj_length(self);
         return self->_data;
+    }
     return NULL;
 }
 
@@ -383,15 +386,15 @@ void zis_string_obj_write_to_stream(struct zis_string_obj *self, struct zis_stre
     char *buffer;
     size_t size;
     buffer = zis_stream_obj_char_buf_ptr(stream, 0, &size);
-    size = zis_string_obj_value(self, buffer, size);
+    size = zis_string_obj_to_u8str(self, buffer, size);
     if (size != (size_t)-1) {
         zis_stream_obj_char_buf_ptr(stream, size, NULL);
     } else {
-        // TODO: make `zis_string_obj_value()` support copying part of a string,
+        // TODO: make `zis_string_obj_to_u8str()` support copying part of a string,
         // so that long strings can be copied to stream buffer separately.
-        size = zis_string_obj_value(self, NULL, 0);
+        size = zis_string_obj_to_u8str(self, NULL, 0);
         buffer = zis_mem_alloc(size);
-        size = zis_string_obj_value(self, buffer, size);
+        size = zis_string_obj_to_u8str(self, buffer, size);
         assert(size != (size_t)-1);
         zis_stream_obj_write_chars(stream, buffer, size);
         zis_mem_free(buffer);

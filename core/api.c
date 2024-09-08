@@ -332,7 +332,7 @@ ZIS_API int zis_read_string(zis_t z, unsigned int reg, char *buf, size_t *sz) {
         return ZIS_E_IDX;
     if (zis_unlikely(!zis_object_type_is(obj, z->globals->type_String)))
         return ZIS_E_TYPE;
-    const size_t n = zis_string_obj_value(zis_object_cast(obj, struct zis_string_obj), buf, *sz);
+    const size_t n = zis_string_obj_to_u8str(zis_object_cast(obj, struct zis_string_obj), buf, *sz);
     if (zis_unlikely(n == (size_t)-1))
         return ZIS_E_BUF;
     *sz = n;
@@ -861,7 +861,7 @@ do {                  \
             CHECK_TYPE(String);
             char *buf = va_arg(x->ap, char *);
             size_t *sz = va_arg(x->ap, size_t *);
-            const size_t n = zis_string_obj_value(
+            const size_t n = zis_string_obj_to_u8str(
                 zis_object_cast(in_obj, struct zis_string_obj), buf, *sz
             );
             if (zis_unlikely(n == (size_t)-1)) {

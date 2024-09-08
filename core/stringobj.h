@@ -47,12 +47,13 @@ size_t zis_string_obj_length(const struct zis_string_obj *self);
 /// Copy `String` data to buffer `buf` as UTF-8 string and return the size (bytes).
 /// Return -1 if the buffer is not big enough.
 /// Set `buf` to NULL to get the minimum size of buffer.
-zis_nodiscard size_t zis_string_obj_value(
+zis_nodiscard size_t zis_string_obj_to_u8str(
     const struct zis_string_obj *self, char *buf, size_t buf_sz
 );
 
-/// Get the UTF-8 data. Returns NULL if the data is not stored in UTF-8 format.
-const char *zis_string_obj_data_utf8(const struct zis_string_obj *self);
+/// Try to get the raw data in ASCII (UTF-8) format. `len` is optional.
+/// Returns NULL if the data is not stored as ASCII.
+const char *zis_string_obj_as_ascii(const struct zis_string_obj *self, size_t *len /* = NULL */);
 
 /// Concatenate two strings.
 struct zis_string_obj *zis_string_obj_concat(

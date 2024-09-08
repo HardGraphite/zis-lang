@@ -2150,7 +2150,8 @@ ZIS_NATIVE_FUNC_DEF(T_Int_F_parse, z, {1, 1, 2}) {
     bool make_result_neg = false;
     if (zis_object_type_is(frame[1], z->globals->type_String)) {
         struct zis_string_obj *str = zis_object_cast(frame[1], struct zis_string_obj);
-        str_begin = zis_string_obj_data_utf8(str);
+        size_t str_len;
+        str_begin = zis_string_obj_as_ascii(str, &str_len);
         if (!str_begin) {
         error_bad_str:
             frame[0] = zis_object_from(zis_exception_obj_format(
@@ -2158,7 +2159,7 @@ ZIS_NATIVE_FUNC_DEF(T_Int_F_parse, z, {1, 1, 2}) {
             ));
             return ZIS_THR;
         }
-        str_end = str_begin + zis_string_obj_length(str);
+        str_end = str_begin + str_len;
     } else {
         frame[0] = zis_object_from(zis_exception_obj_format_common(
             z, ZIS_EXC_FMT_WRONG_ARGUMENT_TYPE, "s", frame[1]

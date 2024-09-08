@@ -485,7 +485,7 @@ static void scan_string(
 
     zis_debug_log(
         TRACE, "Lexer", "string: ``%s''",
-        zis_string_obj_data_utf8(tok->value_string) ? zis_string_obj_data_utf8(tok->value_string) : "..."
+        zis_string_obj_as_ascii(tok->value_string, NULL) ? zis_string_obj_as_ascii(tok->value_string, NULL) : "..."
     );
 }
 

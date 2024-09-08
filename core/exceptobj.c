@@ -107,7 +107,7 @@ static void _represent_type_of_obj(
     struct zis_string_obj *represent =
         zis_context_guess_variable_name(z, zis_object_from(obj_type));
     if (represent) {
-        const size_t n = zis_string_obj_value(represent, buf, buf_sz - 1);
+        const size_t n = zis_string_obj_to_u8str(represent, buf, buf_sz - 1);
         if (n != (size_t)-1) {
             buf[n] = 0;
             return;
@@ -309,7 +309,7 @@ static int _print_stack_trace_fn(
         struct zis_string_obj *func_name =
             zis_context_guess_variable_name(z, zis_object_from(func_obj));
         if (func_name) {
-            size_t n = zis_string_obj_value(func_name, buffer, sizeof buffer - 1);
+            size_t n = zis_string_obj_to_u8str(func_name, buffer, sizeof buffer - 1);
             if (n != (size_t)-1) {
                 buffer[n] = 0;
                 break;
@@ -340,7 +340,7 @@ int zis_exception_obj_print(
     fputs("Exception: ", stdout);
     if (zis_object_type_is(self->what, z->globals->type_String)) {
         char buffer[80];
-        buffer[zis_string_obj_value(zis_object_cast(self->what, struct zis_string_obj), buffer, sizeof buffer)] = 0;
+        buffer[zis_string_obj_to_u8str(zis_object_cast(self->what, struct zis_string_obj), buffer, sizeof buffer)] = 0;
         fputs(buffer, stdout);
     }
     // TODO: print the `type` and `data` fields.

@@ -76,7 +76,7 @@ static bool read_need_next_line(zis_t z, struct zis_object *syntax_err) {
     struct zis_string_obj *err_msg =
         zis_object_cast(exc_obj->what, struct zis_string_obj);
     char err_msg_str[128];
-    size_t err_msg_size = zis_string_obj_value(err_msg, err_msg_str, sizeof err_msg_str);
+    size_t err_msg_size = zis_string_obj_to_u8str(err_msg, err_msg_str, sizeof err_msg_str);
     if (err_msg_size == (size_t)-1)
         return false;
     return
