@@ -52,6 +52,12 @@ static void bigint_copy(
     memcpy(dst_v, src_v, sizeof src_v[0] * len);
 }
 
+/// Number of used bits, aka bit width.
+static unsigned int bigint_width(const bigint_cell_t *restrict a_v, unsigned int a_len) {
+    assert(a_len && a_v[a_len - 1]);
+    return a_len * BIGINT_CELL_WIDTH - zis_bits_count_lz(a_v[a_len - 1]);
+}
+
 /// a_v[a_len] = a_v[a_len] * b + c ... carry
 static bigint_cell_t bigint_self_mul_add_1(
     bigint_cell_t *restrict a_v, unsigned int a_len,
@@ -284,15 +290,27 @@ static void bigint_mul(
     }
 }
 
+#define _bigint_div_trim_leading_zeros(__vec, __len) \
+do { \
+    assert((__len)); \
+    if (zis_likely((__vec)[(__len) - 1])) \
+        break; \
+    (__len)--; \
+} while(0)
+
+static void bigint_shl(const bigint_cell_t *restrict, unsigned int, unsigned int, bigint_cell_t *restrict, unsigned int);
+
 /// q_vec[a_len] = a_vec[a_len] / b_vec[b_len] ... r_vec[a_len] .
 /// Assume that b is not zero.
+/// The lengths of `t_vec`, `q_vec`, and `r_vec` must not be less than `a_len`.
 static void bigint_div(
-    const bigint_cell_t *restrict a_vec, unsigned int a_len,
-    const bigint_cell_t *restrict b_vec, unsigned int b_len,
-    bigint_cell_t *restrict q_vec,
-    bigint_cell_t *restrict r_vec
+    const bigint_cell_t *restrict a_vec, unsigned int a_len, // numerator
+    const bigint_cell_t *restrict b_vec, unsigned int b_len, // denominator
+    bigint_cell_t *restrict t_vec, // temporary
+    bigint_cell_t *restrict q_vec, // quotient
+    bigint_cell_t *restrict r_vec  // remainder
 ) {
-    const unsigned int q_len = a_len, r_len = a_len;
+    const unsigned int t_len = a_len, q_len = a_len, r_len = a_len;
 
     assert(a_len > 0 && b_len > 0);
     assert(!(b_len == 1 && b_vec[0] == 0)); // b != 0
@@ -314,24 +332,44 @@ static void bigint_div(
      *                   r1    r0
      */
 
-    // TODO: This implementation is terribly slow! Speed it up.
-
     bigint_zero(q_vec, q_len);
     bigint_copy(r_vec, a_vec, a_len);
 
+    const unsigned int b_vec_width = bigint_width(b_vec, b_len);
+
     for (unsigned int i = a_len - b_len; i != (unsigned int)-1; i--) {
+        bigint_cell_t q = 0;
+
         bigint_cell_t *const r_vec_x = r_vec + i;
         unsigned int r_len_x = r_len - i;
-        bigint_cell_t q = 0;
+        _bigint_div_trim_leading_zeros(r_vec_x, r_len_x);
+
         while (true) {
-            while (!r_vec_x[r_len_x - 1])
-                assert(r_len_x), r_len_x--; // `bigint_cmp()` does not allow leading zeros.
-            if (bigint_cmp(r_vec_x, r_len_x, b_vec, b_len) < 0)
+            const unsigned int r_vec_x_width = bigint_width(r_vec_x, r_len_x);
+            if (r_vec_x_width <= b_vec_width)
                 break;
+
+            unsigned int t_shift = r_vec_x_width - b_vec_width;
+            bigint_shl(b_vec, b_len, t_shift, t_vec, t_len);
+            if (bigint_cmp(r_vec_x, r_len_x, t_vec, t_len) < 0) {
+                t_shift--;
+                bigint_shl(b_vec, b_len, t_shift, t_vec, t_len);
+            }
+
+            bigint_self_sub(r_vec_x, r_len_x, t_vec, t_len);
+            _bigint_div_trim_leading_zeros(r_vec_x, r_len_x);
+            assert(t_shift < sizeof q * 8);
+            assert(!(q & (BIGINT_CELL_C(1) << t_shift)));
+            q |= BIGINT_CELL_C(1) << t_shift;
+        }
+
+        while (bigint_cmp(r_vec_x, r_len_x, b_vec, b_len) >= 0) {
             bigint_self_sub(r_vec_x, r_len_x, b_vec, b_len);
+            _bigint_div_trim_leading_zeros(r_vec_x, r_len_x);
             assert(q != BIGINT_CELL_MAX);
             q++;
         }
+
         q_vec[i] = q;
     }
 }
@@ -357,12 +395,14 @@ static void bigint_shl(
     unsigned int n,
     bigint_cell_t *restrict y_vec, unsigned int y_len
 ) {
+    assert(y_vec != a_vec);
+
     const unsigned int cell_offset = n / BIGINT_CELL_WIDTH;
     const unsigned int bit_offset  = n % BIGINT_CELL_WIDTH;
 
     unsigned int y_len_min;
     if (!bit_offset) {
-        memmove(y_vec + cell_offset, a_vec, a_len * sizeof y_vec[0]);
+        memcpy(y_vec + cell_offset, a_vec, a_len * sizeof y_vec[0]);
         y_len_min = a_len + cell_offset;
     } else {
         bigint_cell_t carry = 0;
@@ -1207,9 +1247,12 @@ zis_nodiscard bool zis_int_obj_or_smallint_divmod(
             var.rhs_int_obj->cells[0]
         );
     } else {
+        struct zis_int_obj *const tmp_buf =
+            int_obj_alloc(z, var.lhs_int_obj->cell_count);
         bigint_div(
             var.lhs_int_obj->cells, var.lhs_int_obj->cell_count,
             var.rhs_int_obj->cells, var.rhs_int_obj->cell_count,
+            tmp_buf->cells,
             var.res_quot->cells, var.res_rem->cells
         );
     }
