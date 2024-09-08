@@ -254,7 +254,7 @@ size_t zis_string_obj_to_u8str(const struct zis_string_obj *self, char *buf, siz
 
     switch (char_type) {
 
-#define COPY_STR_DATA(C_X) \
+#define CONV_STR_DATA(C_X) \
     do {                   \
         const string_obj_c##C_X##_t *const data = string_obj_data((void *)self); \
         if (buf) {         \
@@ -287,18 +287,25 @@ size_t zis_string_obj_to_u8str(const struct zis_string_obj *self, char *buf, siz
             return n_bytes;\
         }                  \
     } while (0)            \
-// ^^^ COPY_STR_DATA() ^^^
+// ^^^ CONV_STR_DATA() ^^^
 
     case STR_OBJ_C1:
-        COPY_STR_DATA(1);
+        if (buf) {
+            static_assert(STR_OBJ_C1_CODE_MAX <= 0x7f, "");
+            string_obj_c1_t *const data = string_obj_data((void *)self);
+            if (buf_sz < char_count)
+                return (size_t)-1;
+            memcpy(buf, data, char_count);
+        }
+        return char_count;
     case STR_OBJ_C2:
-        COPY_STR_DATA(2);
+        CONV_STR_DATA(2);
     case STR_OBJ_C4:
-        COPY_STR_DATA(4);
+        CONV_STR_DATA(4);
     default:
         zis_unreachable();
 
-#undef COPY_STR_DATA
+#undef CONV_STR_DATA
 
     }
 }
