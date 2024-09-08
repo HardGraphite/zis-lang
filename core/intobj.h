@@ -56,6 +56,12 @@ struct zis_object *zis_int_obj_trunc(
     const struct zis_int_obj *num, unsigned int n_bits
 );
 
+/// Get the number of used bits, aka bit width.
+unsigned int zis_int_obj_length(const struct zis_int_obj *num);
+
+/// Count the number of existing `bit` (0 or 1) in `num`.
+unsigned int zis_int_obj_count(const struct zis_int_obj *num, int bit);
+
 /// Small integer arithmetic: `lhs + rhs`.
 zis_static_force_inline struct zis_object *zis_smallint_add(
     struct zis_context *z, zis_smallint_t lhs, zis_smallint_t rhs

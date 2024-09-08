@@ -913,6 +913,17 @@ struct zis_object *zis_int_obj_trunc(
     return zis_object_from(res);
 }
 
+unsigned int zis_int_obj_length(const struct zis_int_obj *num) {
+    return int_obj_width(num);
+}
+
+unsigned int zis_int_obj_count(const struct zis_int_obj *num, int bit) {
+    unsigned int popcount = 0;
+    for (unsigned int i = 0, n = num->cell_count; i < n; i++)
+        popcount += zis_bits_popcount(num->cells[i]);
+    return bit ? popcount : int_obj_width(num) - popcount;
+}
+
 /// Try to do simple small-int multiplication.
 /// On failure, returns NULL, and `zis_int_obj_or_smallint_mul()` should be used instead.
 struct zis_object *_smallint_try_mul(
@@ -2069,6 +2080,63 @@ ZIS_NATIVE_FUNC_DEF(T_Int_M_div, z, {2, 0, 2}) {
     return ZIS_OK;
 }
 
+ZIS_NATIVE_FUNC_DEF(T_Int_M_length, z, {1, 0, 1}) {
+    /*#DOCSTR# func Int:length() :: Int
+    Returns the number of bits in the integer, aka bit width. */
+    assert_arg1_smi_or_Int(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_object *self_v = frame[1];
+    unsigned int result;
+    if (zis_object_is_smallint(self_v)) {
+        zis_smallint_t self_smi = zis_smallint_from_ptr(self_v);
+        zis_smallint_unsigned_t self_smi_abs = self_smi < 0 ?
+            (zis_smallint_unsigned_t)0 - (zis_smallint_unsigned_t)self_smi :
+            (zis_smallint_unsigned_t)self_smi;
+        result = !self_smi_abs ? 0 : sizeof self_smi_abs * 8 - zis_bits_count_lz(self_smi_abs);
+    } else {
+        result = zis_int_obj_length(zis_object_cast(self_v, struct zis_int_obj));
+    }
+    frame[0] = zis_object_from(zis_int_obj_or_smallint(z, (int64_t)result));
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Int_M_count, z, {2, 0, 2}) {
+    /*#DOCSTR# func Int:count(bit :: Int) :: Int
+    Returns the number of `bit` (0 or 1) bits in the integer. */
+    assert_arg1_smi_or_Int(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_object *self_v = frame[1], *bit_v = frame[2];
+    if (!(zis_object_is_smallint(bit_v) || zis_object_type(bit_v) == g->type_Int)) {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_WRONG_ARGUMENT_TYPE, "bit", bit_v
+        ));
+        return ZIS_THR;
+    }
+    int bit;
+    if (zis_object_is_smallint(bit_v)) {
+        zis_smallint_t bit_ = zis_smallint_from_ptr(bit_v);
+        bit = (bit_ == 0 || bit_ == 1) ? (int)bit_ : 2;
+    } else {
+        bit = 2;
+    }
+    unsigned int result;
+    if (bit == 2) {
+        result = 0;
+    } else if (zis_object_is_smallint(self_v)) {
+        zis_smallint_t self_smi = zis_smallint_from_ptr(self_v);
+        zis_smallint_unsigned_t self_smi_abs = self_smi < 0 ?
+            (zis_smallint_unsigned_t)0 - (zis_smallint_unsigned_t)self_smi :
+            (zis_smallint_unsigned_t)self_smi;
+        const unsigned int popcount = zis_bits_popcount(self_smi_abs);
+        result = bit ? popcount : !self_smi_abs ? 0 : (sizeof self_smi_abs * 8 - zis_bits_count_lz(self_smi_abs) - popcount);
+    } else {
+        result = zis_int_obj_count(zis_object_cast(self_v, struct zis_int_obj), bit);
+    }
+    frame[0] = zis_object_from(zis_int_obj_or_smallint(z, (int64_t)result));
+    return ZIS_OK;
+}
+
 ZIS_NATIVE_FUNC_DEF(T_Int_F_parse, z, {1, 1, 2}) {
     /*#DOCSTR# func Int.parse(s :: String, ?base :: Int) :: Int
     Converts a string representation of a integer to its value.
@@ -2171,6 +2239,8 @@ ZIS_NATIVE_FUNC_DEF_LIST(
     { "hash"        , &T_Int_M_hash           },
     { "to_string"   , &T_Int_M_to_string      },
     { "div"         , &T_Int_M_div            },
+    { "length"      , &T_Int_M_length         },
+    { "count"       , &T_Int_M_count          },
 );
 
 ZIS_NATIVE_VAR_DEF_LIST(
