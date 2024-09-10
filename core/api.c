@@ -12,7 +12,6 @@
 #include "invoke.h"
 #include "loader.h"
 #include "locals.h"
-#include "ndefutil.h"
 #include "object.h"
 #include "stack.h"
 #include "strutil.h"

@@ -5,6 +5,7 @@
 #include "locals.h"
 #include "ndefutil.h"
 #include "objmem.h"
+#include "objvec.h"
 #include "stack.h"
 
 #include "exceptobj.h"

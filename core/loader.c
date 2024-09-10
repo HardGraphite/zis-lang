@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <stddef.h>
+#include <string.h>
 
 #include "assembly.h"
 #include "attributes.h"
@@ -15,7 +16,7 @@
 #include "memory.h"
 #include "ndefutil.h"
 #include "objmem.h"
-#include "platform.h" // ZIS_WORDSIZE
+#include "objvec.h"
 
 #include "arrayobj.h"
 #include "exceptobj.h"

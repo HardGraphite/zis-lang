@@ -8,6 +8,7 @@
 #include "globals.h"
 #include "ndefutil.h"
 #include "objmem.h"
+#include "objvec.h"
 
 #include "typeobj.h"
 

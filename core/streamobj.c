@@ -1,5 +1,7 @@
 #include "streamobj.h"
 
+#include <string.h>
+
 #include "context.h"
 #include "fsutil.h"
 #include "globals.h"

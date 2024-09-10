@@ -34,6 +34,7 @@ Source code for the runtime core.
     - [`ndefutil.h`](ndefutil.h)
     - [`object.h`](object.h), [`object.c`](object.c)
     - [`objmem.h`](objmem.h), [`objmem.c`](objmem.c)
+    - [`objvec.h`](objvec.h)
     - [`smallint.h`](smallint.h)
 + built-in types (`*obj.*`)
     - [`arrayobj.h`](arrayobj.h), [`arrayobj.c`](arrayobj.c)

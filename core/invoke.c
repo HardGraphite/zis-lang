@@ -1,7 +1,7 @@
 #include "invoke.h"
 
-#include <stdarg.h>
 #include <math.h>
+#include <stdarg.h>
 
 #include "assembly.h" // zis_debug_dump_bytecode()
 #include "attributes.h"
@@ -10,8 +10,8 @@
 #include "globals.h"
 #include "instr.h"
 #include "loader.h"
-#include "ndefutil.h"
 #include "object.h"
+#include "objvec.h"
 #include "stack.h"
 
 #include "arrayobj.h"
