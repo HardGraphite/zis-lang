@@ -4,6 +4,7 @@
 
 #include "attributes.h"
 #include "object.h"
+#include "objvec.h"
 
 struct zis_context;
 
@@ -26,7 +27,7 @@ struct zis_tuple_obj *_zis_tuple_obj_new_empty(struct zis_context *z);
 /// Concatenate a vector of tuples.
 struct zis_tuple_obj *zis_tuple_obj_concat(
     struct zis_context *z,
-    struct zis_tuple_obj *v[], size_t n
+    struct zis_object_vec_view tuples
 );
 
 /// Create a shallow copy of a range of elements in a tuple.
