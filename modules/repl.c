@@ -126,10 +126,10 @@ ZIS_NATIVE_FUNC_DEF(F_read, z, {0, 0, 2}) {
         assert(zis_object_type_is(frame[1], z->globals->type_String));
         if (line_num > 1) {
             assert(zis_object_type_is(frame[2], z->globals->type_String));
-            frame[2] = zis_object_from(zis_string_obj_concat(
+            frame[2] = zis_object_from(zis_string_obj_concat2(
                 z,
                 zis_object_cast(frame[2], struct zis_string_obj),
-                zis_string_obj_concat(
+                zis_string_obj_concat2(
                     z,
                     zis_string_obj_from_char(z, '\n'),
                     zis_object_cast(frame[1], struct zis_string_obj)

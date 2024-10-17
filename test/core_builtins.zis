@@ -372,6 +372,14 @@ func test_String_join()
     testing.check_equal(String.join(', ', [65, 66, 67]), 'A, B, C')
 end
 
+func test_String_concat()
+    testing.check_equal(String.concat('A', 'BB', 'CCC', 'DDDD'), 'ABBCCCDDDD')
+    testing.check_equal(String.concat('1', '二', '𒐈'), '1二𒐈')
+    testing.check_equal(String.concat(65, 66, 67), 'ABC')
+    testing.check_equal(String.concat(['A', 'BB', 'CCC', 'DDDD']), 'ABBCCCDDDD')
+    testing.check_equal(String.concat([65, 66, 67]), 'ABC')
+end
+
 ## Tuple
 
 func test_Tuple_operator_add()

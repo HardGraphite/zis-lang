@@ -649,10 +649,10 @@ static int _to_str_foreach_fn(struct zis_object *key, struct zis_object *val, vo
     if (state->is_first)
         state->is_first = false;
     else
-        *state->str_obj_p = zis_string_obj_concat(z, *state->str_obj_p, zis_string_obj_new(z, ", ", 2));
-    *state->str_obj_p = zis_string_obj_concat(z, *state->str_obj_p, zis_object_to_string(z, state->temp_regs[0], true, NULL));
-    *state->str_obj_p = zis_string_obj_concat(z, *state->str_obj_p, zis_string_obj_new(z, " -> ", 4));
-    *state->str_obj_p = zis_string_obj_concat(z, *state->str_obj_p, zis_object_to_string(z, state->temp_regs[1], true, NULL));
+        *state->str_obj_p = zis_string_obj_concat2(z, *state->str_obj_p, zis_string_obj_new(z, ", ", 2));
+    *state->str_obj_p = zis_string_obj_concat2(z, *state->str_obj_p, zis_object_to_string(z, state->temp_regs[0], true, NULL));
+    *state->str_obj_p = zis_string_obj_concat2(z, *state->str_obj_p, zis_string_obj_new(z, " -> ", 4));
+    *state->str_obj_p = zis_string_obj_concat2(z, *state->str_obj_p, zis_object_to_string(z, state->temp_regs[1], true, NULL));
 
     return 0;
 }
@@ -670,7 +670,7 @@ ZIS_NATIVE_FUNC_DEF(T_Map_M_to_string, z, {1, 1, 4}) {
         z, zis_object_cast(frame[1], struct zis_map_obj),
         _to_str_foreach_fn, &state
     );
-    *state.str_obj_p = zis_string_obj_concat(z, *state.str_obj_p, zis_string_obj_new(z, "}" , 1));
+    *state.str_obj_p = zis_string_obj_concat2(z, *state.str_obj_p, zis_string_obj_new(z, "}" , 1));
     frame[0] = zis_object_from(*state.str_obj_p);
     return ZIS_OK;
 }

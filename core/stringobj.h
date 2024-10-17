@@ -63,8 +63,15 @@ struct zis_string_obj *zis_string_obj_join(
     struct zis_string_obj *separator /*=NULL*/, struct zis_object_vec_view items
 );
 
-/// Concatenate two strings.
+/// Concatenate strings and characters.
+/// Equivalent to `zis_string_obj_join(NULL, items)`.
 struct zis_string_obj *zis_string_obj_concat(
+    struct zis_context *z,
+    struct zis_object_vec_view items
+);
+
+/// Concatenate two strings.
+struct zis_string_obj *zis_string_obj_concat2(
     struct zis_context *z,
     struct zis_string_obj *str1, struct zis_string_obj *str2
 );

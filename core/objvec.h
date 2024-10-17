@@ -117,7 +117,7 @@ do { \
 /// @see struct zis_callstack
 #define zis_object_vec_view_from_frame(frame_expr, var_start, var_count) \
     ((struct zis_object_vec_view){ \
-        ._container_ptr_ref = _Generic((frame_expr), struct zis_object **: &(frame_expr)), \
+        ._container_ptr_ref = _Generic(&(frame_expr), struct zis_object ***: &(frame_expr)), \
         ._offset = (var_start) * sizeof(struct zis_object *), \
         .length = (var_count), \
     })

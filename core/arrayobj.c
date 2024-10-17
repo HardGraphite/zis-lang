@@ -505,13 +505,13 @@ ZIS_NATIVE_FUNC_DEF(T_Array_M_to_string, z, {1, 1, 2}) {
         if (i >= zis_array_obj_length(array))
             break;
         if (i)
-            *str_obj_p = zis_string_obj_concat(z, *str_obj_p, zis_string_obj_new(z, ", ", 2));
-        *str_obj_p = zis_string_obj_concat(
+            *str_obj_p = zis_string_obj_concat2(z, *str_obj_p, zis_string_obj_new(z, ", ", 2));
+        *str_obj_p = zis_string_obj_concat2(
             z, *str_obj_p,
             zis_object_to_string(z, zis_array_obj_get(array, i), true, NULL)
         );
     }
-    *str_obj_p = zis_string_obj_concat(z, *str_obj_p, zis_string_obj_new(z, "]" , 1));
+    *str_obj_p = zis_string_obj_concat2(z, *str_obj_p, zis_string_obj_new(z, "]" , 1));
 
     assert(zis_object_type_is(zis_object_from(*str_obj_p), z->globals->type_String));
     frame[0] = zis_object_from(*str_obj_p);

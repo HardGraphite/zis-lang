@@ -170,8 +170,8 @@ struct zis_string_obj *zis_object_to_string(
         var.result = zis_context_guess_variable_name(z, zis_object_from(zis_object_type(obj)));
         if (!var.result)
             var.result = zis_string_obj_new(z, "\?\?", 2);
-        var.result = zis_string_obj_concat(z, zis_string_obj_new(z, "\\<", 2), var.result);
-        var.result = zis_string_obj_concat(z, var.result, zis_string_obj_new(z, ">", 1));
+        var.result = zis_string_obj_concat2(z, zis_string_obj_new(z, "\\<", 2), var.result);
+        var.result = zis_string_obj_concat2(z, var.result, zis_string_obj_new(z, ">", 1));
         zis_locals_drop(z, var);
         return var.result;
     }

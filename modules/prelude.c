@@ -101,7 +101,7 @@ ZIS_NATIVE_FUNC_DEF(F_input, z, {0, 1, 1}) {
             first_read = false;
         } else {
             assert(zis_object_type_is(*reg1, z->globals->type_String));
-            str = zis_string_obj_concat(z, zis_object_cast(*reg1, struct zis_string_obj), str);
+            str = zis_string_obj_concat2(z, zis_object_cast(*reg1, struct zis_string_obj), str);
         }
         *reg1 = zis_object_from(str);
         if (found_lf)

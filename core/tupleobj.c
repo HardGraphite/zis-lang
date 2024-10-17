@@ -299,15 +299,15 @@ ZIS_NATIVE_FUNC_DEF(T_Tuple_M_to_string, z, {1, 1, 2}) {
         if (i >= zis_tuple_obj_length(tuple))
             break;
         if (i)
-            *str_obj_p = zis_string_obj_concat(z, *str_obj_p, zis_string_obj_new(z, ", ", 2));
-        *str_obj_p = zis_string_obj_concat(
+            *str_obj_p = zis_string_obj_concat2(z, *str_obj_p, zis_string_obj_new(z, ", ", 2));
+        *str_obj_p = zis_string_obj_concat2(
             z, *str_obj_p,
             zis_object_to_string(z, zis_tuple_obj_get(tuple, i), true, NULL)
         );
     }
     const bool has_one_element =
         zis_tuple_obj_length(zis_object_cast(frame[1], struct zis_tuple_obj)) == 1;
-    *str_obj_p = zis_string_obj_concat(
+    *str_obj_p = zis_string_obj_concat2(
         z, *str_obj_p,
         zis_string_obj_new(z, ",)" + (ptrdiff_t)(has_one_element ? 0 : 1), (size_t)-1)
     );

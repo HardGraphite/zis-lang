@@ -497,32 +497,22 @@ struct zis_string_obj *zis_string_obj_join(
 
 struct zis_string_obj *zis_string_obj_concat(
     struct zis_context *z,
-    struct zis_string_obj *_str1, struct zis_string_obj *_str2
+    struct zis_object_vec_view items
 ) {
-    zis_locals_decl(
-        z, var,
-        struct zis_string_obj *str1, *str2, *new_str;
-    );
-    var.str1 = _str1, var.str2 = _str2, var.new_str = _str2;
+    return zis_string_obj_join(z, NULL, items);
+}
 
-    const enum string_obj_char_type
-    str1t = string_obj_char_type(var.str1), str2t = string_obj_char_type(var.str2);
-    const size_t str1n = string_obj_length(var.str1), str2n = string_obj_length(var.str2);
-
-    if (str1t == str2t) {
-        struct zis_string_obj *const new_str = string_obj_alloc(z, str1t, str1n + str2n);
-        void *const new_str_data = string_obj_data(new_str);
-        const size_t cn = string_obj_char_size(str1t);
-        const size_t str1_data_size = str1n * cn, str2_data_size = str2n * cn;
-        memcpy(new_str_data, string_obj_data(var.str1), str1_data_size);
-        memcpy((char *)new_str_data + str1_data_size, string_obj_data(var.str2), str2_data_size);
-        var.new_str = new_str;
-    } else {
-        zis_context_panic(z, ZIS_CONTEXT_PANIC_IMPL);
-    }
-
+struct zis_string_obj *zis_string_obj_concat2(
+    struct zis_context *z,
+    struct zis_string_obj *str1, struct zis_string_obj *str2
+) {
+    zis_locals_decl_1(z, var, struct zis_object *items[2]);
+    var.items[0] = zis_object_from(str1), var.items[1] = zis_object_from(str2);
+    struct zis_object **items = var.items;
+    struct zis_string_obj *res =
+        zis_string_obj_join(z, NULL, zis_object_vec_view_from_frame(items, 0, 2));
     zis_locals_drop(z, var);
-    return var.new_str;
+    return res;
 }
 
 bool zis_string_obj_equals(struct zis_string_obj *lhs, struct zis_string_obj *rhs) {
@@ -601,15 +591,8 @@ ZIS_NATIVE_FUNC_DEF(T_String_M_operator_add, z, {2, 0, 2}) {
         ));
         return ZIS_THR;
     }
-    struct zis_string_obj *lhs = zis_object_cast(frame[1], struct zis_string_obj);
-    struct zis_string_obj *rhs = zis_object_cast(frame[2], struct zis_string_obj);
-    struct zis_string_obj *result;
-    if (zis_unlikely(!string_obj_length(lhs)))
-        result = rhs;
-    else if (zis_unlikely(!string_obj_length(rhs)))
-        result = lhs;
-    else
-        result = zis_string_obj_concat(z, lhs, rhs);
+    struct zis_string_obj *result =
+        zis_string_obj_join(z, NULL, zis_object_vec_view_from_frame(frame, 1, 2));
     frame[0] = zis_object_from(result);
     return ZIS_OK;
 }
@@ -732,7 +715,6 @@ ZIS_NATIVE_FUNC_DEF(T_String_F_join, z, {1, -1, 2}) {
     Concatenates strings and characters, using the specified separator between them. */
     /*#DOCSTR# func String.join(separator :: String, items :: Tuple[String|Int]) :: String
     Concatenates an array of strings and characters, using the specified separator between them. */
-    assert_arg1_String(z);
     struct zis_context_globals *g = z->globals;
     struct zis_object **frame = z->callstack->frame;
     struct zis_string_obj *separator;
@@ -764,6 +746,33 @@ ZIS_NATIVE_FUNC_DEF(T_String_F_join, z, {1, -1, 2}) {
     return ZIS_OK;
 }
 
+ZIS_NATIVE_FUNC_DEF(T_String_F_concat, z, {0, -1, 1}) {
+    /*#DOCSTR# func String.concat(*items :: String|Int) :: String
+    Concatenates strings and characters. */
+    /*#DOCSTR# func String.concat(items :: Tuple[String|Int]) :: String
+    Concatenates an array of strings and characters. */
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_object_vec_view items;
+    {
+        assert(zis_object_type_is(frame[1], g->type_Tuple));
+        struct zis_tuple_obj *items_tuple = zis_object_cast(frame[1], struct zis_tuple_obj);
+        size_t item_count = zis_tuple_obj_length(items_tuple);
+        if (item_count == 1 && zis_object_type_is(zis_tuple_obj_get(items_tuple, 0), g->type_Array)) {
+            struct zis_array_slots_obj *item_slots =
+                zis_object_cast(zis_tuple_obj_get(items_tuple, 0), struct zis_array_obj)->_data;
+            item_count = zis_array_slots_obj_length(item_slots);
+            frame[1] = zis_object_from(item_slots);
+            items = zis_object_vec_view_from_fields(frame[1], struct zis_array_slots_obj, _data, 0, item_count);
+        } else {
+            items = zis_object_vec_view_from_fields(frame[1], struct zis_tuple_obj, _data, 0, item_count);
+        }
+    }
+    struct zis_string_obj *new_str = zis_string_obj_join(z, NULL, items);
+    frame[0] = zis_object_from(new_str);
+    return ZIS_OK;
+}
+
 ZIS_NATIVE_FUNC_DEF_LIST(
     T_String_D_methods,
     { "+"           , &T_String_M_operator_add      },
@@ -777,6 +786,7 @@ ZIS_NATIVE_FUNC_DEF_LIST(
 ZIS_NATIVE_VAR_DEF_LIST(
     T_String_D_statics,
     { "join"       , { '^', .F = &T_String_F_join   } },
+    { "concat"     , { '^', .F = &T_String_F_concat } },
 );
 
 ZIS_NATIVE_TYPE_DEF_XB(

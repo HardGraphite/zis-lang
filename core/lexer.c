@@ -468,7 +468,7 @@ static void scan_string(
             error(l, "illegal string literal");
         if (has_temp_result) {
             assert(zis_object_type(zis_object_from(*temp_result_ref)) == z->globals->type_String);
-            str_obj = zis_string_obj_concat(z, *temp_result_ref, str_obj);
+            str_obj = zis_string_obj_concat2(z, *temp_result_ref, str_obj);
         } else {
             has_temp_result = true;
         }
