@@ -12,8 +12,10 @@
 #include "stack.h"
 #include "strutil.h"
 
+#include "arrayobj.h"
 #include "exceptobj.h"
 #include "streamobj.h"
+#include "tupleobj.h"
 
 struct zis_string_obj {
     ZIS_OBJECT_HEAD
@@ -40,6 +42,15 @@ enum string_obj_char_type {
 typedef uint8_t  string_obj_c1_t;
 typedef uint16_t string_obj_c2_t;
 typedef uint32_t string_obj_c4_t;
+
+/// Minimum char type for a character.
+static enum string_obj_char_type char_min_char_type(zis_wchar_t c) {
+    if (c <= STR_OBJ_C1_CODE_MAX)
+        return STR_OBJ_C1;
+    if (c <= STR_OBJ_C2_CODE_MAX)
+        return STR_OBJ_C2;
+    return  STR_OBJ_C4;
+}
 
 /// Get size of a char.
 zis_static_force_inline size_t string_obj_char_size(enum string_obj_char_type ct) {
@@ -77,6 +88,31 @@ static struct zis_string_obj *string_obj_alloc(
     assert(!(len & ~(SIZE_MAX >> 2)));
     self->_type_and_length = (len << 2) | (size_t)ct;
     return self;
+}
+
+/// Dummy string object that can be allocated on stack for representing a character.
+typedef union dummy_string_obj_for_char {
+    struct zis_string_obj string_obj;
+    char _data[sizeof(struct zis_string_obj) + sizeof(zis_wchar_t)];
+} dummy_string_obj_for_char;
+
+/// Initialize a dummy_string_obj_for_char.
+static void dummy_string_obj_for_char_init(dummy_string_obj_for_char *restrict ds, zis_wchar_t c) {
+    enum string_obj_char_type ct = char_min_char_type(c);
+    ds->string_obj._type_and_length = (1 << 2) | (size_t)ct; // See `string_obj_alloc()`.
+    switch (ct) {
+    case STR_OBJ_C1:
+        *(string_obj_c1_t *)string_obj_data(&ds->string_obj) = (string_obj_c1_t)c;
+        break;
+    case STR_OBJ_C2:
+        *(string_obj_c2_t *)string_obj_data(&ds->string_obj) = (string_obj_c2_t)c;
+        break;
+    case STR_OBJ_C4:
+        *(string_obj_c4_t *)string_obj_data(&ds->string_obj) = (string_obj_c4_t)c;
+        break;
+    default:
+        zis_unreachable();
+    }
 }
 
 /* ----- public functions --------------------------------------------------- */
@@ -320,6 +356,145 @@ const char *zis_string_obj_as_ascii(const struct zis_string_obj *self, size_t *l
     return NULL;
 }
 
+zis_nodiscard static string_obj_c1_t *
+_zis_string_obj_join_copy_to_c1(string_obj_c1_t *dest, struct zis_string_obj *str) {
+    void *str_data = string_obj_data(str);
+    size_t str_len = string_obj_length(str);
+    assert(string_obj_char_type(str) == STR_OBJ_C1);
+    memcpy(dest, str_data, str_len * sizeof *dest);
+    return dest + str_len;
+}
+
+zis_nodiscard static string_obj_c2_t *
+_zis_string_obj_join_copy_to_c2(string_obj_c2_t *dest, struct zis_string_obj *str) {
+    void *str_data = string_obj_data(str);
+    size_t str_len = string_obj_length(str);
+    switch (string_obj_char_type(str)) {
+    case STR_OBJ_C1:
+        for (size_t i = 0; i < str_len; i++)
+            dest[i] = ((string_obj_c1_t *)str_data)[i];
+        break;
+    case STR_OBJ_C2:
+        memcpy(dest, str_data, str_len * sizeof *dest);
+        break;
+    default:
+        zis_unreachable();
+    }
+    return dest + str_len;
+}
+
+zis_nodiscard static string_obj_c4_t *
+_zis_string_obj_join_copy_to_c4(string_obj_c4_t *dest, struct zis_string_obj *str) {
+    void *str_data = string_obj_data(str);
+    size_t str_len = string_obj_length(str);
+    switch (string_obj_char_type(str)) {
+    case STR_OBJ_C1:
+        for (size_t i = 0; i < str_len; i++)
+            dest[i] = ((string_obj_c1_t *)str_data)[i];
+        break;
+    case STR_OBJ_C2:
+        for (size_t i = 0; i < str_len; i++)
+            dest[i] = ((string_obj_c2_t *)str_data)[i];
+        break;
+    case STR_OBJ_C4:
+        memcpy(dest, str_data, str_len * sizeof *dest);
+        break;
+    default:
+        zis_unreachable();
+    }
+    return dest + str_len;
+}
+
+struct zis_string_obj *zis_string_obj_join(
+    struct zis_context *z,
+    struct zis_string_obj *separator /*=NULL*/, struct zis_object_vec_view items
+) {
+    if (zis_unlikely(zis_object_vec_view_length(items) == 0))
+        return z->globals->val_empty_string;
+
+    enum string_obj_char_type res_char_type;
+    size_t res_char_count;
+    if (separator) {
+        res_char_type  = string_obj_char_type(separator);
+        res_char_count = (zis_object_vec_view_length(items) - 1) * string_obj_length(separator);
+    } else {
+        res_char_type  = STR_OBJ_C1;
+        res_char_count = 0;
+    }
+
+    {
+        struct zis_type_obj *type_String = z->globals->type_String;
+        zis_object_vec_view_foreach_unchanged(items, item, {
+            enum string_obj_char_type item_char_type;
+            size_t item_char_count;
+            if (zis_object_is_smallint(item)) {
+                zis_smallint_t item_smi = zis_smallint_from_ptr(item);
+                if (zis_unlikely(item_smi < 0))
+                    zis_context_panic(z, ZIS_CONTEXT_PANIC_IMPL); // TODO: handles bad code point.
+                zis_wchar_t c = (zis_wchar_t)(zis_smallint_unsigned_t)item_smi;
+                item_char_type = char_min_char_type(c);
+                item_char_count = 1;
+            } else {
+                if (zis_unlikely(zis_object_type(item) != type_String))
+                    zis_context_panic(z, ZIS_CONTEXT_PANIC_IMPL); // TODO: handles wrong type.
+                struct zis_string_obj *str = zis_object_cast(item, struct zis_string_obj);
+                item_char_type = string_obj_char_type(str);
+                item_char_count = string_obj_length(str);
+            }
+            if (zis_unlikely((int)item_char_type > (int)res_char_type))
+                res_char_type = item_char_type;
+            res_char_count += item_char_count;
+        });
+    }
+
+    struct zis_string_obj *res_str;
+    if (separator) {
+        zis_locals_decl_1(z, var, struct zis_string_obj *sep);
+        var.sep = separator;
+        res_str = string_obj_alloc(z, res_char_type, res_char_count);
+        separator = var.sep;
+        zis_locals_drop(z, var);
+    } else {
+        res_str = string_obj_alloc(z, res_char_type, res_char_count);
+    }
+
+    void *res_str_data_p = string_obj_data(res_str);
+    switch (res_char_type) {
+        dummy_string_obj_for_char dummy_str;
+
+#define COPY_STR_DATA(C_X) \
+        case STR_OBJ_C##C_X: \
+            zis_object_vec_view_foreach_unchanged(items, item, { \
+            if (separator && __vec_view_i) /* has separator and is not the first item */ \
+                res_str_data_p = _zis_string_obj_join_copy_to_c##C_X(res_str_data_p, separator); \
+            struct zis_string_obj *str; \
+            if (zis_object_is_smallint(item)) { \
+                zis_wchar_t c = (zis_wchar_t)(zis_smallint_unsigned_t)zis_smallint_from_ptr(item); \
+                dummy_string_obj_for_char_init(&dummy_str, c); \
+                str = &dummy_str.string_obj; \
+            } else { \
+                assert(zis_object_type_is(item, z->globals->type_String)); \
+                str = zis_object_cast(item, struct zis_string_obj); \
+            } \
+            res_str_data_p = _zis_string_obj_join_copy_to_c##C_X(res_str_data_p, str); \
+        }); \
+        break; \
+
+    COPY_STR_DATA(1);
+    COPY_STR_DATA(2);
+    COPY_STR_DATA(4);
+
+#undef COPY_STR_DATA
+
+    default:
+        zis_unreachable();
+    }
+    assert((char *)res_str_data_p ==
+        (char *)string_obj_data(res_str) + string_obj_length(res_str) * string_obj_char_size(res_char_type));
+
+    return res_str;
+}
+
 struct zis_string_obj *zis_string_obj_concat(
     struct zis_context *z,
     struct zis_string_obj *_str1, struct zis_string_obj *_str2
@@ -552,6 +727,43 @@ ZIS_NATIVE_FUNC_DEF(T_String_M_to_string, z, {1, 1, 2}) {
     return ZIS_OK;
 }
 
+ZIS_NATIVE_FUNC_DEF(T_String_F_join, z, {1, -1, 2}) {
+    /*#DOCSTR# func String.join(separator :: String, *items :: String|Int) :: String
+    Concatenates strings and characters, using the specified separator between them. */
+    /*#DOCSTR# func String.join(separator :: String, items :: Tuple[String|Int]) :: String
+    Concatenates an array of strings and characters, using the specified separator between them. */
+    assert_arg1_String(z);
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_string_obj *separator;
+    if (zis_object_type_is(frame[1], g->type_String)) {
+        separator = zis_object_cast(frame[1], struct zis_string_obj);
+    } else {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_WRONG_ARGUMENT_TYPE, "separator", frame[1]
+        ));
+        return ZIS_THR;
+    }
+    struct zis_object_vec_view items;
+    {
+        assert(zis_object_type_is(frame[2], g->type_Tuple));
+        struct zis_tuple_obj *items_tuple = zis_object_cast(frame[2], struct zis_tuple_obj);
+        size_t item_count = zis_tuple_obj_length(items_tuple);
+        if (item_count == 1 && zis_object_type_is(zis_tuple_obj_get(items_tuple, 0), g->type_Array)) {
+            struct zis_array_slots_obj *item_slots =
+                zis_object_cast(zis_tuple_obj_get(items_tuple, 0), struct zis_array_obj)->_data;
+            item_count = zis_array_slots_obj_length(item_slots);
+            frame[2] = zis_object_from(item_slots);
+            items = zis_object_vec_view_from_fields(frame[2], struct zis_array_slots_obj, _data, 0, item_count);
+        } else {
+            items = zis_object_vec_view_from_fields(frame[2], struct zis_tuple_obj, _data, 0, item_count);
+        }
+    }
+    struct zis_string_obj *new_str = zis_string_obj_join(z, separator, items);
+    frame[0] = zis_object_from(new_str);
+    return ZIS_OK;
+}
+
 ZIS_NATIVE_FUNC_DEF_LIST(
     T_String_D_methods,
     { "+"           , &T_String_M_operator_add      },
@@ -562,8 +774,13 @@ ZIS_NATIVE_FUNC_DEF_LIST(
     { "to_string"   , &T_String_M_to_string         },
 );
 
+ZIS_NATIVE_VAR_DEF_LIST(
+    T_String_D_statics,
+    { "join"       , { '^', .F = &T_String_F_join   } },
+);
+
 ZIS_NATIVE_TYPE_DEF_XB(
     String,
     struct zis_string_obj, _bytes_size,
-    NULL, T_String_D_methods, NULL
+    NULL, T_String_D_methods, T_String_D_statics
 );

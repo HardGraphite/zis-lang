@@ -44,6 +44,7 @@ zis_static_force_inline void zis_object_vec_fill(
 /* ----- vector view -------------------------------------------------------- */
 
 /// GC-safe reference to a vector (array) of object pointers.
+/// @warning This is not a GC-root and and does not extend the lifetime of the referred objects.
 struct zis_object_vec_view {
     /**
      * @struct zis_object_vec_view

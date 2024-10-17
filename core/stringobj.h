@@ -7,6 +7,7 @@
 #include <stdint.h>
 
 #include "attributes.h"
+#include "objvec.h" // struct zis_object_vec_view
 
 struct zis_context;
 struct zis_object;
@@ -54,6 +55,13 @@ zis_nodiscard size_t zis_string_obj_to_u8str(
 /// Try to get the raw data in ASCII (UTF-8) format. `len` is optional.
 /// Returns NULL if the data is not stored as ASCII.
 const char *zis_string_obj_as_ascii(const struct zis_string_obj *self, size_t *len /* = NULL */);
+
+/// Concatenate strings and characters, using the specified separator between them.
+/// The `separator` is optional.
+struct zis_string_obj *zis_string_obj_join(
+    struct zis_context *z,
+    struct zis_string_obj *separator /*=NULL*/, struct zis_object_vec_view items
+);
 
 /// Concatenate two strings.
 struct zis_string_obj *zis_string_obj_concat(
