@@ -794,3 +794,152 @@ ZIS_NATIVE_TYPE_DEF_XB(
     struct zis_string_obj, _bytes_size,
     NULL, T_String_D_methods, T_String_D_statics
 );
+
+/* ----- string builder ----------------------------------------------------- */
+
+struct zis_string_builder_obj {
+    ZIS_OBJECT_HEAD
+    // --- SLOTS ---
+    struct zis_object *appended_item_count;
+    struct zis_array_slots_obj *appended_items;
+    struct zis_array_obj *concatted_strings;
+};
+
+#define STRING_BUILDER_BUFFER_SIZE 64
+
+struct zis_string_builder_obj *zis_string_builder_obj_new(struct zis_context *z) {
+    zis_locals_decl(
+        z, var,
+        struct zis_array_slots_obj *appended_items;
+        struct zis_array_obj *concatted_strings;
+    );
+    zis_locals_zero(var);
+    var.appended_items = zis_array_slots_obj_new(z, NULL, STRING_BUILDER_BUFFER_SIZE);
+    var.concatted_strings = zis_array_obj_new2(z, 2, NULL, 0);
+    struct zis_object *const _obj = zis_objmem_alloc(z, z->globals->type_String_Builder);
+    struct zis_string_builder_obj *sb = zis_object_cast(_obj, struct zis_string_builder_obj);
+    sb->appended_item_count = zis_smallint_to_ptr(0);
+    sb->appended_items = var.appended_items;
+    sb->concatted_strings = var.concatted_strings;
+    zis_locals_drop(z, var);
+    return sb;
+}
+
+static void _string_builder_obj_append(
+    struct zis_context *z,
+    struct zis_string_builder_obj *sb, struct zis_object *item
+) {
+    assert(zis_object_is_smallint(item) || zis_object_type_is(item, z->globals->type_String));
+    assert(zis_object_is_smallint(sb->appended_item_count));
+    assert(zis_smallint_from_ptr(sb->appended_item_count) >= 0);
+    size_t appended_item_count = (zis_smallint_unsigned_t)zis_smallint_from_ptr(sb->appended_item_count);
+    assert(appended_item_count <= zis_array_slots_obj_length(sb->appended_items));
+    if (appended_item_count == zis_array_slots_obj_length(sb->appended_items)) {
+        zis_locals_decl(
+            z, var,
+            struct zis_string_builder_obj *sb;
+            struct zis_object *item;
+            struct zis_array_slots_obj *appended_items;
+        );
+        var.sb = sb, var.item = item, var.appended_items = sb->appended_items;
+        struct zis_string_obj *cs = zis_string_obj_join(
+            z, NULL, zis_object_vec_view_from_fields(
+                var.appended_items, struct zis_array_slots_obj, _data,
+                0, appended_item_count
+            )
+        );
+        assert(cs);
+        zis_array_obj_append(z, var.sb->concatted_strings, zis_object_from(cs));
+        sb = var.sb, item = var.item;
+        assert(sb->appended_items == var.appended_items);
+        zis_locals_drop(z, var);
+        appended_item_count = 0;
+        zis_object_vec_zero(sb->appended_items->_data, zis_array_slots_obj_length(sb->appended_items));
+    }
+    zis_array_slots_obj_set(sb->appended_items, appended_item_count++, item);
+    sb->appended_item_count = zis_smallint_to_ptr((zis_smallint_t)(zis_smallint_unsigned_t)appended_item_count);
+}
+
+void zis_string_builder_obj_append(
+    struct zis_context *z,
+    struct zis_string_builder_obj *sb, struct zis_string_obj *s
+) {
+    if (string_obj_length(s)) {
+        _string_builder_obj_append(z, sb, zis_object_from(s));
+    }
+}
+
+bool zis_string_builder_obj_append_char(
+    struct zis_context *z,
+    struct zis_string_builder_obj *sb, zis_string_obj_wchar_t c
+) {
+    if (c > 0x10ffff)
+        return false;
+    _string_builder_obj_append(z, sb, zis_smallint_to_ptr((zis_smallint_t)(zis_smallint_unsigned_t)c));
+    return true;
+}
+
+struct zis_string_obj *zis_string_builder_obj_string(
+    struct zis_context *z, struct zis_string_builder_obj *_sb
+) {
+    zis_locals_decl(
+        z, var,
+        struct zis_string_builder_obj *sb;
+        struct zis_array_slots_obj *items;
+    );
+    var.sb = _sb, var.items = z->globals->val_empty_array_slots;
+
+    assert(zis_object_is_smallint(var.sb->appended_item_count));
+    assert(zis_smallint_from_ptr(var.sb->appended_item_count) >= 0);
+    if (zis_smallint_from_ptr(var.sb->appended_item_count)) {
+        size_t item_count =
+            (zis_smallint_unsigned_t)zis_smallint_from_ptr(var.sb->appended_item_count);
+        var.items = var.sb->appended_items;
+        struct zis_string_obj *cs = zis_string_obj_join(
+            z, NULL, zis_object_vec_view_from_fields(
+                var.items, struct zis_array_slots_obj, _data,
+                0, item_count
+            )
+        );
+        assert(cs);
+        zis_array_obj_append(z, var.sb->concatted_strings, zis_object_from(cs));
+        var.sb->appended_item_count = zis_smallint_to_ptr(0);
+        zis_object_vec_zero(var.sb->appended_items->_data, item_count);
+    }
+
+    size_t concatted_strings_n = zis_array_obj_length(var.sb->concatted_strings);
+    struct zis_string_obj *result;
+    if (concatted_strings_n == 1) {
+        struct zis_object *x = zis_array_obj_get(var.sb->concatted_strings, 0);
+        assert(zis_object_type_is(x, z->globals->type_String));
+        result = zis_object_cast(x, struct zis_string_obj);
+    } else if (concatted_strings_n > 1) {
+        var.items = var.sb->concatted_strings->_data;
+        result = zis_string_obj_join(
+            z, NULL, zis_object_vec_view_from_fields(
+                var.items, struct zis_array_slots_obj, _data,
+                0, concatted_strings_n
+            )
+        );
+        assert(result);
+        zis_array_obj_clear(var.sb->concatted_strings);
+        zis_array_obj_append(z, var.sb->concatted_strings, zis_object_from(result));
+    } else {
+        result = z->globals->val_empty_string;
+    }
+
+    zis_locals_drop(z, var);
+    return result;
+}
+
+void zis_string_builder_obj_clear(struct zis_string_builder_obj *sb) {
+    sb->appended_item_count = zis_smallint_to_ptr(0);
+    zis_object_vec_zero(sb->appended_items->_data, zis_array_slots_obj_length(sb->appended_items));
+    zis_array_obj_clear(sb->concatted_strings);
+}
+
+ZIS_NATIVE_TYPE_DEF_NB(
+    String_Builder,
+    struct zis_string_builder_obj,
+    NULL, NULL, NULL
+);

@@ -58,6 +58,7 @@ struct zis_type_obj;
     E(Function)                 \
     E(Map_Node)                 \
     E(Module)                   \
+    E(String_Builder)           \
     _ZIS_BUILTIN_TYPE_LIST2__E_AstNode \
 // ^^^ _ZIS_BUILTIN_TYPE_LIST2 ^^^
 

@@ -15,6 +15,8 @@ struct zis_stream_obj;
 
 typedef uint32_t zis_string_obj_wchar_t;
 
+/* ----- string ------------------------------------------------------------- */
+
 /// `String` object. Unicode strings.
 struct zis_string_obj;
 
@@ -84,3 +86,31 @@ int zis_string_obj_compare(struct zis_string_obj *lhs, struct zis_string_obj *rh
 
 /// Write the string to an output stream.
 void zis_string_obj_write_to_stream(struct zis_string_obj *self, struct zis_stream_obj *stream);
+
+/* ----- string builder ----------------------------------------------------- */
+
+/// `String.Builder` object.
+struct zis_string_builder_obj;
+
+/// Create a string builder.
+struct zis_string_builder_obj *zis_string_builder_obj_new(struct zis_context *z);
+
+/// Append a string to the string builder.
+void zis_string_builder_obj_append(
+    struct zis_context *z,
+    struct zis_string_builder_obj *sb, struct zis_string_obj *s
+);
+
+/// Append a charater to the string builder.
+bool zis_string_builder_obj_append_char(
+    struct zis_context *z,
+    struct zis_string_builder_obj *sb, zis_string_obj_wchar_t c
+);
+
+/// Get the result as a string.
+struct zis_string_obj *zis_string_builder_obj_string(
+    struct zis_context *z, struct zis_string_builder_obj *sb
+);
+
+/// Remove all characters.
+void zis_string_builder_obj_clear(struct zis_string_builder_obj *sb);
