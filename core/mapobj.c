@@ -637,7 +637,8 @@ ZIS_NATIVE_FUNC_DEF(T_Map_M_length, z, {1, 0, 1}) {
 
 struct _to_str_foreach_state {
     struct zis_context *z;
-    struct zis_string_obj **str_obj_p;
+    struct zis_string_builder_obj **str_builder_p;
+    struct zis_string_obj **arrow_str_p, **comma_str_p;
     struct zis_object **temp_regs; // [2]
     bool is_first;
 };
@@ -645,33 +646,46 @@ struct _to_str_foreach_state {
 static int _to_str_foreach_fn(struct zis_object *key, struct zis_object *val, void *_state) {
     struct _to_str_foreach_state *restrict state = _state;
     struct zis_context *z = state->z;
+
     state->temp_regs[0] = key, state->temp_regs[1] = val;
+    state->temp_regs[0] = zis_object_from(zis_object_to_string(z, state->temp_regs[0], true, NULL));
+    state->temp_regs[1] = zis_object_from(zis_object_to_string(z, state->temp_regs[1], true, NULL));
+
     if (state->is_first)
         state->is_first = false;
     else
-        *state->str_obj_p = zis_string_obj_concat2(z, *state->str_obj_p, zis_string_obj_new(z, ", ", 2));
-    *state->str_obj_p = zis_string_obj_concat2(z, *state->str_obj_p, zis_object_to_string(z, state->temp_regs[0], true, NULL));
-    *state->str_obj_p = zis_string_obj_concat2(z, *state->str_obj_p, zis_string_obj_new(z, " -> ", 4));
-    *state->str_obj_p = zis_string_obj_concat2(z, *state->str_obj_p, zis_object_to_string(z, state->temp_regs[1], true, NULL));
+        zis_string_builder_obj_append(z, *state->str_builder_p, *state->comma_str_p);
+
+    zis_string_builder_obj_append(z, *state->str_builder_p, zis_object_cast(state->temp_regs[0], struct zis_string_obj));
+    zis_string_builder_obj_append(z, *state->str_builder_p, *state->arrow_str_p);
+    zis_string_builder_obj_append(z, *state->str_builder_p, zis_object_cast(state->temp_regs[1], struct zis_string_obj));
 
     return 0;
 }
 
-ZIS_NATIVE_FUNC_DEF(T_Map_M_to_string, z, {1, 1, 4}) {
+ZIS_NATIVE_FUNC_DEF(T_Map_M_to_string, z, {1, 1, 7}) {
     /*#DOCSTR# func Map:to_string(?fmt) :: String
     Returns a string representation. */
     assert_arg1_Map(z);
     struct zis_object **frame = z->callstack->frame;
     struct _to_str_foreach_state state = {
-        z, (struct zis_string_obj **)(frame + 2), frame + 3, true
+        z,
+        (struct zis_string_builder_obj **)(frame + 3),
+        (struct zis_string_obj **)(frame + 4),
+        (struct zis_string_obj **)(frame + 5),
+        frame + 6,
+        true
     };
-    *state.str_obj_p = zis_string_obj_new(z, "{", 1);
+    *state.str_builder_p = zis_string_builder_obj_new(z);
+    *state.arrow_str_p = zis_string_obj_new(z, " -> ", 4);
+    *state.comma_str_p = zis_string_obj_new(z, ", ", 2);
+    zis_string_builder_obj_append_char(z, *state.str_builder_p, '{');
     zis_map_obj_foreach(
         z, zis_object_cast(frame[1], struct zis_map_obj),
         _to_str_foreach_fn, &state
     );
-    *state.str_obj_p = zis_string_obj_concat2(z, *state.str_obj_p, zis_string_obj_new(z, "}" , 1));
-    frame[0] = zis_object_from(*state.str_obj_p);
+    zis_string_builder_obj_append_char(z, *state.str_builder_p, '}');
+    frame[0] = zis_object_from(zis_string_builder_obj_string(z, *state.str_builder_p));
     return ZIS_OK;
 }
 

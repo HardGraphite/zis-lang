@@ -286,34 +286,34 @@ ZIS_NATIVE_FUNC_DEF(T_Tuple_M_hash, z, {1, 0, 1}) {
     return ZIS_OK;
 }
 
-ZIS_NATIVE_FUNC_DEF(T_Tuple_M_to_string, z, {1, 1, 2}) {
+ZIS_NATIVE_FUNC_DEF(T_Tuple_M_to_string, z, {1, 1, 4}) {
     /*#DOCSTR# func Tuple:to_string(?fmt) :: String
     Returns string representation for this tuple. */
     assert_arg1_Tuple(z);
     struct zis_object **frame = z->callstack->frame;
 
-    struct zis_string_obj **str_obj_p = (struct zis_string_obj **)(frame + 2);
-    *str_obj_p = zis_string_obj_new(z, "(", 1);
+    struct zis_string_builder_obj **str_builder_p = (struct zis_string_builder_obj **)(frame + 3);
+    struct zis_string_obj **comma_str_p = (struct zis_string_obj **)(frame + 4);
+    *str_builder_p = zis_string_builder_obj_new(z);
+    *comma_str_p = zis_string_obj_new(z, ", ", 2);
+
+    zis_string_builder_obj_append_char(z, *str_builder_p, '(');
     for (size_t i = 0; ; i++) {
         struct zis_tuple_obj *tuple = zis_object_cast(frame[1], struct zis_tuple_obj);
-        if (i >= zis_tuple_obj_length(tuple))
+        if (i >= zis_tuple_obj_length(tuple)) {
+            if (i == 1)
+                zis_string_builder_obj_append_char(z, *str_builder_p, ',');
             break;
+        }
         if (i)
-            *str_obj_p = zis_string_obj_concat2(z, *str_obj_p, zis_string_obj_new(z, ", ", 2));
-        *str_obj_p = zis_string_obj_concat2(
-            z, *str_obj_p,
-            zis_object_to_string(z, zis_tuple_obj_get(tuple, i), true, NULL)
-        );
+            zis_string_builder_obj_append(z, *str_builder_p, *comma_str_p);
+        struct zis_string_obj *item_str = zis_object_to_string(z, zis_tuple_obj_get(tuple, i), true, NULL);
+        zis_string_builder_obj_append(z, *str_builder_p, item_str);
     }
-    const bool has_one_element =
-        zis_tuple_obj_length(zis_object_cast(frame[1], struct zis_tuple_obj)) == 1;
-    *str_obj_p = zis_string_obj_concat2(
-        z, *str_obj_p,
-        zis_string_obj_new(z, ",)" + (ptrdiff_t)(has_one_element ? 0 : 1), (size_t)-1)
-    );
+    zis_string_builder_obj_append_char(z, *str_builder_p, ')');
 
-    assert(zis_object_type_is(zis_object_from(*str_obj_p), z->globals->type_String));
-    frame[0] = zis_object_from(*str_obj_p);
+    assert(zis_object_type_is(zis_object_from(*str_builder_p), z->globals->type_String_Builder));
+    frame[0] = zis_object_from(zis_string_builder_obj_string(z, *str_builder_p));
     return ZIS_OK;
 }
 
