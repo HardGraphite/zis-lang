@@ -45,7 +45,11 @@
 #endif
 
 #if defined(_WIN32) || defined(__CYGWIN__)
+#  if defined(__MINGW32__)
+#    define ZIS_API      __declspec(dllexport) __declspec(noinline)
+#  else
 #    define ZIS_API      __declspec(dllexport, noinline)
+#  endif
 #    define ZIS_API_VAR  __declspec(dllexport)
 #elif (__GNUC__ + 0 >= 4) || defined(__clang__)
 #    define ZIS_API      __attribute__((used, visibility("default"), noinline))

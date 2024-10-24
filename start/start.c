@@ -185,7 +185,7 @@ static int zis_main(int argc, char *argv[]) {
     return exit_status;
 }
 
-#ifdef _WIN32
+#if defined(_WIN32) && !defined(__MINGW32__)
 
 #include "winutil.h"
 

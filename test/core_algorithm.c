@@ -5,7 +5,7 @@
 #include "../core/algorithm.c"
 
 zis_test0_define(pow_u32) {
-    const uint32_t OVERFLOW = 0;
+    const uint32_t POW_OVERFLOW = 0;
     zis_test_assert_eq(zis_math_pow_u32(0, 0), 1);
     zis_test_assert_eq(zis_math_pow_u32(0, 1), 0);
     zis_test_assert_eq(zis_math_pow_u32(1, 1), 1);
@@ -15,7 +15,7 @@ zis_test0_define(pow_u32) {
             double a = pow(i, j);
             uint32_t b = zis_math_pow_u32(i, j);
             if (a > (double)UINT32_MAX) {
-                zis_test_assert_eq(b, OVERFLOW);
+                zis_test_assert_eq(b, POW_OVERFLOW);
                 break;
             } else {
                 zis_test_assert_eq(b, a);
