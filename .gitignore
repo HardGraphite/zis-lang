@@ -25,6 +25,10 @@ CMakeFiles/
 *.out
 *.exe
 
+*.gcno
+*.gcda
+*.gcov
+
 __pycache__/
 *.py[cdo]
 

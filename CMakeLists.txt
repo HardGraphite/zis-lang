@@ -23,6 +23,7 @@ option(ZIS_BUILD_SHARED  "Build and link shared library (static otherwise)" OFF)
 option(ZIS_BUILD_CORE    "Build `core', the ZIS library"                     ON)
 option(ZIS_BUILD_START   "Build `start', an executable entry"                ON)
 option(ZIS_BUILD_MODULES "Build `modules', the modules"                      ON)
+option(ZIS_BUILD_COVERAGE "Enable coverage testing support"                 OFF)
 option(ZIS_DEBUG         "Enable debugging"                                 OFF)
 option(ZIS_DEBUG_LOGGING "Enable debug logging"                             OFF)
 option(ZIS_DEBUG_DUMPBT  "Dump stack backtrace when crashing"               OFF)
@@ -53,6 +54,16 @@ disable_if_unsupported(
     ZIS_BUILD_IPO _ZIS_SUPPORT_INTERPROCEDURAL_OPTIMIZATION
     "interprocedural optimization"
 )
+
+if(ZIS_BUILD_COVERAGE)
+    if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+        add_compile_options(--coverage)
+        add_link_options(--coverage)
+    else()
+        message(FATAL_ERROR "Option `ZIS_BUILD_COVERAGE' is not supported with ${CMAKE_C_COMPILER_ID} compiler")
+    endif()
+    message(STATUS "`ZIS_BUILD_COVERAGE` is ${ZIS_BUILD_COVERAGE}.")
+endif()
 
 if(MSVC)
     add_compile_options(
