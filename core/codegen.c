@@ -226,6 +226,7 @@ static void frame_scope_free_regs(
     assert(n);
     assert(freed_regs.end - 1 <= fs->reg_allocated_max);
 
+    // #1 - if at the end of allocated region - shrink the allocated region
     if (freed_regs.end - 1 == fs->reg_allocated_max) {
         fs->reg_allocated_max -= n;
         if (fs->free_regs_list_len) {
@@ -242,24 +243,28 @@ static void frame_scope_free_regs(
     struct frame_scope_free_regs *const free_regs_list = fs->free_regs_list;
     const unsigned int free_regs_list_len = (unsigned int)fs->free_regs_list_len;
 
+    // #2 - if before the first recorded free_regs - insert front
     if (!free_regs_list_len || freed_regs.start < free_regs_list[0].start) {
         frame_scope__free_regs_list_insert(fs, 0, freed_regs);
         zis_debug_log(TRACE, "CGen", "frame_scope_free_regs(%u, %u) (insert front)", regs_start, n);
         return;
     }
 
-    if (freed_regs.start > free_regs_list[free_regs_list_len - 1].end) {
+    // #3 - if after the last recorded free_regs - insert back
+    if (freed_regs.start >= free_regs_list[free_regs_list_len - 1].end) {
         frame_scope__free_regs_list_insert(fs, free_regs_list_len, freed_regs);
         zis_debug_log(TRACE, "CGen", "frame_scope_free_regs(%u, %u) (insert back)", regs_start, n);
         return;
     }
 
-    for (unsigned int index_l = 0, index_r = free_regs_list_len;;) {
+    // #4 - else - insert, keep sorted
+    for (unsigned int index_l = 0, index_r = free_regs_list_len - 1;;) {
         const unsigned int index_m = index_l + (index_r - index_l) / 2;
         struct frame_scope_free_regs *free_regs_m = &free_regs_list[index_m];
         if (freed_regs.start < free_regs_m->start) {
             assert(freed_regs.end <= free_regs_m->start);
-            if (index_m > 0 && freed_regs.start > free_regs_list[index_m - 1].start) {
+            assert(index_m >= 1); // otherwise goes to #2
+            if (freed_regs.start > free_regs_list[index_m - 1].start) {
                 frame_scope__free_regs_list_insert(fs, index_m, freed_regs);
                 zis_debug_log(TRACE, "CGen", "frame_scope_free_regs(%u, %u) (insert @%u)", regs_start, n, index_m);
                 return;
@@ -268,7 +273,8 @@ static void frame_scope_free_regs(
         } else {
             assert(freed_regs.start > free_regs_m->start);
             assert(freed_regs.start >= free_regs_m->end);
-            if (index_m + 1 < free_regs_list_len && freed_regs.start < free_regs_list[index_m + 1].start) {
+            assert(index_m + 1 < free_regs_list_len); // see initial value of index_r
+            if (freed_regs.start < free_regs_list[index_m + 1].start) {
                 frame_scope__free_regs_list_insert(fs, index_m + 1, freed_regs);
                 zis_debug_log(TRACE, "CGen", "frame_scope_free_regs(%u, %u) (insert @%u)", regs_start, n, index_m + 1);
                 return;
