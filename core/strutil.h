@@ -48,16 +48,22 @@ zis_static_force_inline size_t zis_u8char_len_1(zis_char8_t u8_first_byte) {
     return (u8_first_byte & 0x80) == 0 ? 1 : _zis_u8char_len_1_mb(u8_first_byte);
 }
 
-/// Calculate length of next UTF-8 character. If illegal byte is found,
-/// return `-1 - off`, where `off` is the offset to the byte that is illegal.
-int zis_u8char_len_s(const zis_char8_t *u8_str, size_t n_bytes);
+/// Calculate length of next UTF-8 character. Return 0 if it is illegal.
+size_t zis_u8char_len_s(const zis_char8_t *u8_str, size_t n_bytes);
+
+/// Calculate length of next UTF-8 character, checking each byte.
+/// If illegal byte is found, return `-1 - off`, where `off` is the offset to the byte that is illegal.
+int zis_u8char_len_checked(const zis_char8_t *u8_str, size_t n_bytes);
 
 /// Get number of UTF-8 characters.
 size_t zis_u8str_len(const zis_char8_t *u8_str);
 
+/// Check each byte and get number of UTF-8 characters.
+size_t zis_u8str_len_s(const zis_char8_t *u8_str, size_t n_bytes);
+
 /// Check each byte and get number of UTF-8 characters. If illegal byte is found,
 /// return `-1 - off` where `off` is the offset to the byte that is illegal.
-int zis_u8str_len_s(const zis_char8_t *u8_str, size_t n_bytes);
+intptr_t zis_u8str_len_checked(const zis_char8_t *u8_str, size_t n_bytes);
 
 /// Get the pointer to the `n_chars`-th UTF-8 character. If error occurs, return NULL.
 /// If out of range, return the pointer to the ending NUL char.
