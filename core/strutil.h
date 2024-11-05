@@ -7,6 +7,7 @@
 
 #include "attributes.h"
 #include "compat.h"
+#include "types.h" // zis_ssize_t
 
 /* ----- character types ---------------------------------------------------- */
 
@@ -63,7 +64,7 @@ size_t zis_u8str_len_s(const zis_char8_t *u8_str, size_t n_bytes);
 
 /// Check each byte and get number of UTF-8 characters. If illegal byte is found,
 /// return `-1 - off` where `off` is the offset to the byte that is illegal.
-intptr_t zis_u8str_len_checked(const zis_char8_t *u8_str, size_t n_bytes);
+zis_ssize_t zis_u8str_len_checked(const zis_char8_t *u8_str, size_t n_bytes);
 
 /// Get the pointer to the `n_chars`-th UTF-8 character. If error occurs, return NULL.
 /// If out of range, return the pointer to the ending NUL char.

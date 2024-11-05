@@ -212,7 +212,7 @@ error:
     return len;
 }
 
-intptr_t zis_u8str_len_checked(const zis_char8_t *u8_str, size_t n_bytes) {
+zis_ssize_t zis_u8str_len_checked(const zis_char8_t *u8_str, size_t n_bytes) {
     const zis_char8_t *const u8_str_start = u8_str;
     const zis_char8_t *const u8_str_end = u8_str + n_bytes;
     size_t len = 0;
@@ -228,8 +228,8 @@ intptr_t zis_u8str_len_checked(const zis_char8_t *u8_str, size_t n_bytes) {
         u8_str += n;
         len++;
     }
-    assert(len <= (size_t)INTPTR_MAX);
-    return (intptr_t)len;
+    assert(len <= (size_t)ZIS_SSIZE_MAX);
+    return (zis_ssize_t)len;
 }
 
 zis_char8_t *zis_u8str_find_pos(const zis_char8_t *u8_str, size_t n_chars) {

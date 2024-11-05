@@ -17,6 +17,7 @@
 #include "ndefutil.h"
 #include "objmem.h"
 #include "objvec.h"
+#include "types.h" // zis_ssize_t
 
 #include "arrayobj.h"
 #include "exceptobj.h"
@@ -66,9 +67,6 @@ static const struct zis_native_module_def *find_embedded_module(const char *name
 
     // List sorted. Use the binary search algorithm.
 
-    typedef intptr_t _ssize_t;
-    static_assert(sizeof(size_t) == sizeof(_ssize_t), "");
-
     assert(embedded_module_count && embedded_module_count < SIZE_MAX / 2);
     size_t index_l = 0, index_r = embedded_module_count - 1;
 
@@ -82,7 +80,7 @@ static const struct zis_native_module_def *find_embedded_module(const char *name
             index_l = index_m + 1;
         else
             index_r = index_m - 1;
-    } while ((_ssize_t)index_l <= (_ssize_t)index_r);
+    } while ((zis_ssize_t)index_l <= (zis_ssize_t)index_r);
 
 #else // !ZIS_EMBEDDED_MODULE_LIST_SORTED
 

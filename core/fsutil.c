@@ -544,11 +544,11 @@ void zis_file_close(zis_file_handle_t f) {
 #endif
 }
 
-intptr_t zis_file_seek(zis_file_handle_t f, intptr_t offset, int whence) {
+zis_ssize_t zis_file_seek(zis_file_handle_t f, zis_ssize_t offset, int whence) {
 #if ZIS_FS_POSIX
 
     const int fd = (int)(intptr_t)f;
-    return (intptr_t)lseek(fd, (off_t)offset, whence);
+    return (zis_ssize_t)lseek(fd, (off_t)offset, whence);
 
 #elif ZIS_FS_WINDOWS
 
@@ -565,7 +565,7 @@ intptr_t zis_file_seek(zis_file_handle_t f, intptr_t offset, int whence) {
     );
     if (!ok)
         return -1;
-    return (intptr_t)pos;
+    return (zis_ssize_t)pos;
 
 #endif
 }

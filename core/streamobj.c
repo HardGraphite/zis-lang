@@ -16,7 +16,7 @@
 
 /* ----- stream backend: none ----------------------------------------------- */
 
-static intptr_t sop_none_seek(void *_data, intptr_t offset, int whence) {
+static zis_ssize_t sop_none_seek(void *_data, zis_ssize_t offset, int whence) {
     zis_unused_var(_data), zis_unused_var(offset), zis_unused_var(whence);
     return 0;
 }
@@ -81,7 +81,7 @@ static void sop_str_use_state_for_static_str(
     state->data_end = str + sz;
 }
 
-static intptr_t sop_str_seek(void *_data, intptr_t offset, int whence) {
+static zis_ssize_t sop_str_seek(void *_data, zis_ssize_t offset, int whence) {
     struct sop_str_state *const restrict state = _data;
     const char *new_cur;
     switch (whence) {

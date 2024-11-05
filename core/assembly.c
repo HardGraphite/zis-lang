@@ -12,6 +12,7 @@
 #include "attributes.h"
 #include "debug.h"
 #include "locals.h"
+#include "types.h" // zis_ssize_t
 
 /* ----- constants and lookup-tables ---------------------------------------- */
 
@@ -77,7 +78,6 @@ enum pseudo_opcode {
 
 /// Find opcode by its uppercase name. Returns -1 if not found.
 static int opcode_from_name(const char *name_upper) {
-    static_assert(sizeof(size_t) == sizeof(intptr_t), "");
     const size_t op_count = ZIS_OP_LIST_LEN;
     static_assert(ZIS_OP_LIST_LEN && ZIS_OP_LIST_LEN <= sizeof op_names_sorted / sizeof op_names_sorted[0], "");
 
@@ -92,7 +92,7 @@ static int opcode_from_name(const char *name_upper) {
             index_l = index_m + 1;
         else
             index_r = index_m - 1;
-    } while ((intptr_t)index_l <= (intptr_t)index_r);
+    } while ((zis_ssize_t)index_l <= (zis_ssize_t)index_r);
 
     return -1;
 }
