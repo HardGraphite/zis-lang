@@ -460,7 +460,7 @@ static void scan_string(
         assert(consumed_size <= buf_sz);
         struct zis_string_obj *str_obj =
             allow_escape_sequences ?
-            zis_string_obj_new_esc(z, buf, consumed_size, _lit_str_esc_trans) :
+            zis_string_obj_new_esc(z, buf, consumed_size, '\\', _lit_str_esc_trans) :
             zis_string_obj_new(z, buf, consumed_size);
         stream_buffer_ignore(input, consumed_size);
         loc_next_char_n(l, (unsigned int)consumed_size);

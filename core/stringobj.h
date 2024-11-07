@@ -22,30 +22,42 @@ struct zis_string_obj;
 
 /// Create a `String` object from UTF-8 string.
 /// Set size `n` to `-1` to take char NUL as the end of the string.
-/// Return NULL if `s` is not a valid UTF-8 string.
+/// Return NULL if an error occurs.
 struct zis_string_obj *zis_string_obj_new(
     struct zis_context *z,
     const char *s, size_t n /* = -1 */
 );
 
-/// Create a `String` like `zis_string_obj_new()`, allowing escape sequence ("\\...").
+/// Create a `String` like `zis_string_obj_new()`, allowing escape sequences.
 /// The translator function shall return the translated character and update the `s_end` pointer;
 /// or return -1 to report an error.
+/// Return NULL if an error occurs (exception in REG-0).
 struct zis_string_obj *zis_string_obj_new_esc(
     struct zis_context *z,
     const char *s, size_t n /* = -1 */,
+    char escape_beginning,
     zis_string_obj_wchar_t (*escape_translator)(const char *restrict s, const char **restrict s_end)
 );
 
 struct zis_string_obj *_zis_string_obj_new_empty(struct zis_context *z);
 
 /// Create a `String` object from a character (Unicode code point).
+/// Return NULL if an error occurs (exception in REG-0).
 struct zis_string_obj *zis_string_obj_from_char(
     struct zis_context *z, zis_string_obj_wchar_t ch
 );
 
 /// Return the number of characters in the string.
 size_t zis_string_obj_length(const struct zis_string_obj *self);
+
+/// Get character at the specified position. Returns `-1` if the index is out of range.
+zis_string_obj_wchar_t zis_string_obj_get(const struct zis_string_obj *str, size_t index);
+
+/// Get substring. Returns NULL if the index or length is invalid.
+struct zis_string_obj *zis_string_obj_slice(
+    struct zis_context *z,
+    const struct zis_string_obj *str, size_t begin_index, size_t length
+);
 
 /// Copy `String` data to buffer `buf` as UTF-8 string and return the size (bytes).
 /// Return -1 if the buffer is not big enough.
@@ -60,6 +72,7 @@ const char *zis_string_obj_as_ascii(const struct zis_string_obj *self, size_t *l
 
 /// Concatenate strings and characters, using the specified separator between them.
 /// The `separator` is optional.
+/// Return NULL if an error occurs (exception in REG-0).
 struct zis_string_obj *zis_string_obj_join(
     struct zis_context *z,
     struct zis_string_obj *separator /*=NULL*/, struct zis_object_vec_view items
@@ -67,12 +80,14 @@ struct zis_string_obj *zis_string_obj_join(
 
 /// Concatenate strings and characters.
 /// Equivalent to `zis_string_obj_join(NULL, items)`.
+/// Return NULL if an error occurs (exception in REG-0).
 struct zis_string_obj *zis_string_obj_concat(
     struct zis_context *z,
     struct zis_object_vec_view items
 );
 
 /// Concatenate two strings.
+/// Return NULL if an error occurs (exception in REG-0).
 struct zis_string_obj *zis_string_obj_concat2(
     struct zis_context *z,
     struct zis_string_obj *str1, struct zis_string_obj *str2

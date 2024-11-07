@@ -54,10 +54,10 @@ zis_test0_define(u8char_len_1) {
 }
 
 zis_test0_define(u8str_len) {
-    zis_test_assert_eq(zis_u8str_len((const zis_char8_t *)"\x10"), 1);
-    zis_test_assert_eq(zis_u8str_len((const zis_char8_t *)"\xc4\x80"), 1);
-    zis_test_assert_eq(zis_u8str_len((const zis_char8_t *)"\xe1\x80\x80"), 1);
-    zis_test_assert_eq(zis_u8str_len((const zis_char8_t *)"\xf0\x90\x80\x80"), 1);
+    zis_test_assert_eq(zis_u8str_len((const zis_char8_t *)"\x10", (size_t)-1), 1);
+    zis_test_assert_eq(zis_u8str_len((const zis_char8_t *)"\xc4\x80", (size_t)-1), 1);
+    zis_test_assert_eq(zis_u8str_len((const zis_char8_t *)"\xe1\x80\x80", (size_t)-1), 1);
+    zis_test_assert_eq(zis_u8str_len((const zis_char8_t *)"\xf0\x90\x80\x80", (size_t)-1), 1);
 }
 
 static void do_u8str_find_pos_test(const char *s, size_t n, size_t off) {

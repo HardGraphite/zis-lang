@@ -13,6 +13,7 @@ Source code for the runtime core.
     - [`memory.h`](memory.h), [`memory.c`](memory.c)
     - [`platform.h`](platform.h)
     - [`strutil.h`](strutil.h), [`strutil.c`](strutil.c)
+    - [`types.h`](types.h)
 + runtime context
     - [`api.c`](api.c)
     - [`context.h`](context.h), [`context.c`](context.c)
