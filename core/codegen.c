@@ -732,12 +732,12 @@ static int check_node_maybe_bool(
     }
 }
 
-/// Check whether target register `tgt` is `NTGT`. Throws and error if not.
+/// Check whether target register `tgt` is `NTGT`. Throws an error if not.
 static void check_tgt_is_ntgt(
     struct zis_codegen *restrict cg,
     struct zis_ast_node_obj *node, unsigned int tgt
 ) {
-    if (zis_unlikely(tgt != UINT_MAX))
+    if (zis_unlikely(tgt != UINT_MAX /* NTGT */))
         error(cg, node, "unexpected target register");
 }
 
@@ -1591,6 +1591,39 @@ static int emit_Array(struct zis_codegen *cg, struct zis_ast_node_obj *node, uns
 static int emit_Map(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
     assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Map);
     return emit_list_like_node(cg, node, tgt_reg, ZIS_OPC_MKMAP);
+}
+
+static int emit_Range(struct zis_codegen *cg, struct zis_ast_node_obj *_node, unsigned int tgt_reg) {
+    assert(zis_ast_node_obj_type(_node) == ZIS_AST_NODE_Range);
+    struct zis_ast_node_obj *_begin = zis_ast_node_get_field(_node, Range, begin);
+    struct zis_ast_node_obj *_end = zis_ast_node_get_field(_node, Range, end);
+    if (zis_unlikely(tgt_reg == NTGT)) {
+        if (node_is_constant(_begin) && node_is_constant(_end))
+            return 0;
+        tgt_reg = 0;
+    }
+    int atgt;
+    bool exclude_end;
+    zis_locals_decl(
+        cg, var,
+        struct zis_ast_node_obj *begin, *end;
+    );
+    var.begin = _begin, var.end = _end;
+    exclude_end = zis_ast_node_get_field(_node, Range, exclude_end) == zis_object_from(cg->z->globals->val_true);
+    const int begin_atgt = emit_any(cg, var.begin, ATGT);
+    const int end_atgt = emit_any(cg, var.end, ATGT);
+    struct frame_scope *fs = scope_stack_last_frame_scope(&cg->scope_stack);
+    atgt_free1(fs, begin_atgt);
+    atgt_free1(fs, end_atgt);
+    if (tgt_reg == ATGT)
+        tgt_reg = frame_scope_alloc_regs(fs, 1), atgt = -(int)tgt_reg;
+    else
+        atgt = 0;
+    struct zis_assembler *const as = scope_assembler(cg);
+    const enum zis_opcode opcode = exclude_end ? ZIS_OPC_MKRNGX : ZIS_OPC_MKRNG;
+    zis_assembler_append_ABC(as, opcode, tgt_reg, atgt_abs(begin_atgt), atgt_abs(end_atgt));
+    zis_locals_drop(cg, var);
+    return atgt;
 }
 
 static int emit_Import(struct zis_codegen *cg, struct zis_ast_node_obj *_node, unsigned int tgt_reg) {

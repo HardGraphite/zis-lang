@@ -698,10 +698,10 @@ scan_next_char:
             stream_ignore_1(input);
             if (stream_peek(input) == '.') {
                 loc_next_char(l);
-                token_set_type(tok, ZIS_TOK_ELLIPSIS);
+                token_set_type(tok, ZIS_TOK_OP_RANGE); // "..."
                 goto loc_next__input_ignore1__token_set_loc1__loc_next__return;
             }
-            token_set_type(tok, ZIS_TOK_DOTDOT);
+            token_set_type(tok, ZIS_TOK_OP_XRANGE); // ".."
             goto loc_next__input_ignore1__token_set_loc1__loc_next__return;
         }
         token_set_type(tok, ZIS_TOK_OP_PERIOD);

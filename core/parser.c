@@ -400,6 +400,30 @@ static void expr_builder_gen_one_expr(
 
 #undef CASE_EQL_OP_
 
+    case ZIS_TOK_OP_XRANGE:
+        node_type = (enum zis_ast_node_type)1;
+        goto _range_op_common;
+    case ZIS_TOK_OP_RANGE:
+        node_type = (enum zis_ast_node_type)0;
+        goto _range_op_common;
+    _range_op_common:
+        if (zis_unlikely(zis_array_obj_length(eb->operand_stack) < 2))
+            goto too_few_operands;
+        result_node = zis_ast_node_new(z, Range, false);
+        {
+            struct zis_bool_obj *const exclude_end =
+                (int)node_type ? z->globals->val_true : z->globals->val_false;
+            struct zis_ast_node_obj *rhs_node = expr_builder_pop_operand(eb);
+            struct zis_ast_node_obj *lhs_node = expr_builder_pop_operand(eb);
+            assert(lhs_node && rhs_node);
+            zis_ast_node_set_field(result_node, Range, begin, lhs_node);
+            zis_ast_node_set_field(result_node, Range, end, rhs_node);
+            zis_ast_node_set_field(result_node, Range, exclude_end, zis_object_from(exclude_end));
+            node_copy_loc0(result_node, lhs_node);
+            node_copy_loc1(result_node, rhs_node);
+        }
+        break;
+
     case ZIS_TOK_OP_PERIOD:
         assert(zis_token_type_is_bin_op(op_type));
         if (zis_unlikely(zis_array_obj_length(eb->operand_stack) < 2))

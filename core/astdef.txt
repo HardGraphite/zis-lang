@@ -51,6 +51,7 @@ Send           (Symbol method, Array args)
 Tuple          (Array args)
 Array          (Array args)
 Map            (Array args) # args: key1, val1, key2, val2, ...
+Range          (Node begin, Node end, Object exclude_end) # exclude_end: object true or false
 
 Import         (Node value)
 Return         (Object value) # value: nil or expr-node
