@@ -46,6 +46,7 @@ struct zis_type_obj;
     E(Map)                      \
     E(Nil)                      \
     E(Path)                     \
+    E(Range)                    \
     E(Stream)                   \
     E(String)                   \
     E(Symbol)                   \

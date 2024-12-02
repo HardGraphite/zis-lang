@@ -49,6 +49,7 @@ Source code for the runtime core.
     - [`moduleobj.h`](moduleobj.h), [`moduleobj.c`](moduleobj.c)
     - [`nilobj.h`](nilobj.h), [`nilobj.c`](nilobj.c)
     - [`pathobj.h`](pathobj.h), [`pathobj.c`](pathobj.c)
+    - [`rangeobj.h`](rangeobj.h), [`rangeobj.c`](rangeobj.c)
     - [`streamobj.h`](streamobj.h), [`streamobj.c`](streamobj.c)
     - [`stringobj.h`](stringobj.h), [`stringobj.c`](stringobj.c)
     - [`symbolobj.h`](symbolobj.h), [`symbolobj.c`](symbolobj.c)
