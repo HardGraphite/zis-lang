@@ -21,6 +21,7 @@
 #include "intobj.h"
 #include "mapobj.h"
 #include "moduleobj.h"
+#include "rangeobj.h"
 #include "symbolobj.h"
 #include "tupleobj.h"
 #include "typeobj.h"
@@ -717,6 +718,50 @@ _interp_loop:
             // val_count == 0
             *tgt_p = zis_object_from(zis_map_obj_new(z, 0.0f, 0));
         }
+        IP_ADVANCE;
+        OP_DISPATCH;
+    }
+
+    OP_DEFINE(MKRNG) {
+        uint32_t tgt, begin, end;
+        zis_instr_extract_operands_ABC(this_instr, tgt, begin, end);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        struct zis_object *begin_v, *end_v;
+        {
+            struct zis_object **begin_p = bp + begin;
+            BOUND_CHECK_REG(begin_p);
+            begin_v = *begin_p;
+            struct zis_object **end_p = bp + end;
+            BOUND_CHECK_REG(end_p);
+            end_v = *end_p;
+        }
+        struct zis_range_obj *range = zis_range_obj_new_ob(z, begin_v, end_v, false);
+        if (zis_unlikely(!range))
+            THROW_REG0;
+        *tgt_p = zis_object_from(range);
+        IP_ADVANCE;
+        OP_DISPATCH;
+    }
+
+    OP_DEFINE(MKRNGX) {
+        uint32_t tgt, begin, end;
+        zis_instr_extract_operands_ABC(this_instr, tgt, begin, end);
+        struct zis_object **tgt_p = bp + tgt;
+        BOUND_CHECK_REG(tgt_p);
+        struct zis_object *begin_v, *end_v;
+        {
+            struct zis_object **begin_p = bp + begin;
+            BOUND_CHECK_REG(begin_p);
+            begin_v = *begin_p;
+            struct zis_object **end_p = bp + end;
+            BOUND_CHECK_REG(end_p);
+            end_v = *end_p;
+        }
+        struct zis_range_obj *range = zis_range_obj_new_ob(z, begin_v, end_v, true);
+        if (zis_unlikely(!range))
+            THROW_REG0;
+        *tgt_p = zis_object_from(range);
         IP_ADVANCE;
         OP_DISPATCH;
     }

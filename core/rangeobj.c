@@ -8,6 +8,7 @@
 #include "objmem.h"
 #include "stack.h"
 
+#include "exceptobj.h"
 #include "stringobj.h"
 
 struct zis_range_obj *zis_range_obj_new(
@@ -18,6 +19,26 @@ struct zis_range_obj *zis_range_obj_new(
     struct zis_range_obj *const range = zis_object_cast(obj, struct zis_range_obj);
     range->begin = begin, range->end = end;
     return range;
+}
+
+struct zis_range_obj *zis_range_obj_new_ob(
+    struct zis_context *z,
+    struct zis_object *begin_obj, struct zis_object *end_obj, bool exclude_end
+) {
+    if (!zis_object_is_smallint(begin_obj)) {
+        zis_context_set_reg0(z, zis_object_from(zis_exception_obj_format(
+            z, NULL, begin_obj, "illegal index"
+        )));
+        return NULL;
+    }
+    if (!zis_object_is_smallint(end_obj)) {
+        zis_context_set_reg0(z, zis_object_from(zis_exception_obj_format(
+            z, NULL, end_obj, "illegal index"
+        )));
+        return NULL;
+    }
+    zis_ssize_t begin =  zis_smallint_from_ptr(begin_obj), end = zis_smallint_from_ptr(end_obj);
+    return zis_range_obj_new(z, begin, exclude_end ? end - 1 : end);
 }
 
 #define assert_arg1_Range(__z) \
