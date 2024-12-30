@@ -344,6 +344,14 @@ end
 
 ## String
 
+func test_String_length()
+    testing.check_equal('':length(), 0)
+    testing.check_equal('1':length(), 1)
+    testing.check_equal('123':length(), 3)
+    testing.check_equal('\u{7532}\u{4e59}\u{4e19}\u{4e01}':length(), 4)
+    testing.check_equal('A\u{7532}B\u{4e59}':length(), 4)
+end
+
 func test_String_operator_add()
     testing.check_equal('123' + '456', '123456')
 end

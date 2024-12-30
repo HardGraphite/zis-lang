@@ -575,6 +575,18 @@ ZIS_NATIVE_FUNC_DEF(T_String_M_operator_cmp, z, {2, 0, 2}) {
     return ZIS_OK;
 }
 
+ZIS_NATIVE_FUNC_DEF(T_String_M_length, z, {1, 0, 1}) {
+    /*#DOCSTR# func String:length() :: Int
+    Returns the number of characters in the string. */
+    assert_arg1_String(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_string_obj *self = zis_object_cast(frame[1], struct zis_string_obj);
+    const size_t len = string_obj_length(self);
+    assert(len <= ZIS_SMALLINT_MAX);
+    frame[0] = zis_smallint_to_ptr((zis_smallint_t)len);
+    return ZIS_OK;
+}
+
 ZIS_NATIVE_FUNC_DEF(T_String_M_hash, z, {1, 0, 1}) {
     /*#DOCSTR# func String:hash() :: Int
     Generates hash code. */
@@ -665,6 +677,7 @@ ZIS_NATIVE_FUNC_DEF_LIST(
     { "[]"          , &T_String_M_operator_get_elem },
     { "=="          , &T_String_M_operator_equ      },
     { "<=>"         , &T_String_M_operator_cmp      },
+    { "length"      , &T_String_M_length            },
     { "hash"        , &T_String_M_hash              },
     { "to_string"   , &T_String_M_to_string         },
 );
