@@ -56,7 +56,7 @@ zis_string_obj_wchar_t zis_string_obj_get(const struct zis_string_obj *str, size
 /// Get substring. Returns NULL if the index or length is invalid.
 struct zis_string_obj *zis_string_obj_slice(
     struct zis_context *z,
-    const struct zis_string_obj *str, size_t begin_index, size_t length
+    struct zis_string_obj *str, size_t begin_index, size_t length
 );
 
 /// Copy `String` data to buffer `buf` as UTF-8 string and return the size (bytes).

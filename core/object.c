@@ -9,6 +9,7 @@
 #include "boolobj.h"
 #include "exceptobj.h"
 #include "intobj.h"
+#include "rangeobj.h"
 #include "stringobj.h"
 #include "symbolobj.h"
 #include "typeobj.h"
@@ -211,4 +212,23 @@ zis_noinline size_t _zis_object_index_convert_slow(
 
     assert(index >= 0 && (zis_smallint_unsigned_t)index < length);
     return (zis_smallint_unsigned_t)index;
+}
+
+bool zis_object_index_range_convert(struct zis_object_index_range_convert_args *restrict args) {
+    const size_t length = args->length;
+    const size_t begin = zis_object_index_convert(length, args->range->begin);
+    if (zis_unlikely(begin == (size_t)-1))
+        return false;
+    const size_t end = zis_object_index_convert(length, args->range->end);
+    if (zis_unlikely(end == (size_t)-1 || begin > end)) {
+        if (end != (size_t)-1 ? end : zis_object_index_convert((zis_smallint_unsigned_t)-1, args->range->end) == begin - 1) {
+            args->offset = begin;
+            args->count = 0;
+            return true;
+        }
+        return false;
+    }
+    args->offset = begin;
+    args->count = end - begin + 1;
+    return true;
 }

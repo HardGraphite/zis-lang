@@ -280,3 +280,15 @@ zis_object_index_convert(zis_smallint_unsigned_t length, zis_smallint_t index) {
         return (zis_smallint_unsigned_t)index - 1U;
     return _zis_object_index_convert_slow(length, index);
 }
+
+struct zis_object_index_range_convert_args {
+    struct zis_range_obj *range;
+    zis_smallint_unsigned_t length;
+    size_t offset;
+    size_t count;
+};
+
+/// Calculate beginning offset and element count from a Range.
+/// The rule is similar to `zis_object_index_convert()`.
+/// Returns false when the index is out of range.
+bool zis_object_index_range_convert(struct zis_object_index_range_convert_args *restrict args);

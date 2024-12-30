@@ -363,6 +363,17 @@ func test_String_operator_get_element()
     testing.check_equal(string[4], 0x4e01)
 end
 
+func test_String_operator_get_element_by_range()
+    string = '123456789'
+    testing.check_equal(string[1 ... 9], string)
+    testing.check_equal(string[1 ... -1], string)
+    testing.check_equal(string[5 ... 9], '56789')
+    testing.check_equal(string[5 ... -1], '56789')
+    testing.check_equal(string[5 ... 5], '5')
+    testing.check_equal(string[1 .. 1], '')
+    testing.check_equal(string[5 .. 5], '')
+end
+
 func test_String_join()
     testing.check_equal(String.join('; ', 'A', 'BB', 'CCC', 'DDDD'), 'A; BB; CCC; DDDD')
     testing.check_equal(String.join('；', 'A', 'BB', 'CCC', 'DDDD'), 'A；BB；CCC；DDDD')

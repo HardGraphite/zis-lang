@@ -13,6 +13,7 @@
 
 #include "arrayobj.h"
 #include "exceptobj.h"
+#include "rangeobj.h"
 #include "streamobj.h"
 #include "tupleobj.h"
 
@@ -257,18 +258,21 @@ zis_wchar_t zis_string_obj_get(const struct zis_string_obj *str, size_t index) {
 
 struct zis_string_obj *zis_string_obj_slice(
     struct zis_context *z,
-    const struct zis_string_obj *_str, size_t begin_index, size_t length
+    struct zis_string_obj *_str, size_t begin_index, size_t length
 ) {
-    const size_t end_index = begin_index + length;
     const size_t str_len = string_obj_length(_str);
-    if (zis_unlikely(begin_index >= str_len || end_index >= str_len))
+    if (zis_unlikely(begin_index >= str_len || begin_index + length > str_len))
         return NULL;
     if (zis_unlikely(!length))
         return z->globals->val_empty_string;
+    if (zis_unlikely(str_len == length)) {
+        assert(begin_index == 0);
+        return _str;
+    }
 
     size_t size;
     if (str_len == string_obj_size(_str)) {
-        size = length;
+        size = length; // ASCII
     } else {
         const zis_char8_t *s = string_obj_as_u8str(_str);
         const zis_char8_t *p = zis_u8str_find_pos(s, length);
@@ -279,7 +283,8 @@ struct zis_string_obj *zis_string_obj_slice(
     zis_locals_decl_1(z, var, const struct zis_string_obj *str);
     var.str = _str;
     struct zis_string_obj *const res_str = string_obj_alloc(z, size, length);
-    memcpy(string_obj_data(res_str), string_obj_as_u8str(var.str), size);
+    const zis_char8_t *const s = zis_u8str_find_pos(string_obj_as_u8str(var.str), begin_index);
+    memcpy(string_obj_data(res_str), s, size);
     zis_locals_drop(z, var);
     return res_str;
 }
@@ -485,27 +490,39 @@ ZIS_NATIVE_FUNC_DEF(T_String_M_operator_add, z, {2, 0, 2}) {
 }
 
 ZIS_NATIVE_FUNC_DEF(T_String_M_operator_get_elem, z, {2, 0, 2}) {
-    /*#DOCSTR# func String:\'[]'(position :: Int) :: Int
+    /*#DOCSTR# func String:\'[]'(position :: Int | Range) :: Int
     Gets the character at `position`. */
     assert_arg1_String(z);
     struct zis_context_globals *g = z->globals;
     struct zis_object **frame = z->callstack->frame;
     struct zis_string_obj *self = zis_object_cast(frame[1], struct zis_string_obj);
+    struct zis_object *position_obj = frame[2];
 
-    size_t index;
-    if (zis_object_is_smallint(frame[2])) {
-        index = zis_object_index_convert(string_obj_length(self), zis_smallint_from_ptr(frame[2]));
+    if (zis_object_is_smallint(position_obj)) {
+        size_t index = zis_object_index_convert(string_obj_length(self), zis_smallint_from_ptr(position_obj));
         if (index == (size_t)-1)
             goto index_out_of_range;
         const zis_wchar_t c = zis_string_obj_get(self, index);
         if (c == (zis_wchar_t)-1)
             goto index_out_of_range;
         frame[0] = zis_smallint_to_ptr((zis_smallint_t)c);
+    return ZIS_OK;
+    } else if (zis_object_type_is(position_obj, g->type_Range)) {
+        struct zis_object_index_range_convert_args ca = {
+            .range = zis_object_cast(position_obj, struct zis_range_obj),
+            .length = string_obj_length(self),
+        };
+        if (!zis_object_index_range_convert(&ca))
+            goto index_out_of_range;
+        struct zis_string_obj *res = zis_string_obj_slice(z, self, ca.offset, ca.count);
+        if (!res)
+            goto index_out_of_range;
+        frame[0] = zis_object_from(res);
         return ZIS_OK;
-    } else if (zis_object_type_is(frame[2], g->type_Int)) {
+    } else if (zis_object_type_is(position_obj, g->type_Int)) {
     index_out_of_range:
         frame[0] = zis_object_from(zis_exception_obj_format_common(
-            z, ZIS_EXC_FMT_INDEX_OUT_OF_RANGE, frame[2]
+            z, ZIS_EXC_FMT_INDEX_OUT_OF_RANGE, position_obj
         ));
         return ZIS_THR;
     } else {
