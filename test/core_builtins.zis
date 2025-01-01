@@ -352,6 +352,27 @@ func test_String_length()
     testing.check_equal('A\u{7532}B\u{4e59}':length(), 4)
 end
 
+func test_String_find()
+    string = '12345'
+    testing.check_equal(string:find('12345'), 1)
+    testing.check_equal(string:find('123'), 1)
+    testing.check_equal(string:find('1'), 1)
+    testing.check_equal(string:find(''), 1)
+    testing.check_equal(string:find('0'), nil)
+    testing.check_equal(string:find('345'), 3)
+    testing.check_equal(string:find('34'), 3)
+    testing.check_equal(string:find('3'), 3)
+    testing.check_equal(string:find('5'), 5)
+    testing.check_equal(string:find('3', 2), 3)
+    testing.check_equal(string:find('3', 10), nil)
+    testing.check_equal(string:find(49), 1)
+    testing.check_equal(string:find(50), 2)
+    string = '\u{7532}\u{4e59}\u{4e19}\u{4e01}'
+    testing.check_equal(string:find('\u{4e59}\u{4e19}'), 2)
+    testing.check_equal(string:find(0x4e59), 2)
+    testing.check_equal(string:find(0), nil)
+end
+
 func test_String_operator_add()
     testing.check_equal('123' + '456', '123456')
 end

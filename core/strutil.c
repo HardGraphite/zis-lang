@@ -1,3 +1,5 @@
+#define _GNU_SOURCE // memmem()
+
 #include "strutil.h"
 
 #include <assert.h>
@@ -247,6 +249,39 @@ zis_char8_t *zis_u8str_find_end(const zis_char8_t *u8_str, size_t max_bytes) {
         }
     }
     return NULL;
+}
+
+zis_char8_t *zis_u8str_find(
+    const zis_char8_t *u8_str, size_t u8_str_sz,
+    const zis_char8_t *sub_str, size_t sub_str_sz
+) {
+#ifdef __GNUC__
+
+    return memmem(u8_str, u8_str_sz, sub_str, sub_str_sz);
+
+#else
+
+    if (zis_unlikely(sub_str_sz <= 1)) {
+        if (sub_str_sz == 0)
+            return (zis_char8_t *)u8_str;
+        return memchr(u8_str, sub_str[0], u8_str_sz);
+    }
+
+    if (zis_unlikely(u8_str_sz < sub_str_sz))
+        return NULL;
+
+    const int sub_str_first = sub_str[0];
+    for (const zis_char8_t *p = u8_str, *const p_end = u8_str + u8_str_sz - sub_str_sz + 1; p < p_end; p++) {
+        p = memchr(p, sub_str_first, (size_t)(p_end - p));
+        if (p == NULL)
+            break;
+        if (memcmp(p + 1, sub_str + 1, sub_str_sz - 1) == 0)
+            return (zis_char8_t *)p;
+    }
+
+    return NULL;
+
+#endif
 }
 
 static const zis_wchar_t char_width_table[] = {

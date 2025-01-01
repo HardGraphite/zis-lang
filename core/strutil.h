@@ -75,6 +75,13 @@ zis_char8_t *zis_u8str_find_pos(const zis_char8_t *u8_str, size_t n_chars);
 /// Returns NULL if no valid character is found.
 zis_char8_t *zis_u8str_find_end(const zis_char8_t *u8_str, size_t max_bytes);
 
+/// Search for a sub-string in the UTF-8 string.
+/// Retruns the pointer to the first byte of the first occurrence. If not found returns NULL.
+zis_char8_t *zis_u8str_find(
+    const zis_char8_t *u8_str, size_t u8_str_sz,
+    const zis_char8_t *sub_str, size_t sub_str_sz
+);
+
 /* ----- char and string info ----------------------------------------------- */
 
 /// Get number of columns needed to display the given character.

@@ -59,6 +59,20 @@ struct zis_string_obj *zis_string_obj_slice(
     struct zis_string_obj *str, size_t begin_index, size_t length
 );
 
+/// Search for a sub-string in the string.
+/// Retruns the index of the first occurrence.
+/// If not found returns -1.
+size_t zis_string_obj_find(
+    struct zis_string_obj *str,
+    struct zis_string_obj *sub_str, size_t start /* = 0 */, size_t count /* = SIZE_MAX */
+);
+
+/// Search a character in the string like `zis_string_obj_find()` does.
+size_t zis_string_obj_find_c(
+    struct zis_string_obj *str,
+    zis_string_obj_wchar_t c, size_t start, size_t count
+);
+
 /// Copy `String` data to buffer `buf` as UTF-8 string and return the size (bytes).
 /// Return -1 if the buffer is not big enough.
 /// Set `buf` to NULL to get the minimum size of buffer.

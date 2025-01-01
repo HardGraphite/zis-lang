@@ -13,6 +13,7 @@
 
 #include "arrayobj.h"
 #include "exceptobj.h"
+#include "intobj.h"
 #include "rangeobj.h"
 #include "streamobj.h"
 #include "tupleobj.h"
@@ -76,6 +77,25 @@ static struct zis_string_obj *string_obj_alloc(
     assert(string_obj_size(str) == size);
     assert(string_obj_length(str) == length);
     return str;
+}
+
+/// Dummy string object that can be allocated on stack for representing a character.
+typedef union dummy_string_obj_for_char {
+    struct zis_string_obj string_obj;
+    char _data[sizeof(struct zis_string_obj) + sizeof(zis_wchar_t)];
+} dummy_string_obj_for_char;
+
+/// Initialize a dummy_string_obj_for_char.
+static void dummy_string_obj_for_char_init(dummy_string_obj_for_char *restrict ds, zis_wchar_t c) {
+    // See `string_obj_alloc()`.
+
+    const size_t length = 1; // 1 character.
+    const size_t size = zis_u8char_from_code(c, ds->string_obj._text_bytes);
+    assert(size > 0);
+    *(size_t *)&ds->string_obj._bytes_size = sizeof(dummy_string_obj_for_char) - ZIS_OBJECT_HEAD_SIZE;
+    ds->string_obj._length_info = (length << 4) | (ds->string_obj._bytes_size - STR_OBJ_BYTES_FIXED_SIZE - size);
+    assert(string_obj_size(&ds->string_obj) == size);
+    assert(string_obj_length(&ds->string_obj) == length);
 }
 
 zis_cold_fn zis_noinline
@@ -287,6 +307,49 @@ struct zis_string_obj *zis_string_obj_slice(
     memcpy(string_obj_data(res_str), s, size);
     zis_locals_drop(z, var);
     return res_str;
+}
+
+size_t zis_string_obj_find(
+    struct zis_string_obj *str,
+    struct zis_string_obj *sub_str, size_t start /* = 0 */, size_t count /* = SIZE_MAX */
+) {
+    const size_t str_len = string_obj_length(str);
+    if (zis_unlikely(start >= str_len))
+        return (size_t)-1;
+    const zis_char8_t *const str_data = string_obj_as_u8str(str);
+    const zis_char8_t *const str_at_start = start == 0 ? str_data : zis_u8str_find_pos(str_data, start);
+    const size_t str_size = string_obj_size(str);
+    const size_t str_rest_size = str_size - (str_at_start - str_data);
+
+    zis_char8_t *const found_ptr = zis_u8str_find(
+        str_at_start, str_rest_size,
+        string_obj_as_u8str(sub_str), string_obj_size(sub_str)
+    );
+    if (found_ptr == NULL)
+        return (size_t)-1;
+
+    size_t offset = (size_t)(found_ptr - str_at_start);
+    if (str_len != str_size) { // not ASCII
+        offset = zis_u8str_len(str_at_start, offset);
+    }
+    const size_t found_index = start + offset;
+
+    if (count != SIZE_MAX && count < str_len - start) {
+        const size_t n = string_obj_length(sub_str);
+        if (found_index + n > start + count)
+            return (size_t)-1;
+    }
+
+    return found_index;
+}
+
+size_t zis_string_obj_find_c(
+    struct zis_string_obj *str,
+    zis_string_obj_wchar_t c, size_t start, size_t count
+) {
+    dummy_string_obj_for_char dummy_str;
+    dummy_string_obj_for_char_init(&dummy_str, c);
+    return zis_string_obj_find(str, &dummy_str.string_obj, start, count);
 }
 
 size_t zis_string_obj_to_u8str(const struct zis_string_obj *self, char *buf, size_t buf_sz) {
@@ -587,6 +650,65 @@ ZIS_NATIVE_FUNC_DEF(T_String_M_length, z, {1, 0, 1}) {
     return ZIS_OK;
 }
 
+ZIS_NATIVE_FUNC_DEF(T_String_M_find, z, {2, 2, 4}) {
+    /*#DOCSTR# func String:find(value :: Int | String, ?start :: Int, ?count :: String) :: Int | Nil
+    Searchs for a sub-string or a character in the string and retruns the index
+    of the first occurrence. If not found returns nil. */
+    assert_arg1_String(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_string_obj *self = zis_object_cast(frame[1], struct zis_string_obj);
+    struct zis_object *arg_value = frame[2], *arg_start = frame[3], *arg_count = frame[4];
+
+    size_t start, count;
+    if (arg_start == zis_object_from(z->globals->val_nil)) {
+        start = 0;
+    } else if (zis_object_is_smallint(arg_start)) {
+        zis_smallint_t x = zis_smallint_from_ptr(arg_start);
+        start = zis_object_index_convert(string_obj_length(self), x);
+        if (zis_unlikely(start == (size_t)-1))
+            goto not_found;
+    } else {
+        goto not_found;
+    }
+    if (arg_count == zis_object_from(z->globals->val_nil)) {
+        count = SIZE_MAX;
+    } else if (zis_object_is_smallint(arg_count)) {
+        zis_smallint_t x = zis_smallint_from_ptr(arg_count);
+        if (zis_unlikely(x < 0))
+            goto not_found;
+        count = (zis_smallint_unsigned_t)x;
+    } else if (zis_object_type_is(arg_count, z->globals->type_Int)) {
+        struct zis_int_obj *i = zis_object_cast(arg_count, struct zis_int_obj);
+        if (zis_int_obj_sign(i)) // negative
+            goto not_found;
+        count = SIZE_MAX;
+    } else {
+        goto not_found;
+    }
+
+    size_t index;
+    if (zis_object_is_smallint(arg_value)) {
+        zis_smallint_t x = zis_smallint_from_ptr(arg_value);
+        if (zis_unlikely(x < 0 || x > 0x10ffff))
+            goto not_found;
+        zis_wchar_t c = (zis_wchar_t)(zis_smallint_unsigned_t)x;
+        index = zis_string_obj_find_c(self, c, start, count);
+    } else if (zis_object_type_is(arg_value, z->globals->type_String)) {
+        struct zis_string_obj *s = zis_object_cast(arg_value, struct zis_string_obj);
+        index = zis_string_obj_find(self, s, start, count);
+    } else {
+    not_found:
+        frame[0] = zis_object_from(z->globals->val_nil);
+        return ZIS_OK;
+    }
+    if (zis_unlikely(index == (size_t)-1))
+        goto not_found;
+
+    assert(index < ZIS_SMALLINT_MAX);
+    frame[0] = zis_smallint_to_ptr((zis_smallint_t)(zis_smallint_unsigned_t)index + 1);
+    return ZIS_OK;
+}
+
 ZIS_NATIVE_FUNC_DEF(T_String_M_hash, z, {1, 0, 1}) {
     /*#DOCSTR# func String:hash() :: Int
     Generates hash code. */
@@ -678,6 +800,7 @@ ZIS_NATIVE_FUNC_DEF_LIST(
     { "=="          , &T_String_M_operator_equ      },
     { "<=>"         , &T_String_M_operator_cmp      },
     { "length"      , &T_String_M_length            },
+    { "find"        , &T_String_M_find              },
     { "hash"        , &T_String_M_hash              },
     { "to_string"   , &T_String_M_to_string         },
 );

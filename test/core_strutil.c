@@ -71,6 +71,29 @@ zis_test0_define(u8str_find_pos) {
     do_u8str_find_pos_test(u8"你好", 1, 3);
 }
 
+static void do_u8str_find_test(const char *s, const char *sub_str, size_t index) {
+    const zis_char8_t *s1 = (const zis_char8_t *)s;
+    const zis_char8_t *ss1 = (const zis_char8_t *)sub_str;
+    const zis_char8_t *s2 = zis_u8str_find(s1, strlen(s), ss1, strlen(sub_str));
+    if (index == (size_t)-1)
+        zis_test_assert_eq(s2, NULL);
+    else
+        zis_test_assert_eq(s2, zis_u8str_find_pos(s1, index));
+}
+
+zis_test0_define(u8str_find) {
+    do_u8str_find_test("", "", 0);
+    do_u8str_find_test("", "1", (size_t)-1);
+    do_u8str_find_test("123", "2", 1);
+    do_u8str_find_test("123", "12", 0);
+    do_u8str_find_test("123", "23", 1);
+    do_u8str_find_test("123", "123", 0);
+    do_u8str_find_test("123", "1234", (size_t)-1);
+    do_u8str_find_test("123", "0", (size_t)-1);
+    do_u8str_find_test(u8"你好", u8"你", 0);
+    do_u8str_find_test(u8"你好", u8"好", 1);
+}
+
 zis_test0_list(
     main,
     zis_test0_case(str_icmp),
@@ -80,4 +103,5 @@ zis_test0_list(
     zis_test0_case(u8char_len_1),
     zis_test0_case(u8str_len),
     zis_test0_case(u8str_find_pos),
+    zis_test0_case(u8str_find),
 )
