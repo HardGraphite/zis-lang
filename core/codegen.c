@@ -74,7 +74,7 @@ static struct frame_scope *frame_scope_create(struct zis_context *z) {
     return fs;
 }
 
-static void frame_scope_destory(struct frame_scope *fs, struct zis_context *z) {
+static void frame_scope_destroy(struct frame_scope *fs, struct zis_context *z) {
     assert(fs->type == SCOPE_FRAME);
     zis_assembler_destroy(fs->as, z, NULL);
     zis_mem_free(fs->free_regs_list);
@@ -352,7 +352,7 @@ static struct var_scope *var_scope_create(void) {
     return vs;
 }
 
-static void var_scope_destory(struct var_scope *vs) {
+static void var_scope_destroy(struct var_scope *vs) {
     assert(vs->type == SCOPE_VAR);
     zis_mem_free(vs->vars);
     zis_mem_free(vs);
@@ -409,7 +409,7 @@ static struct loop_scope *loop_scope_create(void) {
     return ls;
 }
 
-static void loop_scope_destory(struct loop_scope *ls) {
+static void loop_scope_destroy(struct loop_scope *ls) {
     assert(ls->type == SCOPE_LOOP);
     zis_mem_free(ls);
 }
@@ -446,13 +446,13 @@ static void scope_stack_fini(struct scope_stack *restrict ss, struct zis_context
             const union scope_ptr next_s = s.any->_parent_scope;
             switch (s.any->type) {
             case SCOPE_LOOP:
-                loop_scope_destory(s.loop);
+                loop_scope_destroy(s.loop);
                 break;
             case SCOPE_VAR:
-                var_scope_destory(s.var);
+                var_scope_destroy(s.var);
                 break;
             case SCOPE_FRAME:
-                frame_scope_destory(s.frame, z);
+                frame_scope_destroy(s.frame, z);
                 break;
             default:
                 zis_unreachable();
