@@ -171,6 +171,12 @@ struct zis_ast_node_Map_data {
     struct zis_array_obj *args;
 };
 
+struct zis_ast_node_Range_data {
+    struct zis_ast_node_obj *begin;
+    struct zis_ast_node_obj *end;
+    struct zis_object *exclude_end;
+};
+
 struct zis_ast_node_Import_data {
     struct zis_ast_node_obj *value;
 };
@@ -248,6 +254,7 @@ struct zis_ast_node_Module_data {
     E(Tuple          , "Array\0args\0") \
     E(Array          , "Array\0args\0") \
     E(Map            , "Array\0args\0") \
+    E(Range          , "Node\0begin\0Node\0end\0Object\0exclude_end\0") \
     E(Import         , "Node\0value\0") \
     E(Return         , "Object\0value\0") \
     E(Throw          , "Object\0value\0") \

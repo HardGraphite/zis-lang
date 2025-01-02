@@ -243,35 +243,29 @@ class SymbolObjPtrPrinter(ObjPtrPrinter):
 class StringObjPtrPrinter(ObjPtrPrinter):
     OBJ_TYPE_NAME = 'string'
 
-    def calc_size_info(self) -> tuple[int, int, int]: # (char_size, char_count, data_size)
-        v_bytes_size = self.val['_bytes_size']
-        v_data = self.val['_data']
-        data_size = int(v_bytes_size) - (int(v_data.address) - int(v_bytes_size.address))
-        type_and_length = int(self.val['_type_and_length'])
-        char_size = (type_and_length & 0b11) + 1
-        str_length = type_and_length >> 2
-        return char_size, str_length, data_size
+    def char_count(self) -> int:
+        length_info = int(self.val['_length_info'])
+        return length_info >> 4
+
+    def text_size(self) -> int:
+        bytes_size = int(self.val['_bytes_size'])
+        length_info = int(self.val['_length_info'])
+        STR_OBJ_BYTES_FIXED_SIZE = gdb.lookup_type('size_t').sizeof * 2
+        return bytes_size - (length_info & 0xf) - STR_OBJ_BYTES_FIXED_SIZE
+
+    def string(self) -> str:
+        text_bytes = self.val['_text_bytes']
+        return str(text_bytes.lazy_string('UTF-8', self.text_size()).value())
 
     def repr_obj_value(self) -> str:
-        v_data = self.val['_data']
-        char_size, str_length, data_size = self.calc_size_info()
-        data_size = char_size * str_length
-        assert data_size <= data_size
-        data_buf = bytearray(data_size)
-        for i in range(data_size):
-            c = int(v_data[i])
-            data_buf[i] = c
-        data = data_buf.decode('UTF-8')
-        return json.dumps(data)
+        return json.dumps(self.string())
 
     def iter_obj_fields(self) -> Iterator[tuple[str, Any]]:
         val = self.val
-        char_size, str_length, data_size = self.calc_size_info()
         return iter((
             ('_meta', val['_meta']),
             ('_bytes_size', val['_bytes_size']),
-            ('(length)', str_length),
-            ('(char_size)', char_size),
-            ('(data_size)', data_size),
-            ('_data', val['_data']),
+            ('(length)', self.char_count()),
+            ('(size)', self.text_size()),
+            ('(text)', self.string()),
         ))

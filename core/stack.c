@@ -4,8 +4,8 @@
 #include "context.h"
 #include "debug.h"
 #include "memory.h"
-#include "ndefutil.h"
 #include "objmem.h"
+#include "objvec.h"
 
 /* ----- configuration ------------------------------------------------------ */
 
@@ -79,9 +79,8 @@ static void callstack_gc_visitor(void *_cs, enum zis_objmem_obj_visit_op op) {
 }
 
 /// Fill slots with known objects.
-zis_static_force_inline struct zis_object **
-callstack_clear_range(struct zis_object **begin, size_t count) {
-    return zis_object_vec_zero(begin, count);
+zis_static_force_inline void callstack_clear_range(struct zis_object **begin, size_t count) {
+    zis_object_vec_zero(begin, count);
 }
 
 /* ----- public functions --------------------------------------------------- */
@@ -160,7 +159,9 @@ struct zis_object **zis_callstack_frame_alloc_temp(struct zis_context *z, size_t
     if (zis_unlikely((size_t)(cs->_data_end - old_sp) < n))
         callstack_error_overflow(cs);
     cs->top = old_sp + n;
-    return callstack_clear_range(old_sp + 1, n);
+    struct zis_object **p = old_sp + 1;
+    callstack_clear_range(p, n);
+    return p;
 }
 
 void zis_callstack_frame_free_temp(struct zis_context *z, size_t n) {

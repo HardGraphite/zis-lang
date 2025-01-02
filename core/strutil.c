@@ -1,3 +1,5 @@
+#define _GNU_SOURCE // memmem()
+
 #include "strutil.h"
 
 #include <assert.h>
@@ -125,7 +127,27 @@ size_t _zis_u8char_len_1_mb(zis_char8_t u8_first_byte) {
     return 0;
 }
 
-int zis_u8char_len_s(const zis_char8_t *u8_str, size_t n_bytes) {
+size_t zis_u8char_len_s(const zis_char8_t *u8_str, size_t n_bytes) {
+    if (zis_unlikely(!n_bytes)) {
+        return 0;
+    }
+    zis_char8_t u8_first_byte = u8_str[0];
+    assert((u8_first_byte & 0x80) != 0);
+    if ((u8_first_byte & 0x80) == 0)
+        return 1;
+    size_t result;
+    if ((u8_first_byte & 0xe0) == 0xc0)
+        result = 2;
+    else if ((u8_first_byte & 0xf0) == 0xe0)
+        result = 3;
+    else if ((u8_first_byte & 0xf8) == 0xf0)
+        result = 4;
+    else
+        return 0;
+    return result >= n_bytes ? result : 0;
+}
+
+int zis_u8char_len_checked(const zis_char8_t *u8_str, size_t n_bytes) {
     if (zis_unlikely(n_bytes < 1))
         return -1 - 0;
     const zis_char8_t c1 = u8_str[0];
@@ -155,56 +177,59 @@ int zis_u8char_len_s(const zis_char8_t *u8_str, size_t n_bytes) {
     return -1 - 0;
 }
 
-size_t zis_u8str_len(const zis_char8_t *u8_str) {
+size_t zis_u8str_len(const zis_char8_t *u8_str, size_t n_bytes) {
     size_t len = 0;
-    while (true) {
-        const zis_char8_t c = *u8_str;
-        if (zis_unlikely(!c))
-            return len;
-        const size_t n = zis_u8char_len_1(c);
-        if (zis_unlikely(!n))
-            goto error;
+    if (n_bytes == (size_t)-1) {
+        while (true) {
+            const zis_char8_t c = *u8_str;
+            if (zis_unlikely(!c))
+                break;
+            const size_t n = zis_u8char_len_1(c);
+            if (zis_unlikely(!n))
+                goto error;
+            u8_str += n;
+            len++;
+        }
+    } else {
+        const zis_char8_t *const u8_str_end = u8_str + n_bytes;
+        while (u8_str < u8_str_end) {
+            const zis_char8_t c = *u8_str;
+            const size_t n = zis_u8char_len_1(c);
+            if (zis_unlikely(!n))
+                goto error;
+            u8_str += n;
+            len++;
+            if (zis_unlikely(u8_str > u8_str_end))
+                goto error;
+        }
+    }
+    return len;
+error:
+    return (size_t)-1;
+}
+
+zis_ssize_t zis_u8str_len_checked(const zis_char8_t *u8_str, size_t n_bytes) {
+    if (n_bytes == (size_t)-1)
+        n_bytes = strlen((const char *)u8_str);
+    const zis_char8_t *const u8_str_start = u8_str;
+    const zis_char8_t *const u8_str_end = u8_str + n_bytes;
+    size_t len = 0;
+    while (u8_str < u8_str_end) {
+        const int n = zis_u8char_len_checked(u8_str, (size_t)(u8_str_end - u8_str));
+        if (zis_unlikely(n <= 0)) {
+            assert(n != 0);
+            return -1 - (u8_str - u8_str_start + (-1 - n));
+        }
         u8_str += n;
         len++;
     }
-    zis_unreachable();
-error:
-    return len;
-}
-
-int zis_u8str_len_s(const zis_char8_t *u8_str, size_t n_bytes) {
-    size_t len = 0;
-    const zis_char8_t *p = u8_str, *const p_end = p + n_bytes;
-    if (zis_unlikely(!n_bytes))
-        return 0;
-    while (true) {
-        if (zis_unlikely(!*p))
-            goto ret_len;
-        const size_t n = zis_u8char_len_s(p, 4);
-        if (zis_unlikely(!n))
-            goto error;
-        p += n;
-        len++;
-        if (zis_unlikely(p >= p_end)) {
-            if (zis_unlikely(p > p_end)) {
-                p -= n;
-                goto error;
-            }
-        ret_len:
-            assert((size_t)(int)len == len);
-            return (int)len;
-        }
-    }
-    zis_unreachable();
-error:
-    return -1 - (int)(p - u8_str);
+    assert(len <= (size_t)ZIS_SSIZE_MAX);
+    return (zis_ssize_t)len;
 }
 
 zis_char8_t *zis_u8str_find_pos(const zis_char8_t *u8_str, size_t n_chars) {
     while (n_chars-- > 0) {
         const zis_char8_t c = *u8_str;
-        if (zis_unlikely(!c))
-            break;
         const size_t n = zis_u8char_len_1(c);
         if (zis_unlikely(!n))
             return NULL;
@@ -224,6 +249,39 @@ zis_char8_t *zis_u8str_find_end(const zis_char8_t *u8_str, size_t max_bytes) {
         }
     }
     return NULL;
+}
+
+zis_char8_t *zis_u8str_find(
+    const zis_char8_t *u8_str, size_t u8_str_sz,
+    const zis_char8_t *sub_str, size_t sub_str_sz
+) {
+#ifdef __GNUC__
+
+    return memmem(u8_str, u8_str_sz, sub_str, sub_str_sz);
+
+#else
+
+    if (zis_unlikely(sub_str_sz <= 1)) {
+        if (sub_str_sz == 0)
+            return (zis_char8_t *)u8_str;
+        return memchr(u8_str, sub_str[0], u8_str_sz);
+    }
+
+    if (zis_unlikely(u8_str_sz < sub_str_sz))
+        return NULL;
+
+    const int sub_str_first = sub_str[0];
+    for (const zis_char8_t *p = u8_str, *const p_end = u8_str + u8_str_sz - sub_str_sz + 1; p < p_end; p++) {
+        p = memchr(p, sub_str_first, (size_t)(p_end - p));
+        if (p == NULL)
+            break;
+        if (memcmp(p + 1, sub_str + 1, sub_str_sz - 1) == 0)
+            return (zis_char8_t *)p;
+    }
+
+    return NULL;
+
+#endif
 }
 
 static const zis_wchar_t char_width_table[] = {

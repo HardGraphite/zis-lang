@@ -13,6 +13,7 @@ Source code for the runtime core.
     - [`memory.h`](memory.h), [`memory.c`](memory.c)
     - [`platform.h`](platform.h)
     - [`strutil.h`](strutil.h), [`strutil.c`](strutil.c)
+    - [`types.h`](types.h)
 + runtime context
     - [`api.c`](api.c)
     - [`context.h`](context.h), [`context.c`](context.c)
@@ -34,6 +35,7 @@ Source code for the runtime core.
     - [`ndefutil.h`](ndefutil.h)
     - [`object.h`](object.h), [`object.c`](object.c)
     - [`objmem.h`](objmem.h), [`objmem.c`](objmem.c)
+    - [`objvec.h`](objvec.h)
     - [`smallint.h`](smallint.h)
 + built-in types (`*obj.*`)
     - [`arrayobj.h`](arrayobj.h), [`arrayobj.c`](arrayobj.c)
@@ -47,6 +49,7 @@ Source code for the runtime core.
     - [`moduleobj.h`](moduleobj.h), [`moduleobj.c`](moduleobj.c)
     - [`nilobj.h`](nilobj.h), [`nilobj.c`](nilobj.c)
     - [`pathobj.h`](pathobj.h), [`pathobj.c`](pathobj.c)
+    - [`rangeobj.h`](rangeobj.h), [`rangeobj.c`](rangeobj.c)
     - [`streamobj.h`](streamobj.h), [`streamobj.c`](streamobj.c)
     - [`stringobj.h`](stringobj.h), [`stringobj.c`](stringobj.c)
     - [`symbolobj.h`](symbolobj.h), [`symbolobj.c`](symbolobj.c)

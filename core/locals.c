@@ -1,9 +1,8 @@
 #include "locals.h"
 
-#include "attributes.h"
 #include "context.h"
-#include "ndefutil.h"
 #include "objmem.h"
+#include "objvec.h"
 
 /// Locals root visitor. See `zis_objmem_object_visitor_t`.
 static void locals_root_visitor(void *_lr, enum zis_objmem_obj_visit_op op) {

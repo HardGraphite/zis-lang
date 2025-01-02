@@ -56,6 +56,8 @@ struct zis_symbol_obj;
     E(BIT_AND_EQL   , "&=" ,-15) \
     E(BIT_OR_EQL    , "|=" ,-15) \
     E(BIT_XOR_EQL   , "^=" ,-15) \
+    E(XRANGE        , ".." , 13) \
+    E(RANGE         , "...", 13) \
     E(COLON         , ":"  ,  3) \
     E(CALL          , "(...)",2) \
 // ^^^ ZIS_BINARY_OPERATOR_LIST ^^^
@@ -64,8 +66,6 @@ struct zis_symbol_obj;
     E(AT            , "@"       ) \
     E(QUESTION      , "?"       ) \
     E(DOLLAR        , "$"       ) \
-    E(DOTDOT        , ".."      ) \
-    E(ELLIPSIS      , "..."     ) \
     E(L_ARROW       , "<-"      ) \
     E(R_ARROW       , "->"      ) \
     E(COMMA         , ","       ) \

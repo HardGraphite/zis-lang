@@ -4,9 +4,7 @@
 
 #include <assert.h>
 #include <stddef.h>
-#include <string.h>
 
-#include "attributes.h"
 #include "object.h"
 #include "zis.h" // zis_native_*
 
@@ -93,29 +91,3 @@ const struct zis_native_type_def ZIS_NATIVE_TYPE_VAR( NAME ) = {  \
 
 /// Prefix of `ZIS_NATIVE_MODULE_VARNAME()` defined variables as a string.
 #define ZIS_NATIVE_MODULE_VARNAME_PREFIX_STR  ZIS_IDENTIFIER_TO_STR(ZIS_NATIVE_MODULE_VARNAME())
-
-/* ----- functions to operate a vector of objects --------------------------- */
-
-/// Copy a vector of object pointers like `memcpy()`.
-zis_static_force_inline struct zis_object **
-zis_object_vec_copy(struct zis_object **restrict dst, struct zis_object *const *restrict src, size_t n) {
-    return memcpy(dst, src, n * sizeof(struct zis_object *));
-}
-
-/// Copy a vector of object pointers like `memmove()`.
-zis_static_force_inline struct zis_object **
-zis_object_vec_move(struct zis_object **restrict dst, struct zis_object *const *restrict src, size_t n) {
-    return memmove(dst, src, n * sizeof(struct zis_object *));
-}
-
-/// Fill a vector of object pointers with small integers like `memset()`.
-zis_static_force_inline struct zis_object **
-zis_object_vec_zero(struct zis_object **restrict vec, size_t n) {
-    return memset(vec, 0xff, n * sizeof(struct zis_object *));
-}
-
-/// Fill a vector of object pointers with a specific object.
-zis_static_force_inline void
-zis_object_vec_fill(struct zis_object **restrict vec, struct zis_object *val, size_t n) {
-    for (size_t i = 0; i < n; i++) vec[i] = val;
-}

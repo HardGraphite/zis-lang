@@ -30,6 +30,14 @@
     ) ((X)) \
 // ^^^ zis_bits_count_lz() ^^^
 
+#define zis_bits_popcount(X) \
+    (unsigned int) _Generic((X), \
+        unsigned long long : __builtin_popcountll, \
+        unsigned long      : __builtin_popcountl , \
+        unsigned int       : __builtin_popcount    \
+    ) ((X)) \
+// ^^^ zis_bits_popcount() ^^
+
 #elif defined _MSC_VER
 
 #define zis_bits_count_tz(X) \
@@ -48,29 +56,51 @@
     ) ((X)) \
 // ^^^ zis_bits_count_lz() ^^^
 
+#define zis_bits_popcount(X) \
+    _Generic((X),             \
+        unsigned long long : __popcnt64, \
+        unsigned long      : __popcnt,   \
+        unsigned int       : __popcnt    \
+    ) ((X)) \
+// ^^^ zis_bits_popcount() ^^^
+
+#include <intrin.h>
+
+#ifdef _WIN32
+
 static __forceinline unsigned int _zis_bits_count_tz_u32_msvc(unsigned long mask) {
+    __assume(mask);
     unsigned long index;
     _BitScanForward(&index, mask);
     return (unsigned int)index;
 }
 
+static __forceinline unsigned int _zis_bits_count_lz_u32_msvc(unsigned long mask) {
+    __assume(mask);
+    unsigned long index;
+    _BitScanReverse(&index, mask);
+    return 31 - (unsigned int)index;
+}
+
+#endif // _WIN32
+
+#ifdef _WIN64
+
 static __forceinline unsigned int _zis_bits_count_tz_u64_msvc(unsigned __int64 mask) {
+    __assume(mask);
     unsigned long index;
     _BitScanForward64(&index, mask);
     return (unsigned int)index;
 }
 
-static __forceinline unsigned int _zis_bits_count_lz_u32_msvc(unsigned long mask) {
-    unsigned long index;
-    _BitScanReverse(&index, mask);
-    return (unsigned int)index;
-}
-
 static __forceinline unsigned int _zis_bits_count_lz_u64_msvc(unsigned __int64 mask) {
+    __assume(mask);
     unsigned long index;
     _BitScanReverse64(&index, mask);
-    return (unsigned int)index;
+    return 63 - (unsigned int)index;
 }
+
+#endif // _WIN64
 
 #else
 

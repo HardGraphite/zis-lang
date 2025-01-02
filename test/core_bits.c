@@ -7,7 +7,7 @@
 
 #include "../core/bits.h"
 
-zis_test0_define(test_bits_count_tz_u32) {
+zis_test0_define(bits_count_tz_u32) {
     for (unsigned int i = 1; i < 32; i++) {
         unsigned int result;
         result = zis_bits_count_tz(UINT32_C(1) << i);
@@ -17,13 +17,55 @@ zis_test0_define(test_bits_count_tz_u32) {
     }
 }
 
-zis_test0_define(test_bits_count_tz_u64) {
+zis_test0_define(bits_count_tz_u64) {
     for (unsigned int i = 1; i < 64; i++) {
         unsigned int result;
         result = zis_bits_count_tz(UINT64_C(1) << i);
         zis_test_assert_eq(result, i);
         result = zis_bits_count_tz((UINT64_C(1) << i) | (UINT64_C(1) << 63));
         zis_test_assert_eq(result, i);
+    }
+}
+
+zis_test0_define(bits_count_lz_u32) {
+    for (unsigned int i = 0; i < 32; i++) {
+        unsigned int result;
+        result = zis_bits_count_lz(UINT32_MAX >> i);
+        zis_test_assert_eq(result, i);
+    }
+}
+
+zis_test0_define(bits_count_lz_u64) {
+    for (unsigned int i = 0; i < 64; i++) {
+        unsigned int result;
+        result = zis_bits_count_lz(UINT64_MAX >> i);
+        zis_test_assert_eq(result, i);
+    }
+}
+
+zis_test0_define(bits_popcount_u32) {
+    zis_test_assert_eq(zis_bits_popcount((uint32_t)0), 0);
+    for (unsigned int i = 1; i < 32; i++) {
+        const uint32_t bits = UINT32_MAX >> (32 - i);
+        for (unsigned int j = 0; j < 32 - i; j++) {
+            uint32_t value = bits << j;
+            unsigned int result;
+            result = zis_bits_popcount(value);
+            zis_test_assert_eq(result, i);
+        }
+    }
+}
+
+zis_test0_define(bits_popcount_u64) {
+    zis_test_assert_eq(zis_bits_popcount((uint64_t)0), 0);
+    for (unsigned int i = 1; i < 32; i++) {
+        const uint64_t bits = UINT64_MAX >> (64 - i);
+        for (unsigned int j = 0; j < 64 -i; j++) {
+            uint64_t value = bits << j;
+            unsigned int result;
+            result = zis_bits_popcount(value);
+            zis_test_assert_eq(result, i);
+        }
     }
 }
 
@@ -61,7 +103,7 @@ static bool num_in_array(size_t num, const size_t array[], size_t array_len) {
     return false;
 }
 
-zis_test0_define(test_bitset_clear) {
+zis_test0_define(bitset_clear) {
     char data[zis_bitset_required_size(256) * 2];
     const size_t data_size = sizeof data;
     const size_t half_data_size = data_size / 2;
@@ -75,7 +117,7 @@ zis_test0_define(test_bitset_clear) {
     zis_test_assert(mem_all_one(data + half_data_size, half_data_size)); // Second half is untouched.
 }
 
-zis_test0_define(test_bitset_read_and_modify) {
+zis_test0_define(bitset_read_and_modify) {
     char data[3][zis_bitset_required_size(256)];
     struct zis_bitset *const bitset = (struct zis_bitset *)data[1];
     const size_t bitset_length = 256;
@@ -108,7 +150,7 @@ zis_test0_define(test_bitset_read_and_modify) {
     }
 }
 
-zis_test0_define(test_bitset_foreach) {
+zis_test0_define(bitset_foreach) {
     char data[zis_bitset_required_size(256)];
     struct zis_bitset *const bitset = (struct zis_bitset *)data;
     const size_t bitset_size = sizeof data;
@@ -129,9 +171,14 @@ zis_test0_define(test_bitset_foreach) {
 }
 
 zis_test0_list(
-    test_bits_count_tz_u32,
-    test_bits_count_tz_u64,
-    test_bitset_clear,
-    test_bitset_read_and_modify,
-    test_bitset_foreach,
+    core_bits,
+    zis_test0_case(bits_count_tz_u32),
+    zis_test0_case(bits_count_tz_u64),
+    zis_test0_case(bits_count_lz_u32),
+    zis_test0_case(bits_count_lz_u64),
+    zis_test0_case(bits_popcount_u32),
+    zis_test0_case(bits_popcount_u64),
+    zis_test0_case(bitset_clear),
+    zis_test0_case(bitset_read_and_modify),
+    zis_test0_case(bitset_foreach),
 )

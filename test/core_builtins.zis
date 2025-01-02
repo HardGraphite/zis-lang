@@ -47,6 +47,204 @@ func test_Bool_to_string()
     testing.check_equal(false:to_string(), 'false')
 end
 
+## Int
+
+func test_Int_operator_neg()
+    testing.check_equal(0, -0)
+    testing.check_equal(1, -(-1))
+    testing.check_equal(0x100000000000000000000000000000000, -(-0x100000000000000000000000000000000))
+end
+
+func test_Int_operator_add_and_sub()
+    testing.check_equal(1 + 2, 3)
+    testing.check_equal(0x3fffffff + 0x11, 0x40000010)
+    testing.check_equal(0x3fffffffffffffff + 0x11, 0x4000000000000010)
+    testing.check_equal(0x100000000000000000000000000000000 + 0x1, 0x100000000000000000000000000000001)
+    testing.check_equal(0x1 + 0x100000000000000000000000000000000, 0x100000000000000000000000000000001)
+    testing.check_equal(0x100000000000000000000000000000000 - 0x1, 0xffffffffffffffffffffffffffffffff)
+    testing.check_equal(0x1 - 0x100000000000000000000000000000000, -0xffffffffffffffffffffffffffffffff)
+    testing.check_equal(-0xffffffffffffffffffffffffffffffff - 0x1, -0x100000000000000000000000000000000)
+    testing.check_equal(0x1 - (-0xffffffffffffffffffffffffffffffff), -0x100000000000000000000000000000000)
+    testing.check_equal(-0xffffffffffffffffffffffffffffffff + 0x1, -0xfffffffffffffffffffffffffffffffe)
+    testing.check_equal(0x1 + (-0xffffffffffffffffffffffffffffffff), -0xfffffffffffffffffffffffffffffffe)
+    testing.check_equal(0x100000000000000000000000000000000 + 0x100000000000000000000000000000000, 0x200000000000000000000000000000000)
+    testing.check_equal(0x100000000000000000000000000000000 - 0x100000000000000000000000000000000, 0)
+end
+
+func test_Int_operator_mul()
+    testing.check_equal(2 * 3, 6)
+    testing.check_equal(2 * 3, 6)
+    testing.check_equal(0x40000000 * 0x40000000, 0x1000000000000000)
+    testing.check_equal(0x4000000000000000 * 0x1000, 0x4000000000000000000)
+    testing.check_equal(0x1000 * 0x4000000000000000, 0x4000000000000000000)
+    testing.check_equal(0x4000000000000000 * -0x1000, -0x4000000000000000000)
+    testing.check_equal(-0x4000000000000000 * 0x1000, -0x4000000000000000000)
+    testing.check_equal(-0x4000000000000000 * -0x1000, 0x4000000000000000000)
+    testing.check_equal(0x4000000000000000 * -123, -0x1ec000000000000000)
+    testing.check_equal(-0x4000000000000000 * 123, -0x1ec000000000000000)
+end
+
+func test_Int_operator_pow()
+    testing.check_equal(0 ** 0, 1)
+    testing.check_equal(0 ** 1, 0)
+    testing.check_equal(1 ** 0, 1)
+    testing.check_equal(1 ** 1, 1)
+    testing.check_equal(2 ** 0, 1)
+    testing.check_equal(2 ** 1, 2)
+    testing.check_equal(2 ** 2, 4)
+    testing.check_equal(2 ** 3, 8)
+    testing.check_equal((-2) ** 0, 1)
+    testing.check_equal((-2) ** 1, -2)
+    testing.check_equal((-2) ** 2, 4)
+    testing.check_equal((-2) ** 3, -8)
+    testing.check_equal(16 ** 0.5, 4.0)
+    testing.check_equal(16 ** 0.25, 2.0)
+    testing.check_equal(2 ** (-2), 0.25)
+    testing.check_equal(4 ** (-0.5), 0.5)
+    testing.check_equal(31 ** 7, 27512614111)
+    testing.check_equal((-31) ** 7, -27512614111)
+    testing.check_equal(31 ** 8, 852891037441)
+    testing.check_equal((-31) ** 8, 852891037441)
+    testing.check_equal(31 ** 13, 24417546297445042591)
+    testing.check_equal((-31) ** 13, -24417546297445042591)
+    testing.check_equal(31 ** 14, 756943935220796320321)
+    testing.check_equal((-31) ** 14, 756943935220796320321)
+    testing.check_equal(2 ** 128, 0x100000000000000000000000000000000)
+    testing.check_equal((2 ** 64) ** 2, 0x100000000000000000000000000000000)
+end
+
+func test_Int_operator_shl()
+    testing.check_equal(1 << 1, 2)
+    testing.check_equal(-1 << 1, -2)
+    testing.check_equal(2 << -1, 1)
+    testing.check_equal(0x10000000000000000 << 1, 0x20000000000000000)
+    testing.check_equal(-0x10000000000000000 << 1, -0x20000000000000000)
+    testing.check_equal(0x20000000000000000 << -1, 0x10000000000000000)
+    testing.check_equal(0xa01b23c45d67e89f << 13, 0x140364788bacfd13e000)
+    testing.check_equal(0xa01b23c45d67e89f << 16, 0xa01b23c45d67e89f0000)
+    testing.check_equal(1 << 32, 0x100000000)
+    testing.check_equal(1 << 64, 0x10000000000000000)
+end
+
+func test_Int_operator_shr()
+    testing.check_equal(2 >> 1, 1)
+    testing.check_equal(-2 >> 1, -1)
+    testing.check_equal(2 >> -1, 4)
+    testing.check_equal(2 >> 2, 0)
+    testing.check_equal(-2 >> 2, -1)
+    testing.check_equal(0x20000000000000000 >> 1, 0x10000000000000000)
+    testing.check_equal(-0x20000000000000000 >> 1, -0x10000000000000000)
+    testing.check_equal(0x20000000000000000 >> -1, 0x40000000000000000)
+    testing.check_equal(0x20000000000000000 >> 100, 0)
+    testing.check_equal(-0x20000000000000000 >> 100, -1)
+    testing.check_equal(0xa01b23c45d67e89f >> 13, 0x500d91e22eb3f)
+    testing.check_equal(0xa01b23c45d67e89f >> 16, 0xa01b23c45d67)
+    testing.check_equal(1 >> 32, 0)
+    testing.check_equal(1 >> 64, 0)
+end
+
+func test_Int_operator_not()
+    testing.check_equal(~1, -2)
+    testing.check_equal(~0x12345678, -0x12345679)
+    testing.check_equal(~0xa01b23c45d67e89f, -0xa01b23c45d67e8a0)
+end
+
+func test_Int_operator_and()
+    testing.check_equal(1 & 1, 1)
+    testing.check_equal(0x12345678 & 0xabcdef, 0x204468)
+    testing.check_equal(0x12345678 & -0xabcdef, 0x12141210)
+    testing.check_equal(0xa01b23c45d67e89f & 0xabcdef, 0x23c88f)
+    testing.check_equal(0xa01b23c45d67e89f & -0xabcdef, 0xa01b23c45d442011)
+    testing.check_equal(0xabcdef & 0xa01b23c45d67e89f, 0x23c88f)
+    testing.check_equal(-0xabcdef & -0xa01b23c45d67e89f, -0xa01b23c45defedff)
+end
+
+func test_Int_operator_or()
+    testing.check_equal(1 | 1, 1)
+    testing.check_equal(0x12345678 | 0xabcde, 0x123efefe)
+    testing.check_equal(0x12345678 | -0xabcd, -0xa985)
+    testing.check_equal(0xa01b23c45d67e89f | 0xabcd, 0xa01b23c45d67ebdf)
+    testing.check_equal(0xa01b23c45d67e89f | -0xabcd, -0x341)
+    testing.check_equal(0xabcdef | 0xa01b23c45d67e8, 0xa01b23c4ffefef)
+    testing.check_equal(-0xabcdef | -0xa01b23c45d67e8, -0x945e7)
+end
+
+func test_Int_operator_and()
+    testing.check_equal(1 ^ 1, 0)
+    testing.check_equal(0x12345678 ^ 0xabcde, 0x123eeaa6)
+    testing.check_equal(0x12345678 ^ -0xabcd, -0x1234fdb5)
+    testing.check_equal(0xa01b23c45d67e89f ^ 0xabcd, 0xa01b23c45d674352)
+    testing.check_equal(0xa01b23c45d67e89f ^ -0xabcd, -0xa01b23c45d674354)
+    testing.check_equal(0xabcdef ^ 0xa01b23c45d67e8, 0xa01b23c4f6aa07)
+    testing.check_equal(-0xabcdef ^ -0xa01b23c45d67e8, 0xa01b23c4f6aa09)
+end
+
+func test_Int_operator_equ()
+    testing.check_equal(0 == 0, true)
+    testing.check_equal(1 == -1, false)
+    testing.check_equal(1 == 0x100000000000000000000000000000000, false)
+    testing.check_equal(0x100000000000000000000000000000000 == 0x100000000000000000000000000000000, true)
+    testing.check_equal(0x100000000000000000000000000000000 == 0x100000000000000000000000000000001, false)
+    testing.check_equal(0x100000000000000000000000000000000 == -0x100000000000000000000000000000000, false)
+end
+
+func test_Int_operator_cmp()
+    testing.check_equal(1 > -1, true)
+    testing.check_equal(1 < 0x100000000000000000000000000000000, true)
+    testing.check_equal(0x100000000000000000000000000000001 > 0x100000000000000000000000000000000, true)
+    testing.check_equal(0x100000000000000000000000000000000 > -0x10000000000000000000000000000000, true)
+    testing.check_equal(-0x100000000000000000000000000000000 > -0x100000000000000000000000000000001, true)
+end
+
+func test_Int_to_string()
+    testing.check_equal(0:to_string(), '0')
+    testing.check_equal((-1):to_string(), '-1')
+    testing.check_equal(0x100000000000000000000000000000000:to_string(), '340282366920938463463374607431768211456')
+    testing.check_equal((-0x100000000000000000000000000000000):to_string(), '-340282366920938463463374607431768211456')
+end
+
+func test_Int_div()
+    testing.check_equal(5:div(2), (2, 1))
+    testing.check_equal(0xa01b23c45d67e89f:div(16), (0xa01b23c45d67e89, 15))
+    testing.check_equal(0xf01b23c45d67e89a0000:div(0x80000000000000000000), (1, 0x701b23c45d67e89a0000))
+    testing.check_equal(0xa01b23c45d67e89f:div(101), (0x195d0321a4576e5, 70))
+    testing.check_equal(0xf01b23c45d67e89a0000:div(0xa01b23c45d67e89f), (98282, 0x3072e42c12997daa))
+    testing.check_equal(0xf01b23c45d67e89a00000000:div(0xa01b23c45d67e89f), (0x17fea4d77, 0x4dcc6239d1650b17))
+end
+
+func test_Int_length()
+    testing.check_equal(0:length(), 0)
+    testing.check_equal(1:length(), 1)
+    testing.check_equal(2:length(), 2)
+    testing.check_equal(3:length(), 2)
+    testing.check_equal((-3):length(), 2)
+    testing.check_equal(0xf01b23c45d67e89a0000:length(), 80)
+end
+
+func test_Int_count()
+    testing.check_equal(0:count(0), 0)
+    testing.check_equal(0:count(1), 0)
+    testing.check_equal(1:count(0), 0)
+    testing.check_equal(1:count(1), 1)
+    testing.check_equal(2:count(0), 1)
+    testing.check_equal(2:count(1), 1)
+    testing.check_equal(3:count(0), 0)
+    testing.check_equal(3:count(1), 2)
+    testing.check_equal((-3):count(0), 0)
+    testing.check_equal((-3):count(1), 2)
+    testing.check_equal(0xf01b23c45d67e89a0000:count(0), 48)
+    testing.check_equal(0xf01b23c45d67e89a0000:count(1), 32)
+end
+
+func test_Int_parse()
+    testing.check_equal(Int.parse('123'), 123)
+    testing.check_equal(Int.parse('-123'), -123)
+    testing.check_equal(Int.parse('0x123'), 0x123)
+    testing.check_equal(Int.parse('-0x123'), -0x123)
+    testing.check_equal(Int.parse('123', 16), 0x123)
+    testing.check_equal(Int.parse('-123', 16), -0x123)
+end
+
 ## Float
 
 func test_Float_operator_neg()
@@ -146,6 +344,35 @@ end
 
 ## String
 
+func test_String_length()
+    testing.check_equal('':length(), 0)
+    testing.check_equal('1':length(), 1)
+    testing.check_equal('123':length(), 3)
+    testing.check_equal('\u{7532}\u{4e59}\u{4e19}\u{4e01}':length(), 4)
+    testing.check_equal('A\u{7532}B\u{4e59}':length(), 4)
+end
+
+func test_String_find()
+    string = '12345'
+    testing.check_equal(string:find('12345'), 1)
+    testing.check_equal(string:find('123'), 1)
+    testing.check_equal(string:find('1'), 1)
+    testing.check_equal(string:find(''), 1)
+    testing.check_equal(string:find('0'), nil)
+    testing.check_equal(string:find('345'), 3)
+    testing.check_equal(string:find('34'), 3)
+    testing.check_equal(string:find('3'), 3)
+    testing.check_equal(string:find('5'), 5)
+    testing.check_equal(string:find('3', 2), 3)
+    testing.check_equal(string:find('3', 10), nil)
+    testing.check_equal(string:find(49), 1)
+    testing.check_equal(string:find(50), 2)
+    string = '\u{7532}\u{4e59}\u{4e19}\u{4e01}'
+    testing.check_equal(string:find('\u{4e59}\u{4e19}'), 2)
+    testing.check_equal(string:find(0x4e59), 2)
+    testing.check_equal(string:find(0), nil)
+end
+
 func test_String_operator_add()
     testing.check_equal('123' + '456', '123456')
 end
@@ -163,6 +390,34 @@ func test_String_operator_get_element()
     testing.check_equal(string[2], 0x4e59)
     testing.check_equal(string[3], 0x4e19)
     testing.check_equal(string[4], 0x4e01)
+end
+
+func test_String_operator_get_element_by_range()
+    string = '123456789'
+    testing.check_equal(string[1 ... 9], string)
+    testing.check_equal(string[1 ... -1], string)
+    testing.check_equal(string[5 ... 9], '56789')
+    testing.check_equal(string[5 ... -1], '56789')
+    testing.check_equal(string[5 ... 5], '5')
+    testing.check_equal(string[1 .. 1], '')
+    testing.check_equal(string[5 .. 5], '')
+end
+
+func test_String_join()
+    testing.check_equal(String.join('; ', 'A', 'BB', 'CCC', 'DDDD'), 'A; BB; CCC; DDDD')
+    testing.check_equal(String.join('；', 'A', 'BB', 'CCC', 'DDDD'), 'A；BB；CCC；DDDD')
+    testing.check_equal(String.join(',', '1', '二', '𒐈'), '1,二,𒐈')
+    testing.check_equal(String.join(', ', 65, 66, 67), 'A, B, C')
+    testing.check_equal(String.join('; ', ['A', 'BB', 'CCC', 'DDDD']), 'A; BB; CCC; DDDD')
+    testing.check_equal(String.join(', ', [65, 66, 67]), 'A, B, C')
+end
+
+func test_String_concat()
+    testing.check_equal(String.concat('A', 'BB', 'CCC', 'DDDD'), 'ABBCCCDDDD')
+    testing.check_equal(String.concat('1', '二', '𒐈'), '1二𒐈')
+    testing.check_equal(String.concat(65, 66, 67), 'ABC')
+    testing.check_equal(String.concat(['A', 'BB', 'CCC', 'DDDD']), 'ABBCCCDDDD')
+    testing.check_equal(String.concat([65, 66, 67]), 'ABC')
 end
 
 ## Tuple

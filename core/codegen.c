@@ -74,7 +74,7 @@ static struct frame_scope *frame_scope_create(struct zis_context *z) {
     return fs;
 }
 
-static void frame_scope_destory(struct frame_scope *fs, struct zis_context *z) {
+static void frame_scope_destroy(struct frame_scope *fs, struct zis_context *z) {
     assert(fs->type == SCOPE_FRAME);
     zis_assembler_destroy(fs->as, z, NULL);
     zis_mem_free(fs->free_regs_list);
@@ -226,6 +226,7 @@ static void frame_scope_free_regs(
     assert(n);
     assert(freed_regs.end - 1 <= fs->reg_allocated_max);
 
+    // #1 - if at the end of allocated region - shrink the allocated region
     if (freed_regs.end - 1 == fs->reg_allocated_max) {
         fs->reg_allocated_max -= n;
         if (fs->free_regs_list_len) {
@@ -242,24 +243,28 @@ static void frame_scope_free_regs(
     struct frame_scope_free_regs *const free_regs_list = fs->free_regs_list;
     const unsigned int free_regs_list_len = (unsigned int)fs->free_regs_list_len;
 
+    // #2 - if before the first recorded free_regs - insert front
     if (!free_regs_list_len || freed_regs.start < free_regs_list[0].start) {
         frame_scope__free_regs_list_insert(fs, 0, freed_regs);
         zis_debug_log(TRACE, "CGen", "frame_scope_free_regs(%u, %u) (insert front)", regs_start, n);
         return;
     }
 
-    if (freed_regs.start > free_regs_list[free_regs_list_len - 1].end) {
+    // #3 - if after the last recorded free_regs - insert back
+    if (freed_regs.start >= free_regs_list[free_regs_list_len - 1].end) {
         frame_scope__free_regs_list_insert(fs, free_regs_list_len, freed_regs);
         zis_debug_log(TRACE, "CGen", "frame_scope_free_regs(%u, %u) (insert back)", regs_start, n);
         return;
     }
 
-    for (unsigned int index_l = 0, index_r = free_regs_list_len;;) {
+    // #4 - else - insert, keep sorted
+    for (unsigned int index_l = 0, index_r = free_regs_list_len - 1;;) {
         const unsigned int index_m = index_l + (index_r - index_l) / 2;
         struct frame_scope_free_regs *free_regs_m = &free_regs_list[index_m];
         if (freed_regs.start < free_regs_m->start) {
             assert(freed_regs.end <= free_regs_m->start);
-            if (index_m > 0 && freed_regs.start > free_regs_list[index_m - 1].start) {
+            assert(index_m >= 1); // otherwise goes to #2
+            if (freed_regs.start > free_regs_list[index_m - 1].start) {
                 frame_scope__free_regs_list_insert(fs, index_m, freed_regs);
                 zis_debug_log(TRACE, "CGen", "frame_scope_free_regs(%u, %u) (insert @%u)", regs_start, n, index_m);
                 return;
@@ -268,7 +273,8 @@ static void frame_scope_free_regs(
         } else {
             assert(freed_regs.start > free_regs_m->start);
             assert(freed_regs.start >= free_regs_m->end);
-            if (index_m + 1 < free_regs_list_len && freed_regs.start < free_regs_list[index_m + 1].start) {
+            assert(index_m + 1 < free_regs_list_len); // see initial value of index_r
+            if (freed_regs.start < free_regs_list[index_m + 1].start) {
                 frame_scope__free_regs_list_insert(fs, index_m + 1, freed_regs);
                 zis_debug_log(TRACE, "CGen", "frame_scope_free_regs(%u, %u) (insert @%u)", regs_start, n, index_m + 1);
                 return;
@@ -346,7 +352,7 @@ static struct var_scope *var_scope_create(void) {
     return vs;
 }
 
-static void var_scope_destory(struct var_scope *vs) {
+static void var_scope_destroy(struct var_scope *vs) {
     assert(vs->type == SCOPE_VAR);
     zis_mem_free(vs->vars);
     zis_mem_free(vs);
@@ -403,7 +409,7 @@ static struct loop_scope *loop_scope_create(void) {
     return ls;
 }
 
-static void loop_scope_destory(struct loop_scope *ls) {
+static void loop_scope_destroy(struct loop_scope *ls) {
     assert(ls->type == SCOPE_LOOP);
     zis_mem_free(ls);
 }
@@ -440,13 +446,13 @@ static void scope_stack_fini(struct scope_stack *restrict ss, struct zis_context
             const union scope_ptr next_s = s.any->_parent_scope;
             switch (s.any->type) {
             case SCOPE_LOOP:
-                loop_scope_destory(s.loop);
+                loop_scope_destroy(s.loop);
                 break;
             case SCOPE_VAR:
-                var_scope_destory(s.var);
+                var_scope_destroy(s.var);
                 break;
             case SCOPE_FRAME:
-                frame_scope_destory(s.frame, z);
+                frame_scope_destroy(s.frame, z);
                 break;
             default:
                 zis_unreachable();
@@ -726,12 +732,12 @@ static int check_node_maybe_bool(
     }
 }
 
-/// Check whether target register `tgt` is `NTGT`. Throws and error if not.
+/// Check whether target register `tgt` is `NTGT`. Throws an error if not.
 static void check_tgt_is_ntgt(
     struct zis_codegen *restrict cg,
     struct zis_ast_node_obj *node, unsigned int tgt
 ) {
-    if (zis_unlikely(tgt != UINT_MAX))
+    if (zis_unlikely(tgt != UINT_MAX /* NTGT */))
         error(cg, node, "unexpected target register");
 }
 
@@ -1585,6 +1591,39 @@ static int emit_Array(struct zis_codegen *cg, struct zis_ast_node_obj *node, uns
 static int emit_Map(struct zis_codegen *cg, struct zis_ast_node_obj *node, unsigned int tgt_reg) {
     assert(zis_ast_node_obj_type(node) == ZIS_AST_NODE_Map);
     return emit_list_like_node(cg, node, tgt_reg, ZIS_OPC_MKMAP);
+}
+
+static int emit_Range(struct zis_codegen *cg, struct zis_ast_node_obj *_node, unsigned int tgt_reg) {
+    assert(zis_ast_node_obj_type(_node) == ZIS_AST_NODE_Range);
+    struct zis_ast_node_obj *_begin = zis_ast_node_get_field(_node, Range, begin);
+    struct zis_ast_node_obj *_end = zis_ast_node_get_field(_node, Range, end);
+    if (zis_unlikely(tgt_reg == NTGT)) {
+        if (node_is_constant(_begin) && node_is_constant(_end))
+            return 0;
+        tgt_reg = 0;
+    }
+    int atgt;
+    bool exclude_end;
+    zis_locals_decl(
+        cg, var,
+        struct zis_ast_node_obj *begin, *end;
+    );
+    var.begin = _begin, var.end = _end;
+    exclude_end = zis_ast_node_get_field(_node, Range, exclude_end) == zis_object_from(cg->z->globals->val_true);
+    const int begin_atgt = emit_any(cg, var.begin, ATGT);
+    const int end_atgt = emit_any(cg, var.end, ATGT);
+    struct frame_scope *fs = scope_stack_last_frame_scope(&cg->scope_stack);
+    atgt_free1(fs, begin_atgt);
+    atgt_free1(fs, end_atgt);
+    if (tgt_reg == ATGT)
+        tgt_reg = frame_scope_alloc_regs(fs, 1), atgt = -(int)tgt_reg;
+    else
+        atgt = 0;
+    struct zis_assembler *const as = scope_assembler(cg);
+    const enum zis_opcode opcode = exclude_end ? ZIS_OPC_MKRNGX : ZIS_OPC_MKRNG;
+    zis_assembler_append_ABC(as, opcode, tgt_reg, atgt_abs(begin_atgt), atgt_abs(end_atgt));
+    zis_locals_drop(cg, var);
+    return atgt;
 }
 
 static int emit_Import(struct zis_codegen *cg, struct zis_ast_node_obj *_node, unsigned int tgt_reg) {

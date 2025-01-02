@@ -70,7 +70,7 @@ static void check_ret_val_int_seq(zis_t z, const struct zis_native_func_def *fd,
     int status;
     const struct zis_native_func_meta fm = fd->meta;
 
-    const unsigned int reg_a = REG_MAX - 2, reg_o = REG_MAX - 1, reg_tmp = REG_MAX;
+    const unsigned int reg_a = REG_MAX - 3, reg_o = REG_MAX - 2, reg_v = REG_MAX - 1, reg_tmp = REG_MAX;
 
     int64_t v_size;
     status = zis_read_values(z, 0, "(*)", &v_size);
@@ -81,18 +81,30 @@ static void check_ret_val_int_seq(zis_t z, const struct zis_native_func_def *fd,
         status = zis_read_values(z, 0, "(%nn)", reg_a);
         zis_test_assert_eq(status, 3);
         check_tuple_int_seq(z, reg_a, reg_tmp, 1, fm.na, 0);
-    } else if (fm.no == (unsigned char)-1) {
+    } else if (fm.no == -1) {
         status = zis_read_values(z, 0, "(%n%)", reg_a, reg_o);
         zis_test_assert_eq(status, 3);
         check_tuple_int_seq(z, reg_a, reg_tmp, 1, fm.na, 0);
         assert(argc >= fm.na);
         check_tuple_int_seq(z, reg_o, reg_tmp, 1 + fm.na, argc - fm.na, 0);
-    } else {
+    } else if (fm.no > 0) {
         status = zis_read_values(z, 0, "(%%n)", reg_a, reg_o);
         zis_test_assert_eq(status, 3);
         check_tuple_int_seq(z, reg_a, reg_tmp, 1, fm.na, 0);
-        assert(argc >= fm.na && argc <= fm.na + fm.no);
+        assert(argc >= fm.na && argc <= fm.na + (uint8_t)fm.no);
         check_tuple_int_seq(z, reg_o, reg_tmp, 1 + fm.na, argc - fm.na, fm.na + fm.no - argc);
+    } else {
+        status = zis_read_values(z, 0, "(%%%)", reg_a, reg_o, reg_v);
+        zis_test_assert_eq(status, 3);
+        check_tuple_int_seq(z, reg_a, reg_tmp, 1, fm.na, 0);
+        uint8_t no_abs_m1 = (uint8_t)-1 - (uint8_t)fm.no;
+        if (argc <= fm.na + no_abs_m1) {
+            check_tuple_int_seq(z, reg_o, reg_tmp, 1 + fm.na, argc - fm.na, fm.na + no_abs_m1 - argc);
+            check_tuple_int_seq(z, reg_v, reg_tmp, 1 + fm.na + no_abs_m1, 0, 0);
+        } else {
+            check_tuple_int_seq(z, reg_o, reg_tmp, 1 + fm.na, no_abs_m1, 0);
+            check_tuple_int_seq(z, reg_v, reg_tmp, 1 + fm.na + no_abs_m1, argc - fm.na - no_abs_m1, 0);
+        }
     }
     zis_load_nil(z, REG_MAX - 2, 3);
 }
@@ -199,10 +211,10 @@ zis_test_define(test_F_a2o2, z) {
     for (size_t i = 0; i <= 1; i++)
         call_and_check_int_seq(z, &F_a2o2, i, false);
     for (size_t i = 5; i <= 7; i++)
-        call_and_check_int_seq(z, &F_a2o2, 5, false);
+        call_and_check_int_seq(z, &F_a2o2, i, false);
 }
 
-ZIS_NATIVE_FUNC_DEF(F_a2v, z, {2, (unsigned char)-1, 4}) { // func(a1, a2, *v) -> ((a1, a2), nil, v)
+ZIS_NATIVE_FUNC_DEF(F_a2v, z, {2, -1, 4}) { // func(a1, a2, *v) -> ((a1, a2), nil, v)
     zis_make_values(z, 4, "(%%)", 1, 2);
     zis_make_values(z, 0, "(%n%)", 4, 3);
     return ZIS_OK;
@@ -214,12 +226,30 @@ zis_test_define(test_F_a2v, z) {
     for (size_t i = 2; i <= 5; i++)
         call_and_check_int_seq(z, &F_a2v, i, true); // F(1, 2, ...)
     for (size_t i = 0; i <= 1; i++)
-        call_and_check_int_seq(z, &F_a2v, 1, false);
+        call_and_check_int_seq(z, &F_a2v, i, false);
+}
+
+ZIS_NATIVE_FUNC_DEF(F_a2o2v, z, {2, -2-1, 7}) { // func(a1, a2, ?o1, ?o2, *v) -> ((a1, a2), (o1, o2), v)
+    zis_make_values(z, 6, "(%%)", 1, 2);
+    zis_make_values(z, 7, "(%%)", 3, 4);
+    zis_make_values(z, 0, "(%%%)", 6, 7, 5);
+    return ZIS_OK;
+}
+
+zis_test_define(test_F_a2o2v, z) {
+    make_func(z, &F_a2o2v);
+
+    for (size_t i = 2; i <= 8; i++)
+        call_and_check_int_seq(z, &F_a2o2v, i, true); // F(1, 2, ...)
+    for (size_t i = 0; i <= 1; i++)
+        call_and_check_int_seq(z, &F_a2o2v, i, false);
 }
 
 zis_test_list(
+    core_invoke,
     REG_MAX,
-    test_F_a3,
-    test_F_a2o2,
-    test_F_a2v,
+    zis_test_case(test_F_a3),
+    zis_test_case(test_F_a2o2),
+    zis_test_case(test_F_a2v),
+    zis_test_case(test_F_a2o2v),
 )

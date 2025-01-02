@@ -199,9 +199,11 @@ struct zis_native_func_meta {
      * Number of optional arguments.
      *
      * Number of optional arguments in a function, passed after required ones.
-     * Or `-1` to accept a `Tuple` holding the rest arguments (variadic).
+     * If variadic arguments are acceptable, the value shall be `-N-1`,
+     * where `N` is the number of optional arguments, and a `Tuple` holding
+     * the rest arguments (variadic arguments) will be passed after optional ones.
      */
-    uint8_t no;
+    int8_t no;
 
     /**
      * Number of local variables.

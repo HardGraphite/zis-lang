@@ -10,7 +10,7 @@ fi
 
 index=0
 while read bt_line; do
-    if [[ $bt_line =~ ^(.+)\((.+)\)\[.+\]$ ]]; then
+    if [[ $bt_line =~ ^(.+)\((.+)\)[[:space:]]*\[.+\]$ ]]; then
         exe_path="${BASH_REMATCH[1]}"
         addr_info="${BASH_REMATCH[2]}"
         line_info=$(addr2line -pCfe "$exe_path" "$addr_info" 2>/dev/null)

@@ -131,7 +131,7 @@ static void check_random_large_object(zis_t z, int64_t seed) {
     zis_test_assert_eq(memcmp(long_str_buf2, long_str_buf, size), 0);
 }
 
-zis_test_define(test_self_check, z) {
+zis_test_define(self_check, z) {
     make_random_data(z, 0);
     check_random_data(z, 0);
     make_random_large_object(z, 0);
@@ -139,7 +139,7 @@ zis_test_define(test_self_check, z) {
     clear_stack(z);
 }
 
-zis_test_define(test_all_garbage, z) {
+zis_test_define(all_garbage, z) {
     const unsigned long N = 100000;
 
     for (unsigned long i = 0; i < N; i++) {
@@ -150,7 +150,7 @@ zis_test_define(test_all_garbage, z) {
     clear_stack(z);
 }
 
-zis_test_define(test_massive_garbage, z) {
+zis_test_define(massive_garbage, z) {
     const int64_t N = 1000;
 
     make_random_data(z, N);
@@ -169,7 +169,7 @@ zis_test_define(test_massive_garbage, z) {
     clear_stack(z);
 }
 
-zis_test_define(test_massive_survivors, z) {
+zis_test_define(massive_survivors, z) {
     const int64_t N = 1000, M = REG_MAX - TMP_REG_MAX - 1;
 
     for (int64_t j = 0; j < M; j++) {
@@ -194,7 +194,7 @@ zis_test_define(test_massive_survivors, z) {
     clear_stack(z);
 }
 
-zis_test_define(test_large_object, z) {
+zis_test_define(large_object, z) {
     const int64_t N = 200;
 
     make_random_data(z, N);
@@ -220,7 +220,7 @@ zis_test_define(test_large_object, z) {
     clear_stack(z);
 }
 
-zis_test_define(test_complex_references, z) {
+zis_test_define(complex_references, z) {
     const int64_t N = 100;
     const unsigned reg = TMP_REG_MAX + 1;
 
@@ -263,11 +263,12 @@ zis_test_define(test_complex_references, z) {
 }
 
 zis_test_list(
+    core_gc,
     REG_MAX,
-    test_self_check,
-    test_all_garbage,
-    test_massive_garbage,
-    test_massive_survivors,
-    test_large_object,
-    test_complex_references,
+    zis_test_case(self_check),
+    zis_test_case(all_garbage),
+    zis_test_case(massive_garbage),
+    zis_test_case(massive_survivors),
+    zis_test_case(large_object),
+    zis_test_case(complex_references),
 )

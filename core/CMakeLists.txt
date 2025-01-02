@@ -6,6 +6,35 @@ option(ZIS_FEATURE_ASM       "Enable the assembly code support."             ON)
 option(ZIS_FEATURE_DIS       "Enable the disassembling support."             ON)
 option(ZIS_FEATURE_SRC       "Enable the source code support."               ON)
 
+check_support(
+    CheckCGotoSupported check_computed_goto_supported
+    "computed goto statement"
+    CACHE _ZIS_SUPPORT_COMPUTED_GOTO
+)
+check_support(
+    CheckOvArithSupported check_gnuc_overflow_arithmetic_supported
+    "GCC __builtin_*_overflow*() functions"
+    CACHE _ZIS_SUPPORT_GNUC_OVERFLOW_ARITH
+)
+option(
+    ZIS_USE_COMPUTED_GOTO
+    "Use computed goto statements if possible."
+    ${_ZIS_SUPPORT_COMPUTED_GOTO}
+)
+option(
+    ZIS_USE_GNUC_OVERFLOW_ARITH
+    "Use __builtin_*_overflow*() arithmetic functions if possible."
+    ${_ZIS_SUPPORT_GNUC_OVERFLOW_ARITH}
+)
+disable_if_unsupported(
+    ZIS_USE_COMPUTED_GOTO _ZIS_SUPPORT_COMPUTED_GOTO
+    "computed goto statement"
+)
+disable_if_unsupported(
+    ZIS_USE_GNUC_OVERFLOW_ARITH _ZIS_SUPPORT_GNUC_OVERFLOW_ARITH
+    "GCC __builtin_*_overflow*() functions"
+)
+
 set(ZIS_MALLOC_INCLUDE "" CACHE FILEPATH
     "Path to a file to include, which defines malloc(), realloc(), and free().")
 set(ZIS_MALLOC_LINK "" CACHE FILEPATH
@@ -69,6 +98,7 @@ file(CONFIGURE OUTPUT "${zis_core_conf_header_dir}/zis_config.h" @ONLY CONTENT [
 #cmakedefine    ZIS_DISPLAY_NAME    "@ZIS_DISPLAY_NAME@"
 #cmakedefine    ZIS_MALLOC_INCLUDE  "@ZIS_MALLOC_INCLUDE@"
 #cmakedefine01  ZIS_USE_COMPUTED_GOTO
+#cmakedefine01  ZIS_USE_GNUC_OVERFLOW_ARITH
 #cmakedefine01  ZIS_DEBUG
 #cmakedefine01  ZIS_DEBUG_LOGGING
 #cmakedefine01  ZIS_DEBUG_DUMPBT

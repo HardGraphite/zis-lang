@@ -143,8 +143,8 @@ ZIS_NATIVE_FUNC_DEF(T_Symbol_M_to_string, z, {1, 1, 2}) {
         zis_string_obj_new(z, zis_symbol_obj_data(self), zis_symbol_obj_data_size(self));
     if (!sym_as_str)
         sym_as_str = zis_string_obj_new(z, "??", 2);
-    *result_p = zis_string_obj_concat(z, *result_p, sym_as_str);
-    *result_p = zis_string_obj_concat(z, *result_p, zis_string_obj_new(z, ">", 1));
+    *result_p = zis_string_obj_concat2(z, *result_p, sym_as_str);
+    *result_p = zis_string_obj_concat2(z, *result_p, zis_string_obj_new(z, ">", 1));
     return ZIS_OK;
 }
 
@@ -376,21 +376,20 @@ struct zis_symbol_obj *zis_symbol_registry_gets(
     struct zis_context *z,
     struct zis_string_obj *str
 ) {
-    const char *str_data = zis_string_obj_data_utf8(str);
-    if (str_data) {
-        const size_t str_size = zis_string_obj_length(str);
+    size_t str_size;
+    const char *str_data = zis_string_obj_as_ascii(str, &str_size);
+    if (str_data)
         return zis_symbol_registry_get(z, str_data, str_size);
-    }
-    size_t n = zis_string_obj_value(str, NULL, 0);
+    size_t n = zis_string_obj_to_u8str(str, NULL, 0);
     if (n <= 64) {
         char buffer[64];
         assert(n <= sizeof buffer);
-        n = zis_string_obj_value(str, buffer, n);
+        n = zis_string_obj_to_u8str(str, buffer, n);
         assert(n != (size_t)-1);
         return zis_symbol_registry_get(z, buffer, n);
     }
     char *s = zis_mem_alloc(n);
-    n = zis_string_obj_value(str, s, n);
+    n = zis_string_obj_to_u8str(str, s, n);
     assert(n != (size_t)-1);
     struct zis_symbol_obj *sym = zis_symbol_registry_get(z, s, n);
     zis_mem_free(s);

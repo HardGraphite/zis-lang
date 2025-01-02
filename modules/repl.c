@@ -76,7 +76,7 @@ static bool read_need_next_line(zis_t z, struct zis_object *syntax_err) {
     struct zis_string_obj *err_msg =
         zis_object_cast(exc_obj->what, struct zis_string_obj);
     char err_msg_str[128];
-    size_t err_msg_size = zis_string_obj_value(err_msg, err_msg_str, sizeof err_msg_str);
+    size_t err_msg_size = zis_string_obj_to_u8str(err_msg, err_msg_str, sizeof err_msg_str);
     if (err_msg_size == (size_t)-1)
         return false;
     return
@@ -126,10 +126,10 @@ ZIS_NATIVE_FUNC_DEF(F_read, z, {0, 0, 2}) {
         assert(zis_object_type_is(frame[1], z->globals->type_String));
         if (line_num > 1) {
             assert(zis_object_type_is(frame[2], z->globals->type_String));
-            frame[2] = zis_object_from(zis_string_obj_concat(
+            frame[2] = zis_object_from(zis_string_obj_concat2(
                 z,
                 zis_object_cast(frame[2], struct zis_string_obj),
-                zis_string_obj_concat(
+                zis_string_obj_concat2(
                     z,
                     zis_string_obj_from_char(z, '\n'),
                     zis_object_cast(frame[1], struct zis_string_obj)

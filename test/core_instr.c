@@ -13,7 +13,7 @@ zis_test0_define(check_num_min_and_max) {
     static_assert(ZIS_INSTR_I8_MIN == INT8_MIN , "");
 }
 
-zis_test0_define(test_make_and_extract_Aw) {
+zis_test0_define(make_and_extract_Aw) {
     for (uint32_t A = 0; A <= ZIS_INSTR_U25_MAX; A++) {
         uint32_t instr = zis_instr_make_Aw(0, A);
         uint32_t x;
@@ -23,7 +23,7 @@ zis_test0_define(test_make_and_extract_Aw) {
     }
 }
 
-zis_test0_define(test_make_and_extract_Asw) {
+zis_test0_define(make_and_extract_Asw) {
     for (int32_t A = ZIS_INSTR_I25_MIN; A <= ZIS_INSTR_I25_MAX; A++) {
         uint32_t instr = zis_instr_make_Asw(0, A);
         int32_t x;
@@ -33,7 +33,7 @@ zis_test0_define(test_make_and_extract_Asw) {
     }
 }
 
-zis_test0_define(test_make_and_extract_ABw) {
+zis_test0_define(make_and_extract_ABw) {
     for (uint32_t A = 0; A <= ZIS_INSTR_U9_MAX; A++) {
         for (uint32_t B = 0; B <= ZIS_INSTR_U16_MAX; B++) {
             uint32_t instr = zis_instr_make_ABw(0, A, B);
@@ -46,7 +46,7 @@ zis_test0_define(test_make_and_extract_ABw) {
     }
 }
 
-zis_test0_define(test_make_and_extract_AsBw) {
+zis_test0_define(make_and_extract_AsBw) {
     for (int32_t A = ZIS_INSTR_I9_MAX; A <= ZIS_INSTR_I9_MAX; A++) {
         for (uint32_t B = 0; B <= ZIS_INSTR_U16_MAX; B++) {
             uint32_t instr = zis_instr_make_AsBw(0, A, B);
@@ -59,7 +59,7 @@ zis_test0_define(test_make_and_extract_AsBw) {
     }
 }
 
-zis_test0_define(test_make_and_extract_ABsw) {
+zis_test0_define(make_and_extract_ABsw) {
     for (uint32_t A = 0; A <= ZIS_INSTR_U9_MAX; A++) {
         for (int32_t B = ZIS_INSTR_I16_MIN; B <= ZIS_INSTR_I16_MAX; B++) {
             uint32_t instr = zis_instr_make_ABsw(0, A, B);
@@ -72,7 +72,7 @@ zis_test0_define(test_make_and_extract_ABsw) {
     }
 }
 
-zis_test0_define(test_make_and_extract_ABC) {
+zis_test0_define(make_and_extract_ABC) {
     for (uint32_t A = 0; A <= ZIS_INSTR_U9_MAX; A++) {
         for (uint32_t B = 0; B <= ZIS_INSTR_U8_MAX; B++) {
             for (uint32_t C = 0; C <= ZIS_INSTR_U8_MAX; C++) {
@@ -88,7 +88,7 @@ zis_test0_define(test_make_and_extract_ABC) {
     }
 }
 
-zis_test0_define(test_make_and_extract_AsBC) {
+zis_test0_define(make_and_extract_AsBC) {
     for (int32_t A = ZIS_INSTR_I9_MIN; A <= ZIS_INSTR_I9_MAX; A++) {
         for (uint32_t B = 0; B <= ZIS_INSTR_U8_MAX; B++) {
             for (uint32_t C = 0; C <= ZIS_INSTR_U8_MAX; C++) {
@@ -104,7 +104,7 @@ zis_test0_define(test_make_and_extract_AsBC) {
     }
 }
 
-zis_test0_define(test_make_and_extract_ABsCs) {
+zis_test0_define(make_and_extract_ABsCs) {
     for (uint32_t A = 0; A <= ZIS_INSTR_U9_MAX; A++) {
         for (int32_t B = ZIS_INSTR_I8_MIN; B <= ZIS_INSTR_I8_MAX; B++) {
             for (int32_t C = ZIS_INSTR_I8_MIN; C <= ZIS_INSTR_I8_MAX; C++) {
@@ -121,13 +121,14 @@ zis_test0_define(test_make_and_extract_ABsCs) {
 }
 
 zis_test0_list(
-    check_num_min_and_max,
-    test_make_and_extract_Aw,
-    test_make_and_extract_Asw,
-    test_make_and_extract_ABw,
-    test_make_and_extract_AsBw,
-    test_make_and_extract_ABsw,
-    test_make_and_extract_ABC,
-    test_make_and_extract_AsBC,
-    test_make_and_extract_ABsCs,
+    core_instr,
+    zis_test0_case(check_num_min_and_max),
+    zis_test0_case(make_and_extract_Aw),
+    zis_test0_case(make_and_extract_Asw),
+    zis_test0_case(make_and_extract_ABw),
+    zis_test0_case(make_and_extract_AsBw),
+    zis_test0_case(make_and_extract_ABsw),
+    zis_test0_case(make_and_extract_ABC),
+    zis_test0_case(make_and_extract_AsBC),
+    zis_test0_case(make_and_extract_ABsCs),
 )

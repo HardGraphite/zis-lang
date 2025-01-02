@@ -51,6 +51,8 @@
 0x0a  MKTUP     tgt:R9,val_start:R8,val_count:U8 # Create a Tuple: REG[tgt] <- Tuple(REG[val_start ... val_start+val_count-1])
 0x0b  MKARR     tgt:R9,val_start:R8,val_count:U8 # Create an Array: REG[tgt] <- Array(REG[val_start ... val_start+val_count-1])
 0x0c  MKMAP     tgt:R9,val_start:R8,val_count:U8 # Create a Map: REG[tgt] <- Map{REG[vs] -> REG[vs+1], ..., REG[vs+vc*2-2] -> REG[vs+vc*2-1]}
+0x0d  MKRNG     tgt:R9,begin:R8,end:R8           # Create a Range: REG[tgt] <- Range(REG[begin], Range[end]).
+0x0e  MKRNGX    tgt:R9,begin:R8,end:R8           # Create a Range: REG[tgt] <- Range(REG[begin], Range[end] - 1).
 
 0x10  THR       val:R25                          # Throw a value: throws REG[val].
 

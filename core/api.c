@@ -12,7 +12,6 @@
 #include "invoke.h"
 #include "loader.h"
 #include "locals.h"
-#include "ndefutil.h"
 #include "object.h"
 #include "stack.h"
 #include "strutil.h"
@@ -46,7 +45,11 @@
 #endif
 
 #if defined(_WIN32) || defined(__CYGWIN__)
+#  if defined(__MINGW32__)
+#    define ZIS_API      __declspec(dllexport) __declspec(noinline)
+#  else
 #    define ZIS_API      __declspec(dllexport, noinline)
+#  endif
 #    define ZIS_API_VAR  __declspec(dllexport)
 #elif (__GNUC__ + 0 >= 4) || defined(__clang__)
 #    define ZIS_API      __attribute__((used, visibility("default"), noinline))
@@ -274,7 +277,7 @@ ZIS_API int zis_make_int_s(zis_t z, unsigned int reg, const char *str, size_t st
         return ZIS_E_ARG;
     const char *const str_end = str + str_sz, *str_end_1 = str_end;
     struct zis_object *obj = zis_int_obj_or_smallint_s(z, str, &str_end_1, base);
-    if (zis_unlikely(str_end != str_end_1))
+    if (zis_unlikely(!obj || str_end != str_end_1))
         return ZIS_E_ARG;
     *obj_ref = obj;
     return ZIS_OK;
@@ -332,7 +335,7 @@ ZIS_API int zis_read_string(zis_t z, unsigned int reg, char *buf, size_t *sz) {
         return ZIS_E_IDX;
     if (zis_unlikely(!zis_object_type_is(obj, z->globals->type_String)))
         return ZIS_E_TYPE;
-    const size_t n = zis_string_obj_value(zis_object_cast(obj, struct zis_string_obj), buf, *sz);
+    const size_t n = zis_string_obj_to_u8str(zis_object_cast(obj, struct zis_string_obj), buf, *sz);
     if (zis_unlikely(n == (size_t)-1))
         return ZIS_E_BUF;
     *sz = n;
@@ -861,7 +864,7 @@ do {                  \
             CHECK_TYPE(String);
             char *buf = va_arg(x->ap, char *);
             size_t *sz = va_arg(x->ap, size_t *);
-            const size_t n = zis_string_obj_value(
+            const size_t n = zis_string_obj_to_u8str(
                 zis_object_cast(in_obj, struct zis_string_obj), buf, *sz
             );
             if (zis_unlikely(n == (size_t)-1)) {
@@ -1462,7 +1465,7 @@ static int api_import_call_main(zis_t z, struct zis_object **res_ref) {
                 const zis_smallint_t x = zis_smallint_from_ptr(func_ret_val);
                 status = (int)((zis_smallint_unsigned_t)x & 0xff);
             } else if (zis_object_type(func_ret_val) == z->globals->type_Int) {
-                const int64_t x = zis_int_obj_value_trunc(zis_object_cast(func_ret_val, struct zis_int_obj));
+                const int64_t x = zis_int_obj_value_trunc_i(zis_object_cast(func_ret_val, struct zis_int_obj));
                 status = (int)((uint64_t)x) & 0xff;
             }
         }

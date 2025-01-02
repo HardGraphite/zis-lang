@@ -35,23 +35,29 @@
 #elif defined(__x86_64) || defined(__x86_64__) || defined(__amd64) ||          \
         defined(__amd64__) || defined(_M_X64) || defined(_M_AMD64)
 #    define ZIS_ARCH_NAME "x86_64"
+#    define ZIS_ARCH_AMD64 1
 #elif defined(__x86) || defined(__x86__) || defined(_M_IX86)
 #    define ZIS_ARCH_NAME "x86"
+#    define ZIS_ARCH_X86 1
 #elif defined(__aarch64__) || defined(__arm64__) || defined(_M_ARM64)
 #    define ZIS_ARCH_NAME "arm64"
+#    define ZIS_ARCH_ARM64 1
 #elif defined(__arm__) || defined(__arm) || defined(_M_ARM)
 #    define ZIS_ARCH_NAME "arm"
+#    define ZIS_ARCH_ARM 1
 #elif defined(__mips__) || defined(_M_MIPS)
 #    define ZIS_ARCH_NAME "mips"
+#    define ZIS_ARCH_MIPS 1
 #else
 #    define ZIS_ARCH_NAME ""
 #endif
 
-#if defined(__has_include) && __has_include(<bits/wordsize.h>)
+#if ZIS_ARCH_AMD64 || ZIS_ARCH_ARM64
+#    define ZIS_WORDSIZE 64
+#elif ZIS_ARCH_X86 || ZIS_ARCH_ARM
+#    define ZIS_WORDSIZE 32
+#elif defined(__has_include) && __has_include(<bits/wordsize.h>)
 #    include <bits/wordsize.h>
-#    if !(__WORDSIZE == 32 || __WORDSIZE == 64)
-#        error "unexpected __WORDSIZE value"
-#    endif
 #    define ZIS_WORDSIZE __WORDSIZE
 #elif defined(_WIN32)
 #    ifdef _WIN64

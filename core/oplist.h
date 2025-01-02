@@ -2,7 +2,7 @@
 
 #pragma once
 
-#define ZIS_OP_LIST_LEN  65
+#define ZIS_OP_LIST_LEN  67
 
 #define ZIS_OP_LIST_MAX_LEN  (127 + 1)
 
@@ -20,6 +20,8 @@
     E(0x0a, MKTUP   ) \
     E(0x0b, MKARR   ) \
     E(0x0c, MKMAP   ) \
+    E(0x0d, MKRNG   ) \
+    E(0x0e, MKRNGX  ) \
     E(0x10, THR     ) \
     E(0x11, RETNIL  ) \
     E(0x12, RET     ) \
@@ -122,6 +124,8 @@
     E(0x09, MKFLT   , ABsCs) \
     E(0x08, MKINT   , ABsw ) \
     E(0x0c, MKMAP   , ABC  ) \
+    E(0x0d, MKRNG   , ABC  ) \
+    E(0x0e, MKRNGX  , ABC  ) \
     E(0x0a, MKTUP   , ABC  ) \
     E(0x3a, MUL     , ABC  ) \
     E(0x45, NEG     , ABw  ) \
@@ -143,8 +147,6 @@
     E(0x39, SUB     , ABC  ) \
     E(0x10, THR     , Aw   ) \
     E(0x02,         , X    ) \
-    E(0x0d,         , X    ) \
-    E(0x0e,         , X    ) \
     E(0x0f,         , X    ) \
     E(0x14,         , X    ) \
     E(0x43,         , X    ) \

@@ -251,18 +251,25 @@ static void scan_number(
         assert(consumed_size <= buf_sz);
         loc_next_char_n(l, (unsigned int)consumed_size);
         stream_buffer_ignore(input, consumed_size);
-        if (!int_obj)
+        if (zis_unlikely(!int_obj)) {
+            assert(consumed_size == 0); // Otherwise it would be a "too large" error, which is impossible for a short integer literal.
             error_unexpected_end_of(l, "number literal");
+        }
         if (has_temp_result) {
-            const size_t k = consumed_size * digit_base;
-            assert(k <= ZIS_SMALLINT_MAX);
-            int_obj = zis_int_obj_add_x(
-                z, int_obj,
-                zis_int_obj_mul_x(
-                    z, *temp_result_ref,
-                    zis_smallint_to_ptr((zis_smallint_t)k)
-                )
+            struct zis_object *prev_result = *temp_result_ref;
+            *temp_result_ref = int_obj;
+            assert(consumed_size <= ZIS_SMALLINT_MAX);
+            struct zis_object *const weight = zis_int_obj_or_smallint_pow(
+                z,
+                zis_smallint_to_ptr(digit_base),
+                zis_smallint_to_ptr((zis_smallint_t)consumed_size)
             );
+            prev_result = zis_int_obj_or_smallint_mul(z, prev_result, weight);
+            if (zis_unlikely(!prev_result))
+                error(l, "the integer constant is too large");
+            int_obj = zis_int_obj_or_smallint_add(z, *temp_result_ref /* int_obj */, prev_result);
+            if (zis_unlikely(!int_obj))
+                error(l, "the integer constant is too large");
         } else {
             has_temp_result = true;
         }
@@ -453,7 +460,7 @@ static void scan_string(
         assert(consumed_size <= buf_sz);
         struct zis_string_obj *str_obj =
             allow_escape_sequences ?
-            zis_string_obj_new_esc(z, buf, consumed_size, _lit_str_esc_trans) :
+            zis_string_obj_new_esc(z, buf, consumed_size, '\\', _lit_str_esc_trans) :
             zis_string_obj_new(z, buf, consumed_size);
         stream_buffer_ignore(input, consumed_size);
         loc_next_char_n(l, (unsigned int)consumed_size);
@@ -461,7 +468,7 @@ static void scan_string(
             error(l, "illegal string literal");
         if (has_temp_result) {
             assert(zis_object_type(zis_object_from(*temp_result_ref)) == z->globals->type_String);
-            str_obj = zis_string_obj_concat(z, *temp_result_ref, str_obj);
+            str_obj = zis_string_obj_concat2(z, *temp_result_ref, str_obj);
         } else {
             has_temp_result = true;
         }
@@ -478,7 +485,7 @@ static void scan_string(
 
     zis_debug_log(
         TRACE, "Lexer", "string: ``%s''",
-        zis_string_obj_data_utf8(tok->value_string) ? zis_string_obj_data_utf8(tok->value_string) : "..."
+        zis_string_obj_as_ascii(tok->value_string, NULL) ? zis_string_obj_as_ascii(tok->value_string, NULL) : "..."
     );
 }
 
@@ -605,10 +612,19 @@ scan_next_char:
     } while(0)
 
     case '\t':
+    case '\v':
+    case '\f':
     case ' ':
         stream_ignore_1(input);
         loc_next_char(l);
         goto scan_next_char;
+
+    case '\r':
+        stream_ignore_1(input);
+        loc_next_char(l);
+        if (zis_unlikely(stream_peek(input) != '\n'))
+            error_unexpected_char(l, '\r');
+        zis_fallthrough;
 
     case '\n':
         if (zis_unlikely(l->ignore_eol)) {
@@ -682,10 +698,10 @@ scan_next_char:
             stream_ignore_1(input);
             if (stream_peek(input) == '.') {
                 loc_next_char(l);
-                token_set_type(tok, ZIS_TOK_ELLIPSIS);
+                token_set_type(tok, ZIS_TOK_OP_RANGE); // "..."
                 goto loc_next__input_ignore1__token_set_loc1__loc_next__return;
             }
-            token_set_type(tok, ZIS_TOK_DOTDOT);
+            token_set_type(tok, ZIS_TOK_OP_XRANGE); // ".."
             goto loc_next__input_ignore1__token_set_loc1__loc_next__return;
         }
         token_set_type(tok, ZIS_TOK_OP_PERIOD);

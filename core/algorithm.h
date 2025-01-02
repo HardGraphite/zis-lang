@@ -3,6 +3,7 @@
 #pragma once
 
 #include <stddef.h>
+#include <stdint.h>
 
 /* ----- numbers ------------------------------------------------------------ */
 
@@ -16,6 +17,9 @@
 
 /// $f(a, x) = \\log_{a}^{x}$.
 double zis_math_log(double a, double x);
+
+/// $f(base, exponent) = base ^ {exponent}$. Returns 0 if overflows.
+uint32_t zis_math_pow_u32(uint32_t base, uint32_t exponent);
 
 /* ----- hash functions ----------------------------------------------------- */
 

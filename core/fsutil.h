@@ -9,6 +9,7 @@
 
 #include "attributes.h"
 #include "platform.h"
+#include "types.h" // zis_ssize_t
 
 #if ZIS_SYSTEM_WINDOWS
 #    include <wchar.h> // wchar_t
@@ -194,7 +195,7 @@ zis_file_handle_t zis_file_stdio(int file_std_xxx);
 void zis_file_close(zis_file_handle_t f);
 
 /// Move the file position indicator. Returns current position, or -1 on error.
-intptr_t zis_file_seek(zis_file_handle_t f, intptr_t offset, int whence);
+zis_ssize_t zis_file_seek(zis_file_handle_t f, zis_ssize_t offset, int whence);
 
 /// Read bytes from the file. Returns read size, or 0 on EOF, or -1 on error.
 size_t zis_file_read(zis_file_handle_t f, char *restrict buffer, size_t size);

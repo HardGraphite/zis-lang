@@ -65,7 +65,7 @@ static void do_test_lit_int(zis_t z, const char *restrict code, int64_t val) {
     check_int_value(z, val);
 }
 
-zis_test_define(test_lit_int, z) {
+zis_test_define(lit_int, z) {
     for (int i = 0; i <= 1000; i++) {
         char buffer[32];
         snprintf(buffer, sizeof buffer, "%i", i);
@@ -99,7 +99,7 @@ static void do_test_lit_float(zis_t z, const char *restrict code, double val) {
     zis_test_assert_eq(actual_val, val);
 }
 
-zis_test_define(test_lit_float, z) {
+zis_test_define(lit_float, z) {
     for (int i = 0; i <= 1000; i++) {
         char buffer[32];
         const double val = i / 64.0;
@@ -125,7 +125,7 @@ static void do_test_lit_string(zis_t z, const char *restrict code, const char *r
     zis_test_assert(memcmp(actual_str, val, actual_len) == 0);
 }
 
-zis_test_define(test_lit_string, z) {
+zis_test_define(lit_string, z) {
     do_test_lit_string(z, "''", "");
     do_test_lit_string(z, "'abc'", "abc");
     do_test_lit_string(z, "\"abc\"", "abc");
@@ -161,21 +161,21 @@ static void do_test_identifier(zis_t z, const char *restrict code, const char *r
     zis_test_assert_eq(actual_val, 1234);
 }
 
-zis_test_define(test_identifier, z) {
+zis_test_define(identifier, z) {
     do_test_identifier(z, "abc", "abc");
     do_test_identifier(z, "ab12_", "ab12_");
     do_test_identifier(z, " abc ", "abc");
     do_test_identifier(z, "\tabc\n", "abc");
 }
 
-zis_test_define(test_tuple, z) {
+zis_test_define(tuple, z) {
     comp_and_eval_expr(z, "()");
     comp_and_eval_expr(z, "(1,)");
     comp_and_eval_expr(z, "(1,2)");
     comp_and_eval_expr(z, "(1,2,)");
 }
 
-zis_test_define(test_array, z) {
+zis_test_define(array, z) {
     comp_and_eval_expr(z, "[]");
     comp_and_eval_expr(z, "[1]");
     comp_and_eval_expr(z, "[1,]");
@@ -183,7 +183,7 @@ zis_test_define(test_array, z) {
     comp_and_eval_expr(z, "[1,2,]");
 }
 
-zis_test_define(test_map, z) {
+zis_test_define(map, z) {
     comp_and_eval_expr(z, "{}");
     comp_and_eval_expr(z, "{true->1}");
     comp_and_eval_expr(z, "{true->1,}");
@@ -191,13 +191,13 @@ zis_test_define(test_map, z) {
     comp_and_eval_expr(z, "{true->1,false->0}");
 }
 
-zis_test_define(test_comment, z) {
+zis_test_define(comment, z) {
     comp_wrong_code(z, "'");
     comp_and_exec_code(z, " # '", NULL);
     comp_and_exec_code(z, "'  # '", NULL);
 }
 
-zis_test_define(test_expr, z) {
+zis_test_define(expr, z) {
     const int64_t a = 2, b = 3, c = 4;
     comp_and_exec_code(z, "a = 2; b = 3; c = 4; Y = a + b * c", "Y");
     check_int_value(z, a + b * c);
@@ -207,7 +207,7 @@ zis_test_define(test_expr, z) {
     check_int_value(z, a * (b + c));
 }
 
-zis_test_define(test_cond_stmt, z) {
+zis_test_define(cond_stmt, z) {
     comp_and_exec_code(z,
         "a = 10 \n"
         "if a < 20 \n"
@@ -243,7 +243,7 @@ zis_test_define(test_cond_stmt, z) {
     check_int_value(z, 3);
 }
 
-zis_test_define(test_while_stmt, z) {
+zis_test_define(while_stmt, z) {
     comp_and_exec_code(z,
         "i = 0 \n"
         "while i < 1000 \n"
@@ -266,7 +266,7 @@ zis_test_define(test_while_stmt, z) {
     check_int_value(z, 1000);
 }
 
-zis_test_define(test_func_stmt, z) {
+zis_test_define(func_stmt, z) {
     comp_and_exec_code(z,
         "func fibonacci(i) \n"
         "    if i < 2 \n"
@@ -279,18 +279,27 @@ zis_test_define(test_func_stmt, z) {
     check_int_value(z, 55);
 }
 
+zis_test_define(crlf, z) {
+    comp_and_exec_code(z, "x = 1 \r\n x += 2", "x");
+    check_int_value(z, 3);
+
+    comp_wrong_code(z, "x = 1 \r \n x += 2");
+}
+
 zis_test_list(
+    core_compile,
     100,
-    test_lit_int,
-    test_lit_float,
-    test_lit_string,
-    test_identifier,
-    test_tuple,
-    test_array,
-    test_map,
-    test_comment,
-    test_expr,
-    test_cond_stmt,
-    test_while_stmt,
-    test_func_stmt,
+    zis_test_case(lit_int),
+    zis_test_case(lit_float),
+    zis_test_case(lit_string),
+    zis_test_case(identifier),
+    zis_test_case(tuple),
+    zis_test_case(array),
+    zis_test_case(map),
+    zis_test_case(comment),
+    zis_test_case(expr),
+    zis_test_case(cond_stmt),
+    zis_test_case(while_stmt),
+    zis_test_case(func_stmt),
+    zis_test_case(crlf),
 )

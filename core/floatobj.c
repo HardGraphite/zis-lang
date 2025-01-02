@@ -395,6 +395,11 @@ ZIS_NATIVE_FUNC_DEF_LIST(
     { "ceil"       , &T_Float_M_ceil          },
 );
 
+#ifdef _MSC_VER
+#    undef  NAN
+#    define NAN    (0.0 / 0.0)
+#endif // _MSC_VER
+
 ZIS_NATIVE_VAR_DEF_LIST(
     T_float_D_statics,
     { "NAN"       , { 'f', .f = NAN         } },

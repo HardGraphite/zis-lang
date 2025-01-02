@@ -9,6 +9,7 @@
 #include "boolobj.h"
 #include "exceptobj.h"
 #include "intobj.h"
+#include "rangeobj.h"
 #include "stringobj.h"
 #include "symbolobj.h"
 #include "typeobj.h"
@@ -38,7 +39,7 @@ bool zis_object_hash(
     }
     if (zis_object_type(ret) == z->globals->type_Int) {
         const int64_t h =
-            zis_int_obj_value_trunc(zis_object_cast(ret, struct zis_int_obj));
+            zis_int_obj_value_trunc_i(zis_object_cast(ret, struct zis_int_obj));
         *hash_code = (size_t)(h >= INT64_C(0) ? h : -h);
         return true;
     }
@@ -56,16 +57,11 @@ enum zis_object_ordering zis_object_compare(
     if (lhs == rhs)
         return ZIS_OBJECT_EQ;
 
-    if (zis_object_is_smallint(lhs)) {
-        if (zis_object_is_smallint(rhs)) {
-            const zis_smallint_t lhs_v = zis_smallint_from_ptr(lhs);
-            const zis_smallint_t rhs_v = zis_smallint_from_ptr(rhs);
-            assert(lhs_v != rhs_v);
-            return lhs_v <  rhs_v ? ZIS_OBJECT_LT : ZIS_OBJECT_GT;
-        }
-
-        // TODO: call smallint's comparison method
-        zis_context_panic(z, ZIS_CONTEXT_PANIC_IMPL);
+    if (zis_object_is_smallint(lhs) && zis_object_is_smallint(rhs)) {
+        const zis_smallint_t lhs_v = zis_smallint_from_ptr(lhs);
+        const zis_smallint_t rhs_v = zis_smallint_from_ptr(rhs);
+        assert(lhs_v != rhs_v);
+        return lhs_v <  rhs_v ? ZIS_OBJECT_LT : ZIS_OBJECT_GT;
     }
 
     struct zis_object *ret;
@@ -175,8 +171,8 @@ struct zis_string_obj *zis_object_to_string(
         var.result = zis_context_guess_variable_name(z, zis_object_from(zis_object_type(obj)));
         if (!var.result)
             var.result = zis_string_obj_new(z, "\?\?", 2);
-        var.result = zis_string_obj_concat(z, zis_string_obj_new(z, "\\<", 2), var.result);
-        var.result = zis_string_obj_concat(z, var.result, zis_string_obj_new(z, ">", 1));
+        var.result = zis_string_obj_concat2(z, zis_string_obj_new(z, "\\<", 2), var.result);
+        var.result = zis_string_obj_concat2(z, var.result, zis_string_obj_new(z, ">", 1));
         zis_locals_drop(z, var);
         return var.result;
     }
@@ -216,4 +212,23 @@ zis_noinline size_t _zis_object_index_convert_slow(
 
     assert(index >= 0 && (zis_smallint_unsigned_t)index < length);
     return (zis_smallint_unsigned_t)index;
+}
+
+bool zis_object_index_range_convert(struct zis_object_index_range_convert_args *restrict args) {
+    const size_t length = args->length;
+    const size_t begin = zis_object_index_convert(length, args->range->begin);
+    if (zis_unlikely(begin == (size_t)-1))
+        return false;
+    const size_t end = zis_object_index_convert(length, args->range->end);
+    if (zis_unlikely(end == (size_t)-1 || begin > end)) {
+        if (end != (size_t)-1 ? end : zis_object_index_convert((zis_smallint_unsigned_t)-1, args->range->end) == begin - 1) {
+            args->offset = begin;
+            args->count = 0;
+            return true;
+        }
+        return false;
+    }
+    args->offset = begin;
+    args->count = end - begin + 1;
+    return true;
 }

@@ -1,5 +1,7 @@
 #include "streamobj.h"
 
+#include <string.h>
+
 #include "context.h"
 #include "fsutil.h"
 #include "globals.h"
@@ -14,7 +16,7 @@
 
 /* ----- stream backend: none ----------------------------------------------- */
 
-static intptr_t sop_none_seek(void *_data, intptr_t offset, int whence) {
+static zis_ssize_t sop_none_seek(void *_data, zis_ssize_t offset, int whence) {
     zis_unused_var(_data), zis_unused_var(offset), zis_unused_var(whence);
     return 0;
 }
@@ -79,7 +81,7 @@ static void sop_str_use_state_for_static_str(
     state->data_end = str + sz;
 }
 
-static intptr_t sop_str_seek(void *_data, intptr_t offset, int whence) {
+static zis_ssize_t sop_str_seek(void *_data, zis_ssize_t offset, int whence) {
     struct sop_str_state *const restrict state = _data;
     const char *new_cur;
     switch (whence) {
@@ -233,9 +235,9 @@ struct zis_stream_obj *zis_stream_obj_new_str(
 struct zis_stream_obj *zis_stream_obj_new_strob(
     struct zis_context *z, struct zis_string_obj *str_obj
 ) {
-    const size_t data_size = zis_string_obj_value(str_obj, NULL, 0);
+    const size_t data_size = zis_string_obj_to_u8str(str_obj, NULL, 0);
     struct sop_str_state *state = sop_str_alloc_state(data_size);
-    const size_t n = zis_string_obj_value(str_obj, state->_data, data_size);
+    const size_t n = zis_string_obj_to_u8str(str_obj, state->_data, data_size);
     assert(n == data_size), zis_unused_var(n);
     struct zis_stream_obj *self = zis_stream_obj_new(z);
     const int flags = ZIS_STREAM_OBJ_MODE_IN | ZIS_STREAM_OBJ_TEXT | ZIS_STREAM_OBJ_UTF8;

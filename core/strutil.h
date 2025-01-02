@@ -7,6 +7,7 @@
 
 #include "attributes.h"
 #include "compat.h"
+#include "types.h" // zis_ssize_t
 
 /* ----- character types ---------------------------------------------------- */
 
@@ -48,24 +49,38 @@ zis_static_force_inline size_t zis_u8char_len_1(zis_char8_t u8_first_byte) {
     return (u8_first_byte & 0x80) == 0 ? 1 : _zis_u8char_len_1_mb(u8_first_byte);
 }
 
-/// Calculate length of next UTF-8 character. If illegal byte is found,
-/// return `-1 - off`, where `off` is the offset to the byte that is illegal.
-int zis_u8char_len_s(const zis_char8_t *u8_str, size_t n_bytes);
+/// Calculate length of next UTF-8 character. Return 0 if it is illegal.
+size_t zis_u8char_len_s(const zis_char8_t *u8_str, size_t n_bytes);
+
+/// Calculate length of next UTF-8 character, checking each byte.
+/// If illegal byte is found, return `-1 - off`, where `off` is the offset to the byte that is illegal.
+int zis_u8char_len_checked(const zis_char8_t *u8_str, size_t n_bytes);
 
 /// Get number of UTF-8 characters.
-size_t zis_u8str_len(const zis_char8_t *u8_str);
+/// Parameter `n_bytes` is the number of bytes in the string, or `-1` to find the size with strlen().
+/// If illegal byte is found, returns `-1`.
+size_t zis_u8str_len(const zis_char8_t *u8_str, size_t n_bytes);
 
-/// Check each byte and get number of UTF-8 characters. If illegal byte is found,
-/// return `-1 - off` where `off` is the offset to the byte that is illegal.
-int zis_u8str_len_s(const zis_char8_t *u8_str, size_t n_bytes);
+/// Check each byte and get number of UTF-8 characters.
+/// Parameter `n_bytes` is the same with that of `zis_u8str_len()`.
+/// If illegal byte is found, return `-1 - off` where `off` is the offset to the byte that is illegal.
+zis_ssize_t zis_u8str_len_checked(const zis_char8_t *u8_str, size_t n_bytes);
 
-/// Get the pointer to the `n_chars`-th UTF-8 character. If error occurs, return NULL.
-/// If out of range, return the pointer to the ending NUL char.
+/// Get the pointer to the `n_chars`-th UTF-8 character.
+/// The behavior is undefined if `n_chars` is out of range.
+/// If error occurs, returns NULL.
 zis_char8_t *zis_u8str_find_pos(const zis_char8_t *u8_str, size_t n_chars);
 
 /// Find the last valid UTF-8 character. Returns the pointer to 1 byte past the last character.
 /// Returns NULL if no valid character is found.
 zis_char8_t *zis_u8str_find_end(const zis_char8_t *u8_str, size_t max_bytes);
+
+/// Search for a sub-string in the UTF-8 string.
+/// Retruns the pointer to the first byte of the first occurrence. If not found returns NULL.
+zis_char8_t *zis_u8str_find(
+    const zis_char8_t *u8_str, size_t u8_str_sz,
+    const zis_char8_t *sub_str, size_t sub_str_sz
+);
 
 /* ----- char and string info ----------------------------------------------- */
 

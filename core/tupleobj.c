@@ -7,6 +7,7 @@
 #include "globals.h"
 #include "ndefutil.h"
 #include "objmem.h"
+#include "objvec.h"
 #include "stack.h"
 
 #include "exceptobj.h"
@@ -47,31 +48,44 @@ struct zis_tuple_obj *_zis_tuple_obj_new_empty(struct zis_context *z) {
 
 struct zis_tuple_obj *zis_tuple_obj_concat(
     struct zis_context *z,
-    struct zis_tuple_obj *v[], size_t n
+    struct zis_object_vec_view tuples
 ) {
-    assert(v && n != (size_t)-1);
-
-    if (zis_unlikely(n == 1))
-        return v[0];
-
     size_t new_tuple_len = 0;
-    for (size_t i = 0; i < n; i++) {
-        struct zis_tuple_obj *tuple_i = v[i];
-        const size_t tuple_i_len = zis_tuple_obj_length(tuple_i);
-        new_tuple_len += tuple_i_len;
+
+    // Check types and compute the total length.
+    {
+        struct zis_type_obj *const type_Tuple = z->globals->type_Tuple;
+        zis_object_vec_view_foreach_unchanged(tuples, item, {
+            if (!zis_object_type_is(item, type_Tuple))
+                zis_context_panic(z, ZIS_CONTEXT_PANIC_IMPL); // TODO: handles type error.
+            struct zis_tuple_obj *tuple = zis_object_cast(item, struct zis_tuple_obj);
+            const size_t tuple_len = zis_tuple_obj_length(tuple);
+            new_tuple_len += tuple_len;
+        });
     }
 
-    if (zis_unlikely(!new_tuple_len))
+    if (zis_unlikely(!new_tuple_len)) {
         return z->globals->val_empty_tuple;
+    }
+    if (zis_unlikely(zis_object_vec_view_length(tuples) == 1)) {
+        struct zis_object *item = zis_object_vec_view_data(tuples)[0];
+        return zis_object_cast(item, struct zis_tuple_obj);
+    }
 
     struct zis_tuple_obj *new_tuple = tuple_obj_alloc(z, new_tuple_len);
-    for (size_t i = 0, copied_count = 0; i < n; i++) {
-        struct zis_tuple_obj *tuple_i = v[i];
-        const size_t tuple_i_len = zis_tuple_obj_length(tuple_i);
-        assert(copied_count + tuple_i_len <= new_tuple_len);
-        zis_object_vec_copy(new_tuple->_data + copied_count, tuple_i->_data, tuple_i_len);
-        zis_object_write_barrier_n(new_tuple, tuple_i->_data, tuple_i_len);
-        copied_count += tuple_i_len;
+
+    {
+        size_t copied_count = 0;
+        zis_object_vec_view_foreach_unchanged(tuples, item, {
+            assert(zis_object_type_is(item, z->globals->type_Tuple));
+            struct zis_tuple_obj *tuple = zis_object_cast(item, struct zis_tuple_obj);
+            const size_t tuple_len = zis_tuple_obj_length(tuple);
+            assert(copied_count + tuple_len <= new_tuple_len);
+            zis_object_vec_copy(new_tuple->_data + copied_count, tuple->_data, tuple_len);
+            zis_object_write_barrier_n(new_tuple, tuple->_data, tuple_len);
+            copied_count += tuple_len;
+        });
+        assert(copied_count == new_tuple_len);
     }
 
     return new_tuple;
@@ -115,7 +129,7 @@ ZIS_NATIVE_FUNC_DEF(T_Tuple_M_operator_add, z, {2, 0, 2}) {
         return ZIS_THR;
     }
     struct zis_tuple_obj *result =
-        zis_tuple_obj_concat(z, (struct zis_tuple_obj **)(frame + 1), 2);
+        zis_tuple_obj_concat(z, zis_object_vec_view_from_frame(frame, 1, 2));
     frame[0] = zis_object_from(result);
     return ZIS_OK;
 }
@@ -272,34 +286,34 @@ ZIS_NATIVE_FUNC_DEF(T_Tuple_M_hash, z, {1, 0, 1}) {
     return ZIS_OK;
 }
 
-ZIS_NATIVE_FUNC_DEF(T_Tuple_M_to_string, z, {1, 1, 2}) {
+ZIS_NATIVE_FUNC_DEF(T_Tuple_M_to_string, z, {1, 1, 4}) {
     /*#DOCSTR# func Tuple:to_string(?fmt) :: String
     Returns string representation for this tuple. */
     assert_arg1_Tuple(z);
     struct zis_object **frame = z->callstack->frame;
 
-    struct zis_string_obj **str_obj_p = (struct zis_string_obj **)(frame + 2);
-    *str_obj_p = zis_string_obj_new(z, "(", 1);
+    struct zis_string_builder_obj **str_builder_p = (struct zis_string_builder_obj **)(frame + 3);
+    struct zis_string_obj **comma_str_p = (struct zis_string_obj **)(frame + 4);
+    *str_builder_p = zis_string_builder_obj_new(z);
+    *comma_str_p = zis_string_obj_new(z, ", ", 2);
+
+    zis_string_builder_obj_append_char(z, *str_builder_p, '(');
     for (size_t i = 0; ; i++) {
         struct zis_tuple_obj *tuple = zis_object_cast(frame[1], struct zis_tuple_obj);
-        if (i >= zis_tuple_obj_length(tuple))
+        if (i >= zis_tuple_obj_length(tuple)) {
+            if (i == 1)
+                zis_string_builder_obj_append_char(z, *str_builder_p, ',');
             break;
+        }
         if (i)
-            *str_obj_p = zis_string_obj_concat(z, *str_obj_p, zis_string_obj_new(z, ", ", 2));
-        *str_obj_p = zis_string_obj_concat(
-            z, *str_obj_p,
-            zis_object_to_string(z, zis_tuple_obj_get(tuple, i), true, NULL)
-        );
+            zis_string_builder_obj_append(z, *str_builder_p, *comma_str_p);
+        struct zis_string_obj *item_str = zis_object_to_string(z, zis_tuple_obj_get(tuple, i), true, NULL);
+        zis_string_builder_obj_append(z, *str_builder_p, item_str);
     }
-    const bool has_one_element =
-        zis_tuple_obj_length(zis_object_cast(frame[1], struct zis_tuple_obj)) == 1;
-    *str_obj_p = zis_string_obj_concat(
-        z, *str_obj_p,
-        zis_string_obj_new(z, ",)" + (ptrdiff_t)(has_one_element ? 0 : 1), (size_t)-1)
-    );
+    zis_string_builder_obj_append_char(z, *str_builder_p, ')');
 
-    assert(zis_object_type_is(zis_object_from(*str_obj_p), z->globals->type_String));
-    frame[0] = zis_object_from(*str_obj_p);
+    assert(zis_object_type_is(zis_object_from(*str_builder_p), z->globals->type_String_Builder));
+    frame[0] = zis_object_from(zis_string_builder_obj_string(z, *str_builder_p));
     return ZIS_OK;
 }
 

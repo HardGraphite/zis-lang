@@ -12,6 +12,7 @@
 #include "attributes.h"
 #include "debug.h"
 #include "locals.h"
+#include "types.h" // zis_ssize_t
 
 /* ----- constants and lookup-tables ---------------------------------------- */
 
@@ -77,7 +78,6 @@ enum pseudo_opcode {
 
 /// Find opcode by its uppercase name. Returns -1 if not found.
 static int opcode_from_name(const char *name_upper) {
-    static_assert(sizeof(size_t) == sizeof(intptr_t), "");
     const size_t op_count = ZIS_OP_LIST_LEN;
     static_assert(ZIS_OP_LIST_LEN && ZIS_OP_LIST_LEN <= sizeof op_names_sorted / sizeof op_names_sorted[0], "");
 
@@ -92,7 +92,7 @@ static int opcode_from_name(const char *name_upper) {
             index_l = index_m + 1;
         else
             index_r = index_m - 1;
-    } while ((intptr_t)index_l <= (intptr_t)index_r);
+    } while ((zis_ssize_t)index_l <= (zis_ssize_t)index_r);
 
     return -1;
 }
@@ -1100,7 +1100,7 @@ void zis_debug_dump_bytecode(
     };
     fprintf(fp, "# disassembly of function@%p\n", (void *)func_obj);
     fprintf(
-        fp, "# meta = {.na = %u, .no = %u, .nr = %u}\n# constants.len = %zu, symbols.len = %zu\n",
+        fp, "# meta = {.na = %u, .no = %i, .nr = %u}\n# constants.len = %zu, symbols.len = %zu\n",
         func_obj->meta.na, func_obj->meta.no, func_obj->meta.nr,
         zis_array_slots_obj_length(func_obj->_constants),
         zis_array_slots_obj_length(func_obj->_symbols)

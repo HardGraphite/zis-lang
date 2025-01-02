@@ -34,7 +34,7 @@ struct zis_stream_obj {
 
 /// Stream operation functions. See `zis_file_*()` functions.
 struct zis_stream_obj_operations {
-    intptr_t (*seek)(void *, intptr_t, int); ///< seek(self, offset, whence) -> position
+    zis_ssize_t (*seek)(void *, zis_ssize_t, int); ///< seek(self, offset, whence) -> position
     size_t (*read)(void *, char *restrict, size_t); ///< read(self, buffer, size) -> size
     int (*write)(void *, const char *restrict, size_t); ///< write(self, data, size)
     void (*close)(void *); ///< close(self)

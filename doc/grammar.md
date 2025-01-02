@@ -175,6 +175,8 @@ Binary operators:
 |     `>=`     |     8      | greater than or equal to  |
 |     `&&`     |     13     | logical and               |
 | &#124;&#124; |     14     | logical or                |
+|     `..`     |     13     | exclusive-end range       |
+|    `...`     |     13     | range                     |
 |     `.`      |     1      | field access              |
 |     `:`      |     1      | method access             |
 |   `(...)`    |     2      | invocation                |

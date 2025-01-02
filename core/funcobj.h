@@ -18,10 +18,20 @@ typedef uint32_t zis_func_obj_bytecode_word_t;
 
 /// Function metadata.
 struct zis_func_obj_meta {
-    unsigned char  na; ///< Number of arguments (excluding optional ones).
-    unsigned char  no; ///< Number of optional arguments. Or `-1` to accept a `Tuple` holding the rest arguments (variadic).
-    unsigned short nr; ///< Number of registers (arguments and local variables, including REG-0).
+    uint8_t  na; ///< Number of arguments (excluding optional ones). See `struct zis_native_func_meta::na`.
+    int8_t   no; ///< Number of optional arguments. See `struct zis_native_func_meta::no`.
+    uint16_t nr; ///< Number of registers (arguments and local variables, including REG-0).
 };
+
+/// `-no`, assuming that `no` is negative.
+zis_static_force_inline uint8_t zis_func_obj_meta_no_neg2pos(int8_t meta_no) {
+    return (uint8_t)0 - (uint8_t)meta_no;
+}
+
+/// `abs(no)`.
+zis_static_force_inline uint8_t zis_func_obj_meta_no_abs(int8_t meta_no) {
+    return meta_no >= 0 ? (uint8_t)meta_no : zis_func_obj_meta_no_neg2pos(meta_no);
+}
 
 /// Convert func meta.
 zis_nodiscard bool zis_func_obj_meta_conv(

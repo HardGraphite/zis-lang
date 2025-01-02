@@ -6,80 +6,129 @@
 #include "context.h"
 #include "globals.h"
 #include "locals.h"
-#include "memory.h"
 #include "ndefutil.h"
 #include "objmem.h"
 #include "stack.h"
 #include "strutil.h"
 
+#include "arrayobj.h"
 #include "exceptobj.h"
+#include "intobj.h"
+#include "rangeobj.h"
 #include "streamobj.h"
+#include "tupleobj.h"
+
+/* ----- string object -------------------------------------------- */
 
 struct zis_string_obj {
     ZIS_OBJECT_HEAD
     // --- BYTES ---
     const size_t _bytes_size; // !!
-    size_t _type_and_length; // [1:0] -> char type, [N:2] -> length
-    char _data[];
+    size_t _length_info; // [3:0] -> padding count, [N:4] -> length
+    zis_char8_t _text_bytes[]; // UTF-8 bytes
 };
 
 #define STR_OBJ_BYTES_FIXED_SIZE \
     ZIS_NATIVE_TYPE_STRUCT_XB_FIXED_SIZE(struct zis_string_obj, _bytes_size)
 
-/* ----- internal implementation -------------------------------------------- */
+#define STR_OBJ_LENGTH_MAX  (SIZE_MAX >> 4)
 
-enum string_obj_char_type {
-    STR_OBJ_C1 = 0, // U+0000 ~ U+00FF
-    STR_OBJ_C2 = 1, // U+0000 ~ U+FFFF
-    STR_OBJ_C4 = 3, // U+0000 ~ U+10FFFF
-};
-
-#define STR_OBJ_C1_CODE_MAX  0x00ff
-#define STR_OBJ_C2_CODE_MAX  0xffff
-
-typedef uint8_t  string_obj_c1_t;
-typedef uint16_t string_obj_c2_t;
-typedef uint32_t string_obj_c4_t;
-
-/// Get size of a char.
-zis_static_force_inline size_t string_obj_char_size(enum string_obj_char_type ct) {
-    return (size_t)ct + 1;
+/// Number of bytes in the string.
+zis_force_inline static size_t string_obj_size(const struct zis_string_obj *s) {
+    return s->_bytes_size - (s->_length_info & 0xf) - STR_OBJ_BYTES_FIXED_SIZE;
 }
 
-/// Get string char type.
-zis_static_force_inline enum string_obj_char_type
-string_obj_char_type(const struct zis_string_obj *self) {
-    enum string_obj_char_type ct = (enum string_obj_char_type)(self->_type_and_length & 3);
-    assert(ct == STR_OBJ_C1 || ct == STR_OBJ_C2 || ct == STR_OBJ_C4);
-    return ct;
-}
-
-/// Get string length (number of characters).
-zis_static_force_inline size_t string_obj_length(const struct zis_string_obj *self) {
-    return self->_type_and_length >> 2;
+/// Number of characters in the string.
+zis_force_inline static size_t string_obj_length(const struct zis_string_obj *s) {
+    return s->_length_info >> 4;
 }
 
 /// Get string data.
-zis_static_force_inline void *string_obj_data(struct zis_string_obj *self) {
-    return self->_data;
+zis_force_inline static zis_char8_t *string_obj_data(struct zis_string_obj *s) {
+    return s->_text_bytes;
 }
 
-/// Allocate but do not initialize the data.
+/// Get string data.
+zis_force_inline static const zis_char8_t *string_obj_as_u8str(const struct zis_string_obj *s) {
+    return s->_text_bytes;
+}
+
+/// Get string data as ASCII string.
+zis_force_inline static const char *string_obj_as_ascii(const struct zis_string_obj *s) {
+    assert(string_obj_size(s) == string_obj_length(s));
+    return (const char *)s->_text_bytes;
+}
+
+/// Allocate but do not initialize the text data.
 static struct zis_string_obj *string_obj_alloc(
     struct zis_context *z,
-    enum string_obj_char_type ct, size_t len
+    size_t size, size_t length
 ) {
+    assert(length <= STR_OBJ_LENGTH_MAX);
+    assert(size >= length);
     struct zis_object *const obj = zis_objmem_alloc_ex(
         z, ZIS_OBJMEM_ALLOC_AUTO, z->globals->type_String,
-        0, STR_OBJ_BYTES_FIXED_SIZE + len * string_obj_char_size(ct)
+        0, STR_OBJ_BYTES_FIXED_SIZE + size
     );
-    struct zis_string_obj *const self = zis_object_cast(obj, struct zis_string_obj);
-    assert(!(len & ~(SIZE_MAX >> 2)));
-    self->_type_and_length = (len << 2) | (size_t)ct;
-    return self;
+    struct zis_string_obj *const str = zis_object_cast(obj, struct zis_string_obj);
+    assert(!(length & ~(SIZE_MAX >> 4)));
+    assert(str->_bytes_size - STR_OBJ_BYTES_FIXED_SIZE - size <= 0xf);
+    str->_length_info = (length << 4) | (str->_bytes_size - STR_OBJ_BYTES_FIXED_SIZE - size);
+    assert(string_obj_size(str) == size);
+    assert(string_obj_length(str) == length);
+    return str;
 }
 
-/* ----- public functions --------------------------------------------------- */
+/// Dummy string object that can be allocated on stack for representing a character.
+typedef union dummy_string_obj_for_char {
+    struct zis_string_obj string_obj;
+    char _data[sizeof(struct zis_string_obj) + sizeof(zis_wchar_t)];
+} dummy_string_obj_for_char;
+
+/// Initialize a dummy_string_obj_for_char.
+static void dummy_string_obj_for_char_init(dummy_string_obj_for_char *restrict ds, zis_wchar_t c) {
+    // See `string_obj_alloc()`.
+
+    const size_t length = 1; // 1 character.
+    const size_t size = zis_u8char_from_code(c, ds->string_obj._text_bytes);
+    assert(size > 0);
+    *(size_t *)&ds->string_obj._bytes_size = sizeof(dummy_string_obj_for_char) - ZIS_OBJECT_HEAD_SIZE;
+    ds->string_obj._length_info = (length << 4) | (ds->string_obj._bytes_size - STR_OBJ_BYTES_FIXED_SIZE - size);
+    assert(string_obj_size(&ds->string_obj) == size);
+    assert(string_obj_length(&ds->string_obj) == length);
+}
+
+zis_cold_fn zis_noinline
+static int string_obj_illegal_codepoint_error(struct zis_context *z, zis_wchar_t c) {
+    zis_context_set_reg0(z, zis_object_from(zis_exception_obj_format(
+        z, NULL, NULL, "illegal code point %#04x", c
+    )));
+    return ZIS_THR;
+}
+
+zis_cold_fn zis_noinline
+static int string_obj_invalid_bytes_error(struct zis_context *z) {
+    zis_context_set_reg0(z, zis_object_from(zis_exception_obj_format(
+        z, NULL, NULL, "invalid byte sequence for a UTF-8 string"
+    )));
+    return ZIS_THR;
+}
+
+zis_cold_fn zis_noinline
+static int string_obj_invalid_escape_sequence_error(struct zis_context *z, const char *seq) {
+    zis_context_set_reg0(z, zis_object_from(zis_exception_obj_format(
+        z, NULL, NULL, "invalid string escape sequence: %s", seq
+    )));
+    return ZIS_THR;
+}
+
+zis_cold_fn zis_noinline
+static int string_obj_too_long_error(struct zis_context *z) {
+    zis_context_set_reg0(z, zis_object_from(zis_exception_obj_format(
+        z, "value", NULL, "the string is too long"
+    )));
+    return ZIS_THR;
+}
 
 struct zis_string_obj *zis_string_obj_new(
     struct zis_context *z,
@@ -91,309 +140,391 @@ struct zis_string_obj *zis_string_obj_new(
     if (zis_unlikely(!n))
         return z->globals->val_empty_string;
 
-    zis_wchar_t codepoint_max = 0;
-    size_t      char_count    = 0;
-    assert(n != (size_t)-1);
-    {
-        const zis_char8_t *src_p = (const zis_char8_t *)s, *const src_end = src_p + n;
-        while (src_p < src_end) {
-            zis_wchar_t  codepoint;
-            const size_t char_len = zis_u8char_to_code(&codepoint, src_p, src_end);
-            if (zis_unlikely(!char_len)) // error at (src_p - s)
-                return NULL;
-            if (codepoint > codepoint_max)
-                codepoint_max = codepoint;
-            src_p += char_len;
-            char_count++;
-        }
-        if (src_p != src_end) // error at (src_end - 1 - s)
-            return NULL;
+    const size_t len = zis_u8str_len((const zis_char8_t *)s, n);
+    if (zis_unlikely(len == (size_t)-1)) {
+        string_obj_invalid_bytes_error(z);
+        return NULL;
+    }
+    if (zis_unlikely(len > STR_OBJ_LENGTH_MAX)) {
+        string_obj_too_long_error(z);
+        return NULL;
     }
 
-#define COPY_STR_DATA(C_X) \
-    do {                   \
-        const zis_char8_t *src_p = (const zis_char8_t *)s; \
-        string_obj_c##C_X##_t *dst_p = string_obj_data(self); \
-        for (size_t i = 0; i < char_count; i++) {          \
-            zis_wchar_t ch;\
-            src_p   += zis_u8char_to_code(&ch, src_p, (void *)UINTPTR_MAX); \
-            *dst_p++ = (string_obj_c##C_X##_t)ch;          \
-        }                  \
-    } while (0)            \
-// ^^^ COPY_STR_DATA() ^^^
-
-    struct zis_string_obj *self;
-    if (codepoint_max <= STR_OBJ_C1_CODE_MAX) {
-        self = string_obj_alloc(z, STR_OBJ_C1, char_count);
-        if (codepoint_max < 0x80)
-            memcpy(string_obj_data(self), s, char_count);
-        else
-            COPY_STR_DATA(1);
-    } else if (codepoint_max <= STR_OBJ_C2_CODE_MAX) {
-        self = string_obj_alloc(z, STR_OBJ_C2, char_count);
-        COPY_STR_DATA(2);
-    } else {
-        self = string_obj_alloc(z, STR_OBJ_C4, char_count);
-        COPY_STR_DATA(4);
-    }
-    return self;
-
-#undef COPY_STR_DATA
+    struct zis_string_obj *str = string_obj_alloc(z, n, len);
+    memcpy(string_obj_data(str), s, n);
+    return str;
 }
 
 struct zis_string_obj *zis_string_obj_new_esc(
     struct zis_context *z,
-    const char *s, size_t n /* = -1 */,
+    const char *string, size_t string_size /* = -1 */,
+    char escape_beginning,
     zis_string_obj_wchar_t (*escape_translator)(const char *restrict s, const char **restrict s_end)
 ) {
     // Adapted from `zis_string_obj_new()`.
 
-    if (zis_unlikely(n == (size_t)-1))
-        n = strlen(s);
+    if (zis_unlikely(string_size == (size_t)-1))
+        string_size = strlen(string);
 
-    if (zis_unlikely(!n))
+    if (zis_unlikely(!string_size))
         return z->globals->val_empty_string;
 
-    zis_wchar_t codepoint_max = 0;
-    size_t      char_count    = 0;
-    bool        has_esc_seq   = false;
-    assert(n != (size_t)-1);
-    {
-        const zis_char8_t *src_p = (const zis_char8_t *)s, *const src_end = src_p + n;
-        while (src_p < src_end) {
-            zis_wchar_t  codepoint;
-            const size_t char_len = zis_u8char_to_code(&codepoint, src_p, src_end);
-            if (zis_unlikely(!char_len)) // error at (src_p - s)
+    size_t len = 0, size = 0;
+    bool has_esc_seq = false;
+    for (const char *p = string, *const p_end = p + string_size;;) {
+        const char *p_esc = memchr(p, escape_beginning, (size_t)(p_end - p));
+        if (!p_esc)
+            p_esc = p_end;
+        {
+            const size_t slice_size = (size_t)(p_esc - p);
+            const size_t slice_len = zis_u8str_len((const zis_char8_t *)p, slice_size);
+            if (zis_unlikely(slice_len == (size_t)-1)) {
+                string_obj_invalid_bytes_error(z);
                 return NULL;
-            if (codepoint == '\\') {
-                has_esc_seq = true;
-                const char *esc_end_p = s + n;
-                codepoint = escape_translator((const char *)src_p + 1, &esc_end_p);
-                if (codepoint == (zis_wchar_t)-1)
-                    return NULL;
-                assert(esc_end_p <= s + n);
-                src_p = (const zis_char8_t *)esc_end_p - 1;
             }
-            if (codepoint > codepoint_max)
-                codepoint_max = codepoint;
-            src_p += char_len;
-            char_count++;
+            len += slice_len;
+            size += slice_size;
         }
-        if (src_p != src_end) // error at (src_end - 1 - s)
-            return NULL;
+        if (p_esc == p_end)
+            break;
+        assert(p_esc < p_end);
+        {
+            has_esc_seq = true;
+            const char *esc_end_p = p_end;
+            zis_wchar_t translated_char = escape_translator(p_esc + 1, &esc_end_p);
+            size_t translated_char_size = zis_u8char_len_from_code(translated_char);
+            if (translated_char == (zis_wchar_t)-1 || translated_char_size == 0) {
+                string_obj_invalid_escape_sequence_error(z, (char[]){ escape_beginning, p_esc[1], 0 });
+                return NULL;
+            }
+            len++;
+            size += translated_char_size;
+            p = esc_end_p;
+        }
+        assert(p <= p_end);
     }
 
-#define COPY_STR_DATA(C_X) \
-    do {                   \
-        const zis_char8_t *src_p = (const zis_char8_t *)s; \
-        string_obj_c##C_X##_t *dst_p = string_obj_data(self); \
-        for (size_t i = 0; i < char_count; i++) {          \
-            zis_wchar_t ch;\
-            src_p   += zis_u8char_to_code(&ch, src_p, (void *)UINTPTR_MAX); \
-            if (ch == '\\') {                              \
-                const char *esc_end_p = s + n;             \
-                ch = escape_translator((const char *)src_p, &esc_end_p);    \
-                assert(ch != (zis_wchar_t)-1);             \
-                assert(esc_end_p <= s + n);                \
-                src_p = (const zis_char8_t *)esc_end_p;    \
-            }              \
-            *dst_p++ = (string_obj_c##C_X##_t)ch;          \
-        }                  \
-    } while (0) // ^^^ COPY_STR_DATA() ^^^
-
-    struct zis_string_obj *self;
-    if (codepoint_max <= STR_OBJ_C1_CODE_MAX) {
-        self = string_obj_alloc(z, STR_OBJ_C1, char_count);
-        if (codepoint_max < 0x80 && !has_esc_seq)
-            memcpy(string_obj_data(self), s, char_count);
-        else
-            COPY_STR_DATA(1);
-    } else if (codepoint_max <= STR_OBJ_C2_CODE_MAX) {
-        self = string_obj_alloc(z, STR_OBJ_C2, char_count);
-        COPY_STR_DATA(2);
-    } else {
-        self = string_obj_alloc(z, STR_OBJ_C4, char_count);
-        COPY_STR_DATA(4);
+    if (zis_unlikely(len > STR_OBJ_LENGTH_MAX)) {
+        string_obj_too_long_error(z);
+        return NULL;
     }
-    return self;
 
-#undef COPY_STR_DATA
+    struct zis_string_obj *str = string_obj_alloc(z, size, len);
+
+    if (!has_esc_seq) {
+        assert(size == string_size);
+        memcpy(string_obj_data(str), string, size);
+        return str;
+    }
+
+    zis_char8_t *str_wr_p = string_obj_data(str);
+    for (const char *p = string, *const p_end = p + string_size;;) {
+        const char *p_esc = memchr(p, escape_beginning, (size_t)(p_end - p));
+        if (!p_esc) {
+            const size_t slice_size = (size_t)(p_end - p);
+            memcpy(str_wr_p, p, slice_size);
+            break;
+        }
+        const size_t slice_size = (size_t)(p_esc - p);
+        memcpy(str_wr_p, p, slice_size);
+        str_wr_p += slice_size;
+        const char *esc_end_p = p_end;
+        const zis_wchar_t translated_char = escape_translator(p_esc + 1, &esc_end_p);
+        assert(translated_char != (zis_wchar_t)-1);
+        const size_t translated_char_size = zis_u8char_from_code(translated_char, str_wr_p);
+        assert(translated_char_size != 0);
+        p = esc_end_p;
+        assert(p <= p_end);
+        str_wr_p += translated_char_size;
+        assert(str_wr_p <= string_obj_data(str) + string_obj_size(str));
+    }
+    return str;
 }
 
 struct zis_string_obj *_zis_string_obj_new_empty(struct zis_context *z) {
-    return string_obj_alloc(z, STR_OBJ_C1, 0U);
+    return string_obj_alloc(z, 0, 0);
 }
 
 struct zis_string_obj *zis_string_obj_from_char(
     struct zis_context *z, zis_string_obj_wchar_t ch
 ) {
-    struct zis_string_obj *self;
-    if (ch <= STR_OBJ_C1_CODE_MAX) {
-        self = string_obj_alloc(z, STR_OBJ_C1, 1);
-        string_obj_c1_t *const data = string_obj_data(self);
-        data[0] = (string_obj_c1_t)ch;
-    } else if (ch <= STR_OBJ_C2_CODE_MAX) {
-        self = string_obj_alloc(z, STR_OBJ_C2, 1);
-        string_obj_c2_t *const data = string_obj_data(self);
-        data[0] = (string_obj_c2_t)ch;
-    } else {
-        self = string_obj_alloc(z, STR_OBJ_C4, 1);
-        string_obj_c4_t *const data = string_obj_data(self);
-        data[0] = (string_obj_c4_t)ch;
+    zis_char8_t buffer[8];
+    const size_t n = zis_u8char_from_code(ch, buffer);
+    assert(n <= sizeof buffer);
+    if (zis_unlikely(n == 0)) {
+        string_obj_illegal_codepoint_error(z, ch);
+        return NULL;
     }
-    return self;
+    return zis_string_obj_new(z, (const char *)buffer, n);
 }
 
 size_t zis_string_obj_length(const struct zis_string_obj *self) {
     return string_obj_length(self);
 }
 
-size_t zis_string_obj_value(const struct zis_string_obj *self, char *buf, size_t buf_sz) {
-    const enum string_obj_char_type char_type  = string_obj_char_type(self);
-    const size_t char_count = string_obj_length(self);
-
-    switch (char_type) {
-
-#define COPY_STR_DATA(C_X) \
-    do {                   \
-        const string_obj_c##C_X##_t *const data = string_obj_data((void *)self); \
-        if (buf) {         \
-            zis_char8_t *buf_p = (zis_char8_t *)buf;                             \
-            zis_char8_t *const buf_end = buf_p + buf_sz;                         \
-            zis_char8_t *const buf_near_end = buf_end - 4;                       \
-            for (size_t i = 0; i < char_count; i++) {                            \
-                if (zis_likely(buf_p <= buf_near_end)) {                         \
-                    const size_t n = zis_u8char_from_code(data[i], buf_p);       \
-                    assert(n && n <= 4);                                         \
-                    buf_p += n;                                                  \
-                } else {   \
-                    zis_char8_t u8c[4];                                          \
-                    const size_t n = zis_u8char_from_code(data[i], u8c);         \
-                    assert(n && n <= 4);                                         \
-                    if (zis_unlikely(buf_p + n > buf_end))                       \
-                        return (size_t)-1;                                       \
-                    memcpy(buf_p, u8c, n);                                       \
-                    buf_p += n;                                                  \
-                }          \
-            }              \
-            return (size_t)((char *)buf_p - buf);                                \
-        } else {           \
-            size_t n_bytes = 0;                                                  \
-            for (size_t i = 0; i < char_count; i++) {                            \
-                const size_t n = zis_u8char_len_from_code(data[i]);              \
-                assert(n); \
-                n_bytes += n;                                                    \
-            }              \
-            return n_bytes;\
-        }                  \
-    } while (0)            \
-// ^^^ COPY_STR_DATA() ^^^
-
-    case STR_OBJ_C1:
-        COPY_STR_DATA(1);
-    case STR_OBJ_C2:
-        COPY_STR_DATA(2);
-    case STR_OBJ_C4:
-        COPY_STR_DATA(4);
-    default:
-        zis_unreachable();
-
-#undef COPY_STR_DATA
-
-    }
+zis_wchar_t zis_string_obj_get(const struct zis_string_obj *str, size_t index) {
+    const size_t str_len = string_obj_length(str);
+    if (zis_unlikely(index >= str_len))
+        return (zis_wchar_t)-1;
+    const zis_char8_t *const str_data = string_obj_as_u8str(str);
+    if (string_obj_size(str) == str_len)
+        return str_data[index];
+    const zis_char8_t *p = zis_u8str_find_pos(str_data, index);
+    assert(p);
+    zis_wchar_t c;
+    zis_u8char_to_code(&c, p, p + 4);
+    return c;
 }
 
-const char *zis_string_obj_data_utf8(const struct zis_string_obj *self) {
-    if (string_obj_char_type(self) == STR_OBJ_C1)
-        return self->_data;
+struct zis_string_obj *zis_string_obj_slice(
+    struct zis_context *z,
+    struct zis_string_obj *_str, size_t begin_index, size_t length
+) {
+    const size_t str_len = string_obj_length(_str);
+    if (zis_unlikely(begin_index >= str_len || begin_index + length > str_len))
+        return NULL;
+    if (zis_unlikely(!length))
+        return z->globals->val_empty_string;
+    if (zis_unlikely(str_len == length)) {
+        assert(begin_index == 0);
+        return _str;
+    }
+
+    size_t size;
+    if (str_len == string_obj_size(_str)) {
+        size = length; // ASCII
+    } else {
+        const zis_char8_t *s = string_obj_as_u8str(_str);
+        const zis_char8_t *p = zis_u8str_find_pos(s, length);
+        assert(p);
+        size = (size_t)(p - s);
+    }
+
+    zis_locals_decl_1(z, var, const struct zis_string_obj *str);
+    var.str = _str;
+    struct zis_string_obj *const res_str = string_obj_alloc(z, size, length);
+    const zis_char8_t *const s = zis_u8str_find_pos(string_obj_as_u8str(var.str), begin_index);
+    memcpy(string_obj_data(res_str), s, size);
+    zis_locals_drop(z, var);
+    return res_str;
+}
+
+size_t zis_string_obj_find(
+    struct zis_string_obj *str,
+    struct zis_string_obj *sub_str, size_t start /* = 0 */, size_t count /* = SIZE_MAX */
+) {
+    const size_t str_len = string_obj_length(str);
+    if (zis_unlikely(start >= str_len))
+        return (size_t)-1;
+    const zis_char8_t *const str_data = string_obj_as_u8str(str);
+    const zis_char8_t *const str_at_start = start == 0 ? str_data : zis_u8str_find_pos(str_data, start);
+    const size_t str_size = string_obj_size(str);
+    const size_t str_rest_size = str_size - (str_at_start - str_data);
+
+    zis_char8_t *const found_ptr = zis_u8str_find(
+        str_at_start, str_rest_size,
+        string_obj_as_u8str(sub_str), string_obj_size(sub_str)
+    );
+    if (found_ptr == NULL)
+        return (size_t)-1;
+
+    size_t offset = (size_t)(found_ptr - str_at_start);
+    if (str_len != str_size) { // not ASCII
+        offset = zis_u8str_len(str_at_start, offset);
+    }
+    const size_t found_index = start + offset;
+
+    if (count != SIZE_MAX && count < str_len - start) {
+        const size_t n = string_obj_length(sub_str);
+        if (found_index + n > start + count)
+            return (size_t)-1;
+    }
+
+    return found_index;
+}
+
+size_t zis_string_obj_find_c(
+    struct zis_string_obj *str,
+    zis_string_obj_wchar_t c, size_t start, size_t count
+) {
+    dummy_string_obj_for_char dummy_str;
+    dummy_string_obj_for_char_init(&dummy_str, c);
+    return zis_string_obj_find(str, &dummy_str.string_obj, start, count);
+}
+
+size_t zis_string_obj_to_u8str(const struct zis_string_obj *self, char *buf, size_t buf_sz) {
+    const size_t size = string_obj_size(self);
+    if (!buf)
+        return size;
+    if (zis_unlikely(buf_sz < size))
+        return (size_t)-1;
+    memcpy(buf, string_obj_as_u8str(self), size);
+    return size;
+}
+
+const char *zis_string_obj_as_ascii(const struct zis_string_obj *self, size_t *len_ret) {
+    const size_t len = string_obj_length(self);
+    if (len == string_obj_size(self)) {
+        if (len_ret)
+            *len_ret = len;
+        return string_obj_as_ascii(self);
+    }
     return NULL;
 }
 
+struct zis_string_obj *zis_string_obj_join(
+    struct zis_context *z,
+    struct zis_string_obj *separator /*=NULL*/, struct zis_object_vec_view items
+) {
+    if (zis_unlikely(zis_object_vec_view_length(items) == 0))
+        return z->globals->val_empty_string;
+
+    size_t res_size, res_len;
+    if (separator) {
+        const size_t n = zis_object_vec_view_length(items) - 1;
+        res_size = string_obj_size(separator) * n;
+        res_len  = string_obj_length(separator) * n;
+    } else {
+        res_size = 0;
+        res_len  = 0;
+    }
+
+    {
+        struct zis_type_obj *type_String = z->globals->type_String;
+        zis_object_vec_view_foreach_unchanged(items, item, {
+            const size_t old_res_size = res_size;
+            if (zis_object_is_smallint(item)) {
+                zis_smallint_t item_smi = zis_smallint_from_ptr(item);
+                zis_wchar_t c = (zis_wchar_t)(zis_smallint_unsigned_t)item_smi;
+                const size_t c_size = zis_u8char_len_from_code(c);
+                if (zis_unlikely(item_smi < 0 || c_size == 0)) {
+                    string_obj_illegal_codepoint_error(z, c);
+                    return NULL;
+                }
+                res_size += c_size;
+                res_len++;
+            } else if (zis_likely(zis_object_type(item) == type_String)) {
+                struct zis_string_obj *str = zis_object_cast(item, struct zis_string_obj);
+                res_size += string_obj_size(str);
+                res_len  += string_obj_length(str);
+            } else {
+                zis_context_set_reg0(z, zis_object_from(zis_exception_obj_format(
+                    z, "type", item, "item is neither a string nor a character"
+                )));
+                return NULL;
+            }
+            if (zis_unlikely(res_size < old_res_size)) {
+                string_obj_too_long_error(z);
+                return NULL;
+            }
+        });
+    }
+
+    if (zis_unlikely(res_len > STR_OBJ_LENGTH_MAX)) {
+        string_obj_too_long_error(z);
+        return NULL;
+    }
+
+    struct zis_string_obj *res_str;
+    if (separator) {
+        zis_locals_decl_1(z, var, struct zis_string_obj *sep);
+        var.sep = separator;
+        res_str = string_obj_alloc(z, res_size, res_len);
+        separator = var.sep;
+        zis_locals_drop(z, var);
+    } else {
+        res_str = string_obj_alloc(z, res_size, res_len);
+    }
+
+    {
+        bool is_first_item = true;
+        zis_char8_t *p = string_obj_data(res_str);
+        zis_object_vec_view_foreach_unchanged(items, item, {
+            if (is_first_item) {
+                is_first_item = false;
+            } else if (separator) {
+                const size_t n = string_obj_size(separator);
+                memcpy(p, string_obj_as_u8str(separator), n);
+                p += n;
+            }
+            if (zis_object_is_smallint(item)) {
+                zis_smallint_t item_smi = zis_smallint_from_ptr(item);
+                zis_wchar_t c = (zis_wchar_t)(zis_smallint_unsigned_t)item_smi;
+                p += zis_u8char_from_code(c, p);
+            } else {
+                assert(zis_object_type(item) == z->globals->type_String);
+                struct zis_string_obj *str = zis_object_cast(item, struct zis_string_obj);
+                const size_t n = string_obj_size(str);
+                memcpy(p, string_obj_as_u8str(str), n);
+                p += n;
+            }
+        });
+        assert(p == string_obj_as_u8str(res_str) + string_obj_size(res_str));
+    }
+
+    return res_str;
+}
+
 struct zis_string_obj *zis_string_obj_concat(
+    struct zis_context *z,
+    struct zis_object_vec_view items
+) {
+    return zis_string_obj_join(z, NULL, items);
+}
+
+struct zis_string_obj *zis_string_obj_concat2(
     struct zis_context *z,
     struct zis_string_obj *_str1, struct zis_string_obj *_str2
 ) {
     zis_locals_decl(
         z, var,
-        struct zis_string_obj *str1, *str2, *new_str;
+        struct zis_string_obj *str1, *str2;
     );
-    var.str1 = _str1, var.str2 = _str2, var.new_str = _str2;
-
-    const enum string_obj_char_type
-    str1t = string_obj_char_type(var.str1), str2t = string_obj_char_type(var.str2);
-    const size_t str1n = string_obj_length(var.str1), str2n = string_obj_length(var.str2);
-
-    if (str1t == str2t) {
-        struct zis_string_obj *const new_str = string_obj_alloc(z, str1t, str1n + str2n);
-        void *const new_str_data = string_obj_data(new_str);
-        const size_t cn = string_obj_char_size(str1t);
-        const size_t str1_data_size = str1n * cn, str2_data_size = str2n * cn;
-        memcpy(new_str_data, string_obj_data(var.str1), str1_data_size);
-        memcpy((char *)new_str_data + str1_data_size, string_obj_data(var.str2), str2_data_size);
-        var.new_str = new_str;
-    } else {
-        zis_context_panic(z, ZIS_CONTEXT_PANIC_IMPL);
+    var.str1 = _str1, var.str2 = _str2;
+    const size_t str1_size = string_obj_size(var.str1), str2_size = string_obj_size(var.str2);
+    const size_t res_size = str1_size + str2_size;
+    const size_t res_len = string_obj_length(var.str1) + string_obj_length(var.str2);
+    if (zis_unlikely(res_size < str1_size || res_len > STR_OBJ_LENGTH_MAX)) {
+        string_obj_too_long_error(z);
+        return NULL;
     }
-
+    struct zis_string_obj *res = string_obj_alloc(z, res_size, res_len);
+    memcpy(string_obj_data(res), string_obj_as_u8str(var.str1), str1_size);
+    memcpy(string_obj_data(res) + str1_size, string_obj_as_u8str(var.str2), str2_size);
     zis_locals_drop(z, var);
-    return var.new_str;
+    return res;
 }
 
 bool zis_string_obj_equals(struct zis_string_obj *lhs, struct zis_string_obj *rhs) {
-    const enum string_obj_char_type lhs_char_type  = string_obj_char_type(lhs);
-    const size_t lhs_char_count = string_obj_length(lhs);
-    const enum string_obj_char_type rhs_char_type  = string_obj_char_type(rhs);
-    const size_t rhs_char_count = string_obj_length(rhs);
-
-    if (lhs_char_type != rhs_char_type || lhs_char_count != rhs_char_count)
+    if (string_obj_length(lhs) != string_obj_length(rhs))
         return false;
-
-    return memcmp(
-        string_obj_data(lhs), string_obj_data(rhs),
-        lhs_char_count * string_obj_char_size(lhs_char_type)
-    ) == 0;
+    const size_t lhs_size = string_obj_size(lhs);
+    if (lhs_size != string_obj_size(rhs))
+        return false;
+    return memcmp(string_obj_as_u8str(lhs), string_obj_as_u8str(rhs), lhs_size) == 0;
 }
 
 int zis_string_obj_compare(struct zis_string_obj *lhs, struct zis_string_obj *rhs) {
-    const enum string_obj_char_type lhs_char_type = string_obj_char_type(lhs);
-    const size_t lhs_char_count = string_obj_length(lhs);
-    const void *lhs_data_raw = string_obj_data(lhs);
-    const enum string_obj_char_type rhs_char_type = string_obj_char_type(rhs);
-    const size_t rhs_char_count = string_obj_length(rhs);
-    const void *rhs_data_raw = string_obj_data(rhs);
-
-    if (lhs_char_type == rhs_char_type) {
-        switch (lhs_char_type) {
-        case STR_OBJ_C1:
-            return memcmp(lhs_data_raw, rhs_data_raw, lhs_char_count);
-        case STR_OBJ_C2:
-        case STR_OBJ_C4:
-            zis_unused_var(rhs_char_count);
-            break;
-        default:
-            zis_unreachable();
-        }
+    const size_t lhs_size = string_obj_size(lhs), rhs_size = string_obj_size(rhs);
+    if (lhs_size <= rhs_size) {
+        const int x = memcmp(string_obj_as_u8str(lhs), string_obj_as_u8str(rhs), lhs_size);
+        return x != 0 ? x : -1;
+    } else {
+        const int x = memcmp(string_obj_as_u8str(lhs), string_obj_as_u8str(rhs), rhs_size);
+        return x != 0 ? x : 1;
     }
-
-    zis_context_panic(NULL, ZIS_CONTEXT_PANIC_IMPL);
 }
 
 void zis_string_obj_write_to_stream(struct zis_string_obj *self, struct zis_stream_obj *stream) {
-    char *buffer;
-    size_t size;
-    buffer = zis_stream_obj_char_buf_ptr(stream, 0, &size);
-    size = zis_string_obj_value(self, buffer, size);
-    if (size != (size_t)-1) {
-        zis_stream_obj_char_buf_ptr(stream, size, NULL);
+    const char *str_data = (const char *)string_obj_as_u8str(self);
+    const size_t str_size = string_obj_size(self);
+    size_t buffer_size;
+    char *buffer = zis_stream_obj_char_buf_ptr(stream, 0, &buffer_size);
+    if (str_size <= buffer_size) {
+        memcpy(buffer, str_data, str_size);
+        zis_stream_obj_char_buf_ptr(stream, str_size, NULL);
     } else {
-        // TODO: make `zis_string_obj_value()` support copying part of a string,
-        // so that long strings can be copied to stream buffer separately.
-        size = zis_string_obj_value(self, NULL, 0);
-        buffer = zis_mem_alloc(size);
-        size = zis_string_obj_value(self, buffer, size);
-        assert(size != (size_t)-1);
-        zis_stream_obj_write_chars(stream, buffer, size);
-        zis_mem_free(buffer);
+        zis_stream_obj_write_chars(stream, str_data, str_size);
     }
 }
 
@@ -415,37 +546,46 @@ ZIS_NATIVE_FUNC_DEF(T_String_M_operator_add, z, {2, 0, 2}) {
         ));
         return ZIS_THR;
     }
-    struct zis_string_obj *lhs = zis_object_cast(frame[1], struct zis_string_obj);
-    struct zis_string_obj *rhs = zis_object_cast(frame[2], struct zis_string_obj);
-    struct zis_string_obj *result;
-    if (zis_unlikely(!string_obj_length(lhs)))
-        result = rhs;
-    else if (zis_unlikely(!string_obj_length(rhs)))
-        result = lhs;
-    else
-        result = zis_string_obj_concat(z, lhs, rhs);
+    struct zis_string_obj *result =
+        zis_string_obj_join(z, NULL, zis_object_vec_view_from_frame(frame, 1, 2));
     frame[0] = zis_object_from(result);
     return ZIS_OK;
 }
 
 ZIS_NATIVE_FUNC_DEF(T_String_M_operator_get_elem, z, {2, 0, 2}) {
-    /*#DOCSTR# func String:\'[]'(position :: Int) :: Int
+    /*#DOCSTR# func String:\'[]'(position :: Int | Range) :: Int
     Gets the character at `position`. */
     assert_arg1_String(z);
     struct zis_context_globals *g = z->globals;
     struct zis_object **frame = z->callstack->frame;
     struct zis_string_obj *self = zis_object_cast(frame[1], struct zis_string_obj);
+    struct zis_object *position_obj = frame[2];
 
-    size_t index;
-    if (zis_object_is_smallint(frame[2])) {
-        index = zis_object_index_convert(string_obj_length(self), zis_smallint_from_ptr(frame[2]));
+    if (zis_object_is_smallint(position_obj)) {
+        size_t index = zis_object_index_convert(string_obj_length(self), zis_smallint_from_ptr(position_obj));
         if (index == (size_t)-1)
             goto index_out_of_range;
-
-    } else if (zis_object_type_is(frame[2], g->type_Int)) {
+        const zis_wchar_t c = zis_string_obj_get(self, index);
+        if (c == (zis_wchar_t)-1)
+            goto index_out_of_range;
+        frame[0] = zis_smallint_to_ptr((zis_smallint_t)c);
+    return ZIS_OK;
+    } else if (zis_object_type_is(position_obj, g->type_Range)) {
+        struct zis_object_index_range_convert_args ca = {
+            .range = zis_object_cast(position_obj, struct zis_range_obj),
+            .length = string_obj_length(self),
+        };
+        if (!zis_object_index_range_convert(&ca))
+            goto index_out_of_range;
+        struct zis_string_obj *res = zis_string_obj_slice(z, self, ca.offset, ca.count);
+        if (!res)
+            goto index_out_of_range;
+        frame[0] = zis_object_from(res);
+        return ZIS_OK;
+    } else if (zis_object_type_is(position_obj, g->type_Int)) {
     index_out_of_range:
         frame[0] = zis_object_from(zis_exception_obj_format_common(
-            z, ZIS_EXC_FMT_INDEX_OUT_OF_RANGE, frame[2]
+            z, ZIS_EXC_FMT_INDEX_OUT_OF_RANGE, position_obj
         ));
         return ZIS_THR;
     } else {
@@ -454,25 +594,6 @@ ZIS_NATIVE_FUNC_DEF(T_String_M_operator_get_elem, z, {2, 0, 2}) {
         ));
         return ZIS_THR;
     }
-
-    zis_wchar_t ch;
-    void *raw_data = string_obj_data(self);
-    switch (string_obj_char_type(self)) {
-    case STR_OBJ_C1:
-        ch = ((const uint8_t *)raw_data)[index];
-        break;
-    case STR_OBJ_C2:
-        ch = ((const uint16_t *)raw_data)[index];
-        break;
-    case STR_OBJ_C4:
-        ch = ((const uint32_t *)raw_data)[index];
-        break;
-    default:
-        zis_unreachable();
-    }
-
-    frame[0] = zis_smallint_to_ptr((zis_smallint_t)ch);
-    return ZIS_OK;
 }
 
 ZIS_NATIVE_FUNC_DEF(T_String_M_operator_equ, z, {2, 0, 2}) {
@@ -517,16 +638,84 @@ ZIS_NATIVE_FUNC_DEF(T_String_M_operator_cmp, z, {2, 0, 2}) {
     return ZIS_OK;
 }
 
+ZIS_NATIVE_FUNC_DEF(T_String_M_length, z, {1, 0, 1}) {
+    /*#DOCSTR# func String:length() :: Int
+    Returns the number of characters in the string. */
+    assert_arg1_String(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_string_obj *self = zis_object_cast(frame[1], struct zis_string_obj);
+    const size_t len = string_obj_length(self);
+    assert(len <= ZIS_SMALLINT_MAX);
+    frame[0] = zis_smallint_to_ptr((zis_smallint_t)len);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_String_M_find, z, {2, 2, 4}) {
+    /*#DOCSTR# func String:find(value :: Int | String, ?start :: Int, ?count :: String) :: Int | Nil
+    Searchs for a sub-string or a character in the string and retruns the index
+    of the first occurrence. If not found returns nil. */
+    assert_arg1_String(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_string_obj *self = zis_object_cast(frame[1], struct zis_string_obj);
+    struct zis_object *arg_value = frame[2], *arg_start = frame[3], *arg_count = frame[4];
+
+    size_t start, count;
+    if (arg_start == zis_object_from(z->globals->val_nil)) {
+        start = 0;
+    } else if (zis_object_is_smallint(arg_start)) {
+        zis_smallint_t x = zis_smallint_from_ptr(arg_start);
+        start = zis_object_index_convert(string_obj_length(self), x);
+        if (zis_unlikely(start == (size_t)-1))
+            goto not_found;
+    } else {
+        goto not_found;
+    }
+    if (arg_count == zis_object_from(z->globals->val_nil)) {
+        count = SIZE_MAX;
+    } else if (zis_object_is_smallint(arg_count)) {
+        zis_smallint_t x = zis_smallint_from_ptr(arg_count);
+        if (zis_unlikely(x < 0))
+            goto not_found;
+        count = (zis_smallint_unsigned_t)x;
+    } else if (zis_object_type_is(arg_count, z->globals->type_Int)) {
+        struct zis_int_obj *i = zis_object_cast(arg_count, struct zis_int_obj);
+        if (zis_int_obj_sign(i)) // negative
+            goto not_found;
+        count = SIZE_MAX;
+    } else {
+        goto not_found;
+    }
+
+    size_t index;
+    if (zis_object_is_smallint(arg_value)) {
+        zis_smallint_t x = zis_smallint_from_ptr(arg_value);
+        if (zis_unlikely(x < 0 || x > 0x10ffff))
+            goto not_found;
+        zis_wchar_t c = (zis_wchar_t)(zis_smallint_unsigned_t)x;
+        index = zis_string_obj_find_c(self, c, start, count);
+    } else if (zis_object_type_is(arg_value, z->globals->type_String)) {
+        struct zis_string_obj *s = zis_object_cast(arg_value, struct zis_string_obj);
+        index = zis_string_obj_find(self, s, start, count);
+    } else {
+    not_found:
+        frame[0] = zis_object_from(z->globals->val_nil);
+        return ZIS_OK;
+    }
+    if (zis_unlikely(index == (size_t)-1))
+        goto not_found;
+
+    assert(index < ZIS_SMALLINT_MAX);
+    frame[0] = zis_smallint_to_ptr((zis_smallint_t)(zis_smallint_unsigned_t)index + 1);
+    return ZIS_OK;
+}
+
 ZIS_NATIVE_FUNC_DEF(T_String_M_hash, z, {1, 0, 1}) {
     /*#DOCSTR# func String:hash() :: Int
     Generates hash code. */
     assert_arg1_String(z);
     struct zis_object **frame = z->callstack->frame;
     struct zis_string_obj *self = zis_object_cast(frame[1], struct zis_string_obj);
-    const enum string_obj_char_type char_type  = string_obj_char_type(self);
-    const size_t char_count = string_obj_length(self);
-    const void *const str_data = string_obj_data(self);
-    const size_t h = zis_hash_bytes(str_data, char_type * char_count);
+    const size_t h = zis_hash_bytes(string_obj_as_u8str(self), string_obj_size(self));
     frame[0] = zis_smallint_to_ptr((zis_smallint_t)h);
     return ZIS_OK;
 }
@@ -541,18 +730,238 @@ ZIS_NATIVE_FUNC_DEF(T_String_M_to_string, z, {1, 1, 2}) {
     return ZIS_OK;
 }
 
+ZIS_NATIVE_FUNC_DEF(T_String_F_join, z, {1, -1, 2}) {
+    /*#DOCSTR# func String.join(separator :: String, *items :: String|Int) :: String
+    Concatenates strings and characters, using the specified separator between them. */
+    /*#DOCSTR# func String.join(separator :: String, items :: Tuple[String|Int]) :: String
+    Concatenates an array of strings and characters, using the specified separator between them. */
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_string_obj *separator;
+    if (zis_object_type_is(frame[1], g->type_String)) {
+        separator = zis_object_cast(frame[1], struct zis_string_obj);
+    } else {
+        frame[0] = zis_object_from(zis_exception_obj_format_common(
+            z, ZIS_EXC_FMT_WRONG_ARGUMENT_TYPE, "separator", frame[1]
+        ));
+        return ZIS_THR;
+    }
+    struct zis_object_vec_view items;
+    {
+        assert(zis_object_type_is(frame[2], g->type_Tuple));
+        struct zis_tuple_obj *items_tuple = zis_object_cast(frame[2], struct zis_tuple_obj);
+        size_t item_count = zis_tuple_obj_length(items_tuple);
+        if (item_count == 1 && zis_object_type_is(zis_tuple_obj_get(items_tuple, 0), g->type_Array)) {
+            struct zis_array_slots_obj *item_slots =
+                zis_object_cast(zis_tuple_obj_get(items_tuple, 0), struct zis_array_obj)->_data;
+            item_count = zis_array_slots_obj_length(item_slots);
+            frame[2] = zis_object_from(item_slots);
+            items = zis_object_vec_view_from_fields(frame[2], struct zis_array_slots_obj, _data, 0, item_count);
+        } else {
+            items = zis_object_vec_view_from_fields(frame[2], struct zis_tuple_obj, _data, 0, item_count);
+        }
+    }
+    struct zis_string_obj *new_str = zis_string_obj_join(z, separator, items);
+    frame[0] = zis_object_from(new_str);
+    return ZIS_OK;
+}
+
+ZIS_NATIVE_FUNC_DEF(T_String_F_concat, z, {0, -1, 1}) {
+    /*#DOCSTR# func String.concat(*items :: String|Int) :: String
+    Concatenates strings and characters. */
+    /*#DOCSTR# func String.concat(items :: Tuple[String|Int]) :: String
+    Concatenates an array of strings and characters. */
+    struct zis_context_globals *g = z->globals;
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_object_vec_view items;
+    {
+        assert(zis_object_type_is(frame[1], g->type_Tuple));
+        struct zis_tuple_obj *items_tuple = zis_object_cast(frame[1], struct zis_tuple_obj);
+        size_t item_count = zis_tuple_obj_length(items_tuple);
+        if (item_count == 1 && zis_object_type_is(zis_tuple_obj_get(items_tuple, 0), g->type_Array)) {
+            struct zis_array_slots_obj *item_slots =
+                zis_object_cast(zis_tuple_obj_get(items_tuple, 0), struct zis_array_obj)->_data;
+            item_count = zis_array_slots_obj_length(item_slots);
+            frame[1] = zis_object_from(item_slots);
+            items = zis_object_vec_view_from_fields(frame[1], struct zis_array_slots_obj, _data, 0, item_count);
+        } else {
+            items = zis_object_vec_view_from_fields(frame[1], struct zis_tuple_obj, _data, 0, item_count);
+        }
+    }
+    struct zis_string_obj *new_str = zis_string_obj_join(z, NULL, items);
+    frame[0] = zis_object_from(new_str);
+    return ZIS_OK;
+}
+
 ZIS_NATIVE_FUNC_DEF_LIST(
     T_String_D_methods,
     { "+"           , &T_String_M_operator_add      },
     { "[]"          , &T_String_M_operator_get_elem },
     { "=="          , &T_String_M_operator_equ      },
     { "<=>"         , &T_String_M_operator_cmp      },
+    { "length"      , &T_String_M_length            },
+    { "find"        , &T_String_M_find              },
     { "hash"        , &T_String_M_hash              },
     { "to_string"   , &T_String_M_to_string         },
+);
+
+ZIS_NATIVE_VAR_DEF_LIST(
+    T_String_D_statics,
+    { "join"       , { '^', .F = &T_String_F_join   } },
+    { "concat"     , { '^', .F = &T_String_F_concat } },
 );
 
 ZIS_NATIVE_TYPE_DEF_XB(
     String,
     struct zis_string_obj, _bytes_size,
-    NULL, T_String_D_methods, NULL
+    NULL, T_String_D_methods, T_String_D_statics
+);
+
+/* ----- string builder ----------------------------------------------------- */
+
+struct zis_string_builder_obj {
+    ZIS_OBJECT_HEAD
+    // --- SLOTS ---
+    struct zis_object *appended_item_count;
+    struct zis_array_slots_obj *appended_items;
+    struct zis_array_obj *concatted_strings;
+};
+
+#define STRING_BUILDER_BUFFER_SIZE 64
+
+struct zis_string_builder_obj *zis_string_builder_obj_new(struct zis_context *z) {
+    zis_locals_decl(
+        z, var,
+        struct zis_array_slots_obj *appended_items;
+        struct zis_array_obj *concatted_strings;
+    );
+    zis_locals_zero(var);
+    var.appended_items = zis_array_slots_obj_new(z, NULL, STRING_BUILDER_BUFFER_SIZE);
+    var.concatted_strings = zis_array_obj_new2(z, 2, NULL, 0);
+    struct zis_object *const _obj = zis_objmem_alloc(z, z->globals->type_String_Builder);
+    struct zis_string_builder_obj *sb = zis_object_cast(_obj, struct zis_string_builder_obj);
+    sb->appended_item_count = zis_smallint_to_ptr(0);
+    sb->appended_items = var.appended_items;
+    sb->concatted_strings = var.concatted_strings;
+    zis_locals_drop(z, var);
+    return sb;
+}
+
+static void _string_builder_obj_append(
+    struct zis_context *z,
+    struct zis_string_builder_obj *sb, struct zis_object *item
+) {
+    assert(zis_object_is_smallint(item) || zis_object_type_is(item, z->globals->type_String));
+    assert(zis_object_is_smallint(sb->appended_item_count));
+    assert(zis_smallint_from_ptr(sb->appended_item_count) >= 0);
+    size_t appended_item_count = (zis_smallint_unsigned_t)zis_smallint_from_ptr(sb->appended_item_count);
+    assert(appended_item_count <= zis_array_slots_obj_length(sb->appended_items));
+    if (appended_item_count == zis_array_slots_obj_length(sb->appended_items)) {
+        zis_locals_decl(
+            z, var,
+            struct zis_string_builder_obj *sb;
+            struct zis_object *item;
+            struct zis_array_slots_obj *appended_items;
+        );
+        var.sb = sb, var.item = item, var.appended_items = sb->appended_items;
+        struct zis_string_obj *cs = zis_string_obj_join(
+            z, NULL, zis_object_vec_view_from_fields(
+                var.appended_items, struct zis_array_slots_obj, _data,
+                0, appended_item_count
+            )
+        );
+        assert(cs);
+        zis_array_obj_append(z, var.sb->concatted_strings, zis_object_from(cs));
+        sb = var.sb, item = var.item;
+        assert(sb->appended_items == var.appended_items);
+        zis_locals_drop(z, var);
+        appended_item_count = 0;
+        zis_object_vec_zero(sb->appended_items->_data, zis_array_slots_obj_length(sb->appended_items));
+    }
+    zis_array_slots_obj_set(sb->appended_items, appended_item_count++, item);
+    sb->appended_item_count = zis_smallint_to_ptr((zis_smallint_t)(zis_smallint_unsigned_t)appended_item_count);
+}
+
+void zis_string_builder_obj_append(
+    struct zis_context *z,
+    struct zis_string_builder_obj *sb, struct zis_string_obj *s
+) {
+    if (string_obj_length(s)) {
+        _string_builder_obj_append(z, sb, zis_object_from(s));
+    }
+}
+
+bool zis_string_builder_obj_append_char(
+    struct zis_context *z,
+    struct zis_string_builder_obj *sb, zis_string_obj_wchar_t c
+) {
+    if (c > 0x10ffff)
+        return false;
+    _string_builder_obj_append(z, sb, zis_smallint_to_ptr((zis_smallint_t)(zis_smallint_unsigned_t)c));
+    return true;
+}
+
+struct zis_string_obj *zis_string_builder_obj_string(
+    struct zis_context *z, struct zis_string_builder_obj *_sb
+) {
+    zis_locals_decl(
+        z, var,
+        struct zis_string_builder_obj *sb;
+        struct zis_array_slots_obj *items;
+    );
+    var.sb = _sb, var.items = z->globals->val_empty_array_slots;
+
+    assert(zis_object_is_smallint(var.sb->appended_item_count));
+    assert(zis_smallint_from_ptr(var.sb->appended_item_count) >= 0);
+    if (zis_smallint_from_ptr(var.sb->appended_item_count)) {
+        size_t item_count =
+            (zis_smallint_unsigned_t)zis_smallint_from_ptr(var.sb->appended_item_count);
+        var.items = var.sb->appended_items;
+        struct zis_string_obj *cs = zis_string_obj_join(
+            z, NULL, zis_object_vec_view_from_fields(
+                var.items, struct zis_array_slots_obj, _data,
+                0, item_count
+            )
+        );
+        assert(cs);
+        zis_array_obj_append(z, var.sb->concatted_strings, zis_object_from(cs));
+        var.sb->appended_item_count = zis_smallint_to_ptr(0);
+        zis_object_vec_zero(var.sb->appended_items->_data, item_count);
+    }
+
+    size_t concatted_strings_n = zis_array_obj_length(var.sb->concatted_strings);
+    struct zis_string_obj *result;
+    if (concatted_strings_n == 1) {
+        struct zis_object *x = zis_array_obj_get(var.sb->concatted_strings, 0);
+        assert(zis_object_type_is(x, z->globals->type_String));
+        result = zis_object_cast(x, struct zis_string_obj);
+    } else if (concatted_strings_n > 1) {
+        var.items = var.sb->concatted_strings->_data;
+        result = zis_string_obj_join(
+            z, NULL, zis_object_vec_view_from_fields(
+                var.items, struct zis_array_slots_obj, _data,
+                0, concatted_strings_n
+            )
+        );
+        assert(result);
+        zis_array_obj_clear(var.sb->concatted_strings);
+        zis_array_obj_append(z, var.sb->concatted_strings, zis_object_from(result));
+    } else {
+        result = z->globals->val_empty_string;
+    }
+
+    zis_locals_drop(z, var);
+    return result;
+}
+
+void zis_string_builder_obj_clear(struct zis_string_builder_obj *sb) {
+    sb->appended_item_count = zis_smallint_to_ptr(0);
+    zis_object_vec_zero(sb->appended_items->_data, zis_array_slots_obj_length(sb->appended_items));
+    zis_array_obj_clear(sb->concatted_strings);
+}
+
+ZIS_NATIVE_TYPE_DEF_NB(
+    String_Builder,
+    struct zis_string_builder_obj,
+    NULL, NULL, NULL
 );

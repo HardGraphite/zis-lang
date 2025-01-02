@@ -13,7 +13,7 @@
 #include <time.h>
 
 void zis_debug_time(struct timespec *tp) {
-#if ZIS_SYSTEM_POSIX
+#if ZIS_SYSTEM_POSIX || (defined(__MINGW32__) && !defined(_UCRT))
     clock_gettime(CLOCK_MONOTONIC, tp);
 #else
     timespec_get(tp, TIME_UTC);
@@ -104,7 +104,10 @@ static void logging_init(void) {
         logging_parse_config(config_string);
 #endif // ZIS_ENVIRON_NAME_DEBUG_LOG
 
+    atexit(logging_fini);
+#if !(defined(__MINGW32__) && !defined(_UCRT))
     at_quick_exit(logging_fini);
+#endif // !(MinGW && !UCRT)
 
     char time_str[24];
     const time_t time_num = time(NULL);
@@ -174,7 +177,7 @@ FILE *zis_debug_log_stream(enum zis_debug_log_level level, const char *group) {
 
 #include "attributes.h"
 
-#if ZIS_SYSTEM_WINDOWS
+#if ZIS_SYSTEM_WINDOWS && !defined(__MINGW32__)
 
 #include <wchar.h>
 #include <Windows.h>

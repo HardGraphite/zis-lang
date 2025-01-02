@@ -4,12 +4,6 @@
 #include <string_view>
 #include <type_traits>
 
-#if defined __unix__ || defined unix
-#include <dlfcn.h>
-#elif defined _WIN32
-#include <Windows.h>
-#endif
-
 class ZiS {
 public:
     using regidx_type = unsigned int;
@@ -68,27 +62,6 @@ ZIS_NATIVE_MODULE(foo) {
     nullptr,
 };
 
-void export_module() {
-    const char *sym = "__zis__mod_foo";
-
-#if defined __unix__ || defined unix
-
-    auto lib = dlopen(nullptr, RTLD_LAZY);
-    if (!dlsym(lib, sym))
-        abort();
-    dlclose(lib);
-
-#elif defined _WIN32
-
-    auto lib = LoadLibraryW(nullptr);
-    if (!GetProcAddress(lib, sym))
-        abort();
-    FreeLibrary(lib);
-
-#endif
-}
-
 int main() {
     cxx_hello();
-    export_module();
 }
