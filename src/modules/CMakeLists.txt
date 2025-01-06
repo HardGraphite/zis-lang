@@ -76,7 +76,7 @@ function(zis_add_module_target mod_name conf_strings sources)
                 target_link_libraries(${zis_core_tgt} ${scope} ${mod_link_libs})
             endif()
             if(${mod_conf_force-embedded})
-                target_include_directories(${zis_core_tgt} PRIVATE ${CMAKE_SOURCE_DIR})
+                target_include_directories(${zis_core_tgt} PRIVATE "${CMAKE_SOURCE_DIR}/src")
             endif()
         else() # shared
             set(mod_tgt "zis_mod_${mod_name}")

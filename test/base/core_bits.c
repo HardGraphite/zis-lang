@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <string.h>
 
-#include "../core/bits.h"
+#include "core/bits.h"
 
 zis_test0_define(bits_count_tz_u32) {
     for (unsigned int i = 1; i < 32; i++) {

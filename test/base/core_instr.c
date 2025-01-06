@@ -2,7 +2,7 @@
 
 #include <assert.h> // static_assert()
 
-#include "../core/instr.h"
+#include "core/instr.h"
 
 zis_test0_define(check_num_min_and_max) {
     static_assert(ZIS_INSTR_U16_MAX == UINT16_MAX, "");

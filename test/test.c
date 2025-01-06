@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../core/platform.h"
+#include "../src/core/platform.h"
 
 #if ZIS_SYSTEM_POSIX
 #    include <signal.h>
