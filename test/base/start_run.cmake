@@ -7,7 +7,7 @@ if(ZIS_MOD_HELLO)
     if(NOT ZIS_MOD_HELLO_EMBED)
         add_test(
             NAME base-start_run_f
-            COMMAND "$<TARGET_FILE:${zis_start_tgt}>" "$<TARGET_FILE:zis_mod_hello>" ${hello_tests_args}
+            COMMAND "$<TARGET_FILE:zis_start_tgt>" "$<TARGET_FILE:zis_mod_hello>" ${hello_tests_args}
         )
         set_tests_properties(
             base-start_run_f PROPERTIES
@@ -18,7 +18,7 @@ if(ZIS_MOD_HELLO)
     # Run a module by its name.
     add_test(
         NAME base-start_run_m
-        COMMAND "$<TARGET_FILE:${zis_start_tgt}>" "@hello" ${hello_tests_args}
+        COMMAND "$<TARGET_FILE:zis_start_tgt>" "@hello" ${hello_tests_args}
     )
     if(NOT ZIS_MOD_HELLO_EMBED)
         set_tests_properties(

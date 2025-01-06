@@ -7,7 +7,7 @@ add_library(zis_test_util STATIC "test.c")
 # For platforms where RPATH is not supported, add the directory of the shared
 # core library to the test's PATH environment variable.
 if(WIN32 AND ZIS_BUILD_CORE AND ZIS_BUILD_SHARED)
-    set(_zis_test_path_modification "PATH=path_list_append:$<TARGET_FILE_DIR:${zis_core_tgt}>")
+    set(_zis_test_path_modification "PATH=path_list_append:$<TARGET_FILE_DIR:zis_core_tgt>")
     function(_zis_test_path_setup test)
         set_tests_properties(
             ${test} PROPERTIES
@@ -44,7 +44,7 @@ function(zis_test_add_c filename)
         _zis_test_path_setup(${test_name})
     endif()
     if(${arg_LINK_CORE})
-        target_link_libraries(${target_name} PRIVATE ${zis_core_tgt})
+        target_link_libraries(${target_name} PRIVATE zis_core_tgt)
     endif()
     if(${arg_ENABLE_EXPORTS})
         set_target_properties(${target_name} PROPERTIES ENABLE_EXPORTS TRUE)
@@ -75,7 +75,7 @@ function(zis_test_add_c_bundle bundle_name)
         target_link_libraries(${bundle_tgt_name} PRIVATE ${arg_LINK})
     endif()
     if(${arg_LINK_CORE})
-        target_link_libraries(${bundle_tgt_name} PRIVATE ${zis_core_tgt})
+        target_link_libraries(${bundle_tgt_name} PRIVATE zis_core_tgt)
     endif()
     foreach(filename IN LISTS arg_FILES)
         get_filename_component(filename_stem ${filename} NAME_WE)
@@ -91,13 +91,13 @@ function(zis_test_add_script filename)
     set(filename "${CMAKE_CURRENT_SOURCE_DIR}/${filename}")
     add_test(
         NAME ${test_name}
-        COMMAND "$<TARGET_FILE:${zis_start_tgt}>" "@testing" "${filename}"
+        COMMAND "$<TARGET_FILE:zis_start_tgt>" "@testing" "${filename}"
     )
     _zis_test_path_setup(${test_name})
     set_tests_properties(
         ${test_name} PROPERTIES
         ENVIRONMENT "ZIS_PATH=$<TARGET_FILE_DIR:zis_mod_testing>"
-        DEPENDS ${zis_start_tgt}
+        DEPENDS zis_start_tgt
     )
 endfunction()
 

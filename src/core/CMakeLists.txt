@@ -136,40 +136,37 @@ aux_source_directory(. zis_core_src)
 ################################
 
 if(ZIS_BUILD_SHARED)
-    add_library(zis_core_shared SHARED ${zis_core_src})
+    add_library(zis_core_tgt SHARED ${zis_core_src})
     target_compile_definitions(
-        zis_core_shared
+        zis_core_tgt
         PRIVATE "ZIS_EXPORT_API=1"
         INTERFACE "ZIS_IMPORT_API=1"
     )
     if(ZIS_MALLOC_LINK)
-        target_link_libraries(zis_core_shared PRIVATE ${ZIS_MALLOC_LINK})
+        target_link_libraries(zis_core_tgt PRIVATE ${ZIS_MALLOC_LINK})
     endif()
-    set(zis_core_tgt zis_core_shared)
 else()
-    add_library(zis_core_static STATIC ${zis_core_src})
+    add_library(zis_core_tgt STATIC ${zis_core_src})
     target_compile_definitions(
-        zis_core_static
+        zis_core_tgt
         PRIVATE "ZIS_EXPORT_API=1"
         INTERFACE "ZIS_EXPORT_API=1"
     )
     if(ZIS_MALLOC_LINK)
-        target_link_libraries(zis_core_static INTERFACE ${ZIS_MALLOC_LINK})
+        target_link_libraries(zis_core_tgt INTERFACE ${ZIS_MALLOC_LINK})
     endif()
-    set(zis_core_tgt zis_core_static)
 endif()
-set(zis_core_tgt ${zis_core_tgt} PARENT_SCOPE)
 # Extra dependencies.
-target_sources(${zis_core_tgt} PRIVATE "astdef.h" "oplist.h")
+target_sources(zis_core_tgt PRIVATE "astdef.h" "oplist.h")
 # Output name and prefix.
-set_target_properties(${zis_core_tgt} PROPERTIES OUTPUT_NAME "${ZIS_OUTPUT_NAME}")
-get_target_property(prefix ${zis_core_tgt} PREFIX)
+set_target_properties(zis_core_tgt PROPERTIES OUTPUT_NAME "${ZIS_OUTPUT_NAME}")
+get_target_property(prefix zis_core_tgt PREFIX)
 if(NOT prefix)
-    set_target_properties(${zis_core_tgt} PROPERTIES PREFIX "lib")
+    set_target_properties(zis_core_tgt PROPERTIES PREFIX "lib")
 endif()
 # Include directory.
 target_include_directories(
-    ${zis_core_tgt}
+    zis_core_tgt
     PUBLIC "${CMAKE_SOURCE_DIR}/include"
     PRIVATE "${zis_core_conf_header_dir}"
 )
@@ -180,14 +177,13 @@ if(UNIX)
     else()
         set(scope INTERFACE)
     endif()
-    target_link_libraries(${zis_core_tgt} ${scope} "m" "dl")
+    target_link_libraries(zis_core_tgt ${scope} "m" "dl")
     unset(scope)
 endif()
-
 if (WIN32 AND ZIS_BUILD_SHARED)
     include(ZisWinUtil)
     zis_win_target_add_rc(
-        ${zis_core_tgt}
+        zis_core_tgt
         "${ZIS_DISPLAY_NAME} programming language runtime core"
         "${ZIS_DISPLAY_NAME}LangCore"
         OFF
@@ -201,7 +197,7 @@ endif()
 include(ZisInstallDirs)
 
 ### Install rules.
-install(TARGETS ${zis_core_tgt} DESTINATION ${zis_install_lib_dir})
+install(TARGETS zis_core_tgt DESTINATION ${zis_install_lib_dir})
 if(ZIS_PACK_HEADER)
     file(GLOB zis_install_headers "${CMAKE_SOURCE_DIR}/include/*.h")
     install(FILES ${zis_install_headers} DESTINATION ${zis_install_inc_dir})
