@@ -1,6 +1,6 @@
 #include "test.h"
 
-#include "../core/strutil.c"
+#include "core/strutil.c"
 
 zis_test0_define(str_icmp) {
     zis_test_assert_eq(zis_str_icmp("abc", "abc"), 0);
@@ -95,7 +95,7 @@ zis_test0_define(u8str_find) {
 }
 
 zis_test0_list(
-    main,
+    core_strutil,
     zis_test0_case(str_icmp),
     zis_test0_case(u8char_from_code),
     zis_test0_case(u8char_to_code),

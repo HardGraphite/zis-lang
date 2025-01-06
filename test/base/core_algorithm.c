@@ -2,7 +2,7 @@
 
 #include <math.h>
 
-#include "../core/algorithm.c"
+#include "core/algorithm.c"
 
 zis_test0_define(pow_u32) {
     const uint32_t POW_OVERFLOW = 0;

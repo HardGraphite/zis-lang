@@ -5,7 +5,7 @@
 #include <stddef.h>
 
 #include "../include/zis.h"
-#include "../core/attributes.h"
+#include "../src/core/attributes.h"
 
 /* ----- test-case definitions ---------------------------------------------- */
 

@@ -20,9 +20,6 @@ check_support(
 
 option(ZIS_BUILD_IPO     "Enable inter-procedural optimization."           ${_ZIS_SUPPORT_INTERPROCEDURAL_OPTIMIZATION})
 option(ZIS_BUILD_SHARED  "Build and link shared library (static otherwise)" OFF)
-option(ZIS_BUILD_CORE    "Build `core', the ZIS library"                     ON)
-option(ZIS_BUILD_START   "Build `start', an executable entry"                ON)
-option(ZIS_BUILD_MODULES "Build `modules', the modules"                      ON)
 option(ZIS_BUILD_COVERAGE "Enable coverage testing support"                 OFF)
 option(ZIS_BUILD_PROFILING "Enable profiling support"                       OFF)
 option(ZIS_DEBUG         "Enable debugging"                                 OFF)
@@ -98,17 +95,7 @@ else() # GCC, Clang, ...
     endif()
 endif()
 
-if(ZIS_BUILD_CORE)
-    add_subdirectory("core")
-endif()
-
-if(ZIS_BUILD_START)
-    add_subdirectory("start")
-endif()
-
-if(ZIS_BUILD_MODULES)
-    add_subdirectory("modules")
-endif()
+add_subdirectory("src")
 
 if(ZIS_TEST)
     enable_testing()

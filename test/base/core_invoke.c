@@ -3,7 +3,7 @@
 #include <assert.h>
 #include <string.h>
 
-#include "../core/attributes.h" // zis_nodiscard
+#include "core/attributes.h" // zis_nodiscard
 
 #define REG_MAX 10
 

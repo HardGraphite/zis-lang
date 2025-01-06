@@ -49,9 +49,7 @@ The project files are organized as follows:
 |-----------|---------------------------------------------------|
 | `cmake`   | CMake scripts                                     |
 | `include` | header files for the core runtime                 |
-| `core`    | source for the core runtime [...](core/README.md) |
-| `start`   | source for the executable entry                   |
-| `modules` | source for the modules [...](modules/README.md)   |
+| `src`     | source code [...](src/README.md)                  |
 | `test`    | test code                                         |
 | `tools`   | programs that help develop [...](tools/README.md) |
 | `doc`     | documentations                                    |

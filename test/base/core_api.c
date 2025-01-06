@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../core/smallint.h" // ZIS_SMALLINT_MIN, ZIS_SMALLINT_MAX
+#include "core/smallint.h" // ZIS_SMALLINT_MIN, ZIS_SMALLINT_MAX
 
 #define REG_MAX 100
 
