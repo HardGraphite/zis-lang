@@ -65,18 +65,18 @@ function(zis_add_module_target mod_name conf_strings sources)
             else()
                 set(zis_embedded_modules ${mod_name} PARENT_SCOPE)
             endif()
-            message(VERBOSE "Add module `${mod_name}' sources to target ${zis_core_tgt}")
-            target_sources(${zis_core_tgt} PRIVATE ${sources})
+            message(VERBOSE "Add module `${mod_name}' sources to target zis_core_tgt")
+            target_sources(zis_core_tgt PRIVATE ${sources})
             if(mod_link_libs)
                 if(ZIS_BUILD_SHARED)
                     set(scope PRIVATE)
                 else()
                     set(scope INTERFACE)
                 endif()
-                target_link_libraries(${zis_core_tgt} ${scope} ${mod_link_libs})
+                target_link_libraries(zis_core_tgt ${scope} ${mod_link_libs})
             endif()
             if(${mod_conf_force-embedded})
-                target_include_directories(${zis_core_tgt} PRIVATE ${CMAKE_SOURCE_DIR})
+                target_include_directories(zis_core_tgt PRIVATE "${CMAKE_SOURCE_DIR}/src")
             endif()
         else() # shared
             set(mod_tgt "zis_mod_${mod_name}")
@@ -90,13 +90,13 @@ function(zis_add_module_target mod_name conf_strings sources)
             target_include_directories(${mod_tgt} PRIVATE "${CMAKE_SOURCE_DIR}/include")
             if(WIN32)
                 if(ZIS_BUILD_SHARED)
-                    target_link_libraries(${mod_tgt} PRIVATE ${zis_core_tgt})
+                    target_link_libraries(${mod_tgt} PRIVATE zis_core_tgt)
                 else()
-                    target_link_libraries(${mod_tgt} PRIVATE ${zis_start_tgt})
+                    target_link_libraries(${mod_tgt} PRIVATE zis_start_tgt)
                 endif()
             elseif(ANDROID)
                 if(ZIS_BUILD_SHARED)
-                    target_link_libraries(${mod_tgt} PRIVATE ${zis_core_tgt})
+                    target_link_libraries(${mod_tgt} PRIVATE zis_core_tgt)
                 endif()
             endif()
             target_link_libraries(${mod_tgt} PRIVATE ${mod_link_libs})
@@ -131,8 +131,9 @@ unset(all_files)
 ##### Generate module list #####
 ################################
 
-set(zis_modules_header_dir "${CMAKE_CURRENT_BINARY_DIR}")
-set(zis_modules_header_dir ${zis_modules_header_dir} PARENT_SCOPE)
+if(NOT IS_DIRECTORY ${zis_src_generated_code_dir})
+    message(FATAL_ERROR "${zis_src_generated_code_dir} is not a directory")
+endif()
 
 if(zis_embedded_modules)
     list(SORT zis_embedded_modules COMPARE STRING)
@@ -145,7 +146,7 @@ else()
     set(ZIS_EMBEDDED_MODULE_LIST_EMPTY TRUE)
     set(ZIS_EMBEDDED_MODULE_LIST "// (empty)")
 endif()
-file(CONFIGURE OUTPUT "${zis_modules_header_dir}/zis_modules.h" @ONLY CONTENT [==[
+file(CONFIGURE OUTPUT "${zis_src_generated_code_dir}/zis_modules.h" @ONLY CONTENT [==[
 #pragma once
 
 #define ZIS_EMBEDDED_MODULE_LIST \
@@ -158,7 +159,7 @@ unset(ZIS_EMBEDDED_MODULE_LIST)
 unset(ZIS_EMBEDDED_MODULE_LIST_SORTED)
 unset(ZIS_EMBEDDED_MODULE_LIST_EMPTY)
 
-target_include_directories(${zis_core_tgt} PRIVATE ${zis_modules_header_dir})
+target_include_directories(zis_core_tgt PRIVATE ${zis_src_generated_code_dir})
 
 #######################################
 ##### Installation configurations #####

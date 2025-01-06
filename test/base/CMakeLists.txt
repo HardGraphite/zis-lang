@@ -1,0 +1,27 @@
+include_directories("${CMAKE_SOURCE_DIR}/src")
+
+if(ZIS_BUILD_CORE)
+    list(APPEND bundle1_src core_api.c core_invoke.c core_gc.c core_compile.c)
+    list(APPEND bundle0_src core_algorithm.c core_bits.c core_fsutil.c core_strutil.c core_instr.c)
+    list(APPEND bundle0_inc ${zis_src_generated_code_dir})
+endif()
+if(ZIS_BUILD_MODULES)
+    list(APPEND bundle0_src core_modlist.c)
+    list(APPEND bundle0_inc ${zis_src_generated_code_dir})
+endif()
+if(ZIS_BUILD_START)
+    list(APPEND bundle0_src start_cliutil.c)
+endif()
+zis_test_add_c_bundle(base-bundle1 FILES ${bundle1_src} LINK_CORE)
+zis_test_add_c_bundle(base-bundle0 FILES ${bundle0_src} INCLUDE_DIR ${bundle0_inc})
+
+if(ZIS_BUILD_START AND ZIS_MOD_TESTING)
+    zis_test_add_script(core_builtins.zis)
+endif()
+
+if(ZIS_BUILD_START)
+    include(start_run.cmake)
+endif()
+
+zis_test_add_c(core_api_c89.c  OBJECT_ONLY PROPERTIES C_STANDARD 90 C_STANDARD_REQUIRED TRUE)
+zis_test_add_c(core_api_cxx.cc OBJECT_ONLY)

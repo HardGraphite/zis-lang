@@ -12,19 +12,13 @@ endif()
 ##### Define build targets #####
 ################################
 
-if(ZIS_BUILD_SHARED)
-    add_executable(zis_start_shared ${zis_start_src})
-    target_link_libraries(zis_start_shared PRIVATE zis_core_shared)
-    set(zis_start_tgt zis_start_shared)
-else()
-    add_executable(zis_start_static ${zis_start_src})
-    set_target_properties(zis_start_static PROPERTIES ENABLE_EXPORTS TRUE)
-    target_link_libraries(zis_start_static PRIVATE zis_core_static)
-    set(zis_start_tgt zis_start_static)
+add_executable(zis_start_tgt ${zis_start_src})
+target_link_libraries(zis_start_tgt PRIVATE zis_core_tgt)
+set_target_properties(zis_start_tgt PROPERTIES OUTPUT_NAME "${ZIS_OUTPUT_NAME}")
+target_include_directories(zis_start_tgt PRIVATE ${zis_src_generated_code_dir})
+if(NOT ZIS_BUILD_SHARED)
+    set_target_properties(zis_start_tgt PROPERTIES ENABLE_EXPORTS TRUE)
 endif()
-set_target_properties(${zis_start_tgt} PROPERTIES OUTPUT_NAME "${ZIS_OUTPUT_NAME}")
-target_include_directories(${zis_start_tgt} PRIVATE ${zis_core_conf_header_dir})
-set(zis_start_tgt ${zis_start_tgt} PARENT_SCOPE)
 
 if(WIN32)
     include(ZisWinUtil)
@@ -36,7 +30,7 @@ if(WIN32)
         set(prod "${ZIS_DISPLAY_NAME}Lang")
     endif()
     zis_win_target_add_rc(
-        ${zis_start_tgt} "${desc}" "${prod}"
+        zis_start_tgt "${desc}" "${prod}"
         "${CMAKE_SOURCE_DIR}/misc/icon_win.ico"
     )
     unset(desc)
@@ -55,4 +49,4 @@ if(ZIS_PACK_RELA_RPATH AND TARGET zis_start_shared)
 endif()
 
 ### Install rules.
-install(TARGETS ${zis_start_tgt} DESTINATION ${zis_install_exe_dir})
+install(TARGETS zis_start_tgt DESTINATION ${zis_install_exe_dir})

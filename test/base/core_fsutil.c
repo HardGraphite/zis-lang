@@ -4,7 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "../core/fsutil.c"
+#include "core/fsutil.c"
 
 void *zis_mem_alloc(size_t sz) {
     return malloc(sz);
@@ -214,7 +214,7 @@ zis_test0_define(path_with_extension) {
 }
 
 zis_test0_list(
-    main,
+    core_fsutil,
     zis_test0_case(path_len),
     zis_test0_case(path_dup),
     zis_test0_case(path_str_conv),
