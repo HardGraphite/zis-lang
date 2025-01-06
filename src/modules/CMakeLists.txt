@@ -131,8 +131,9 @@ unset(all_files)
 ##### Generate module list #####
 ################################
 
-set(zis_modules_header_dir "${CMAKE_CURRENT_BINARY_DIR}")
-set(zis_modules_header_dir ${zis_modules_header_dir} PARENT_SCOPE)
+if(NOT IS_DIRECTORY ${zis_src_generated_code_dir})
+    message(FATAL_ERROR "${zis_src_generated_code_dir} is not a directory")
+endif()
 
 if(zis_embedded_modules)
     list(SORT zis_embedded_modules COMPARE STRING)
@@ -145,7 +146,7 @@ else()
     set(ZIS_EMBEDDED_MODULE_LIST_EMPTY TRUE)
     set(ZIS_EMBEDDED_MODULE_LIST "// (empty)")
 endif()
-file(CONFIGURE OUTPUT "${zis_modules_header_dir}/zis_modules.h" @ONLY CONTENT [==[
+file(CONFIGURE OUTPUT "${zis_src_generated_code_dir}/zis_modules.h" @ONLY CONTENT [==[
 #pragma once
 
 #define ZIS_EMBEDDED_MODULE_LIST \
@@ -158,7 +159,7 @@ unset(ZIS_EMBEDDED_MODULE_LIST)
 unset(ZIS_EMBEDDED_MODULE_LIST_SORTED)
 unset(ZIS_EMBEDDED_MODULE_LIST_EMPTY)
 
-target_include_directories(zis_core_tgt PRIVATE ${zis_modules_header_dir})
+target_include_directories(zis_core_tgt PRIVATE ${zis_src_generated_code_dir})
 
 #######################################
 ##### Installation configurations #####

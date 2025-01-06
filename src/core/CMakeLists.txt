@@ -60,8 +60,9 @@ set(ZIS_BUILD_EXTRA_INFO "" CACHE STRING "Extra build information. See `zis_buil
 ##### Generate files #####
 ##########################
 
-set(zis_core_conf_header_dir "${CMAKE_CURRENT_BINARY_DIR}")
-set(zis_core_conf_header_dir ${zis_core_conf_header_dir} PARENT_SCOPE)
+if(NOT IS_DIRECTORY ${zis_src_generated_code_dir})
+    message(FATAL_ERROR "${zis_src_generated_code_dir} is not a directory")
+endif()
 
 # Compiler info.
 if(CMAKE_C_COMPILER_ID STREQUAL "GNU")
@@ -80,7 +81,7 @@ if(ZIS_BUILD_EXTRA_INFO)
     set(ZIS_BUILD_EXTRA_INFO_STR "\"${ZIS_BUILD_EXTRA_INFO_STR}\"")
 endif()
 
-file(CONFIGURE OUTPUT "${zis_core_conf_header_dir}/zis_config.h" @ONLY CONTENT [==[
+file(CONFIGURE OUTPUT "${zis_src_generated_code_dir}/zis_config.h" @ONLY CONTENT [==[
 #pragma once
 #define         ZIS_VERSION_MAJOR   @ZIS_VERSION_MAJOR@
 #define         ZIS_VERSION_MINOR   @ZIS_VERSION_MINOR@
@@ -168,7 +169,7 @@ endif()
 target_include_directories(
     zis_core_tgt
     PUBLIC "${CMAKE_SOURCE_DIR}/include"
-    PRIVATE "${zis_core_conf_header_dir}"
+    PRIVATE "${zis_src_generated_code_dir}"
 )
 # Link libraries.
 if(UNIX)
