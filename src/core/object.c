@@ -81,7 +81,7 @@ enum zis_object_ordering zis_object_compare(
     zis_context_set_reg0(z, zis_object_from(zis_exception_obj_format(
         z, "type", ret, "method `%s()' returned a non-%s value", "<=>", "integer"
     )));
-    return false;
+    return ZIS_OBJECT_IC;
 }
 
 bool zis_object_equals(

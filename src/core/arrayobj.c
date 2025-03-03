@@ -1,12 +1,16 @@
 #include "arrayobj.h"
 
+#include <math.h>
+
 #include "context.h"
 #include "globals.h"
+#include "invoke.h"
 #include "locals.h"
 #include "ndefutil.h"
 #include "objmem.h"
 #include "objvec.h"
 #include "stack.h"
+#include "types.h"
 
 #include "exceptobj.h"
 #include "stringobj.h"
@@ -72,6 +76,237 @@ struct zis_array_slots_obj *zis_array_slots_obj_new2(
 struct zis_array_slots_obj *_zis_array_slots_obj_new_empty(struct zis_context *z) {
     return array_slots_obj_alloc(z, 0);
 }
+
+/* {{{ sort */
+
+/// Protected objects.
+struct _sort_locals {
+    struct zis_array_slots_obj *items;
+    struct zis_object *predicate; // set to small-int to disable
+};
+
+/// Check whether `lhs <= rhs`.
+zis_nodiscard static int _sort_predicate(
+    struct zis_context *z, struct _sort_locals *locals,
+    size_t lhs_index, size_t rhs_index
+) {
+    struct zis_object *lhs = zis_array_slots_obj_get(locals->items, lhs_index);
+    struct zis_object *rhs = zis_array_slots_obj_get(locals->items, rhs_index);
+
+    if (zis_object_is_smallint((struct zis_object *)locals->predicate)) {
+        enum zis_object_ordering cmp_res = zis_object_compare(z, lhs, rhs);
+        if (zis_unlikely(cmp_res == ZIS_OBJECT_IC))
+            return ZIS_THR;
+        return cmp_res != ZIS_OBJECT_GT ? 1 : 0;
+    } else {
+        struct zis_object *ret;
+        if (zis_unlikely(zis_invoke_vn(z, &ret, locals->predicate, (struct zis_object *[]){lhs, rhs}, 2)))
+            return ZIS_THR;
+        if (ret == zis_object_from(z->globals->val_true))
+            return 1;
+        if (ret == zis_object_from(z->globals->val_false))
+            return 0;
+        zis_context_set_reg0(z, zis_object_from(zis_exception_obj_format(
+            z, "type", ret, "predicate function returned a non-boolean value"
+        )));
+        return ZIS_THR;
+    }
+}
+
+/// Insertion sort.
+zis_nodiscard static int _sort_insertionsort(
+    struct zis_context *z, struct _sort_locals *locals,
+    size_t left, size_t right
+) {
+    assert(left < right);
+    for (size_t i = left + 1; i <= right; i++) {
+        size_t j = i - 1;
+        while (true) {
+            int p = _sort_predicate(z, locals, j, i);
+            if (zis_unlikely(p == ZIS_THR))
+                return ZIS_THR;
+            if (p)
+                break;
+            if (j-- == left)
+                break;
+        }
+        const size_t n = i - 1 - j;
+        if (n) {
+            struct zis_object *item_i = zis_array_slots_obj_get(locals->items, i);
+            struct zis_object **v = locals->items->_data + j + 1;
+            zis_object_vec_move(v + 1, v, n);
+            *v = item_i;
+        }
+    }
+    return 0;
+}
+
+/// Swap items[a] with items[b].
+static void _sort_swap(struct _sort_locals *locals, size_t a, size_t b) {
+    struct zis_object *temp = locals->items->_data[a];
+    locals->items->_data[a] = locals->items->_data[b];
+    locals->items->_data[b] = temp;
+}
+
+/// Do heapify (heap sort).
+zis_nodiscard static int _sort_heapify(
+    struct zis_context *z, struct _sort_locals *locals,
+    size_t left, size_t right
+) {
+    size_t parent = left;
+    while (true) {
+        size_t child = parent * 2 + 1;
+        if (child > right)
+            break;
+        size_t child2 = child + 1;
+        if (child2 <= right) {
+            int p = _sort_predicate(z, locals, child, child2);
+            if (zis_unlikely(p == ZIS_THR))
+                return ZIS_THR;
+            if (p)
+                child = child2;
+        }
+        {
+            int p = _sort_predicate(z, locals, child, parent);
+            if (zis_unlikely(p == ZIS_THR))
+                return ZIS_THR;
+            if (p)
+                break;
+        }
+        _sort_swap(locals, parent, child);
+        parent = child;
+    }
+    return 0;
+}
+
+/// Heap sort.
+zis_nodiscard static int _sort_heapsort(
+    struct zis_context *z, struct _sort_locals *locals,
+    size_t left, size_t right
+) {
+    assert(left < right);
+    assert(right < SIZE_MAX / 2);
+    const size_t len = right - left + 1;
+    for (size_t i = len / 2 - 1; (zis_ssize_t)i >= 0; i--) {
+        const size_t pos = left + i;
+        int status = _sort_heapify(z, locals, pos, right);
+        if (zis_unlikely(status == ZIS_THR))
+            return ZIS_THR;
+    }
+    for (size_t pos = right; pos > left; pos--) {
+        _sort_swap(locals, left, pos);
+        int status = _sort_heapify(z, locals, left, pos);
+        if (zis_unlikely(status == ZIS_THR))
+            return ZIS_THR;
+    }
+    return 0;
+}
+
+/// Find middle of three. Used in _sort_partition().
+static zis_ssize_t _sort_mid_of_three(
+    struct zis_context *z, struct _sort_locals *locals,
+    size_t left, size_t right
+) {
+    size_t middle = left + (right - left) / 2;
+    int status;
+    if (zis_unlikely((status = _sort_predicate(z, locals, left, middle)) == ZIS_THR))
+        return ZIS_THR;
+    if (!status)
+        _sort_swap(locals, left, middle);
+    if (zis_unlikely((status = _sort_predicate(z, locals, left, right)) == ZIS_THR))
+        return ZIS_THR;
+    if (!status)
+        _sort_swap(locals, left, right);
+    if (zis_unlikely((status = _sort_predicate(z, locals, middle, right)) == ZIS_THR))
+        return ZIS_THR;
+    if (status)
+        _sort_swap(locals, middle, right);
+    return (zis_ssize_t)right;
+}
+
+/// Find the pivot (quick sort).
+static size_t _sort_partition(
+    struct zis_context *z, struct _sort_locals *locals,
+    size_t left, size_t right
+) {
+    size_t pivot;
+    {
+        zis_ssize_t ret = _sort_mid_of_three(z, locals, left, right);
+        if (zis_unlikely(ret == ZIS_THR))
+            return ZIS_THR;
+        pivot = (size_t)ret;
+    }
+
+    size_t i = left;
+    for (size_t j = left; j < right; j++) {
+        const int status = _sort_predicate(z, locals, j, pivot);
+        if (zis_unlikely(status == ZIS_THR))
+            return ZIS_THR;
+        if (status) {
+            _sort_swap(locals, i, j);
+            i++;
+        }
+    }
+    _sort_swap(locals, i, right);
+    return i;
+}
+
+/// Quick sort with threshold limitation.
+static int _sort_quicksort(
+    struct zis_context *z, struct _sort_locals *locals,
+    size_t left, size_t right, size_t max_depth
+) {
+    const size_t threshold = 16;
+    assert(left < right);
+    while (right - left > threshold) {
+        if (zis_unlikely(max_depth == 0))
+            return _sort_heapsort(z, locals, left, right);
+        max_depth--;
+        const size_t pivot = _sort_partition(z, locals, left, right);
+        if (pivot - left < right - pivot) {
+            assert(pivot > 0);
+            int status = _sort_quicksort(z, locals, left, pivot - 1, max_depth);
+            if (zis_unlikely(status == ZIS_THR))
+                return ZIS_THR;
+            left = pivot + 1;
+        } else {
+            int status = _sort_quicksort(z, locals, pivot + 1, right, max_depth);
+            if (zis_unlikely(status == ZIS_THR))
+                return ZIS_THR;
+            right = pivot - 1;
+        }
+    }
+    return 0;
+}
+
+/// Introsort.
+zis_nodiscard static int _sort_introsort(
+    struct zis_context *z, struct _sort_locals *locals,
+    size_t left, size_t right) {
+    assert(right > left);
+    const size_t count = right - left + 1;
+    const size_t max_depth = (size_t)(floor(log2((double)count)) * 2);
+    if (zis_unlikely(_sort_quicksort(z, locals, left, right, max_depth) == ZIS_THR))
+        return ZIS_THR;
+    return _sort_insertionsort(z, locals, left, right);
+}
+
+int zis_array_slots_obj_sort(
+    struct zis_context *z,
+    struct zis_array_slots_obj *_self, struct zis_object *_predicate
+) {
+    const size_t count = zis_array_slots_obj_length(_self);
+    if (zis_unlikely(count <= 1))
+        return ZIS_OK;
+    zis_locals_decl_1(z, var, struct _sort_locals locals);
+    var.locals.items = _self;
+    var.locals.predicate = _predicate == NULL ? zis_smallint_to_ptr(0) : _predicate;
+    int status = _sort_introsort(z, &var.locals, 0, count - 1);
+    zis_locals_drop(z, var);
+    return status;
+}
+
+/* }}} sort */
 
 ZIS_NATIVE_TYPE_DEF_XS_NB(
     Array_Slots,
@@ -630,6 +865,18 @@ ZIS_NATIVE_FUNC_DEF(T_Array_M_remove, z, {2, 0, 2}) {
     return ZIS_OK;
 }
 
+ZIS_NATIVE_FUNC_DEF(T_Array_M_sort, z, {1, 1, 2}) {
+    /*#DOCSTR# func Array:sort(?predicate :: Function[[Any, Any], Bool])
+    Sorts elements in place. */
+    assert_arg1_Array(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_array_obj *self = zis_object_cast(frame[1], struct zis_array_obj);
+    struct zis_object *pred = frame[2];
+    if (pred == zis_object_from(z->globals->val_nil))
+        pred = NULL;
+    return zis_array_slots_obj_sort(z, self->_data, pred);
+}
+
 ZIS_NATIVE_FUNC_DEF_LIST(
     T_array_D_methods,
     { "+"           , &T_Array_M_operator_add      },
@@ -643,6 +890,7 @@ ZIS_NATIVE_FUNC_DEF_LIST(
     { "pop"         , &T_Array_M_pop               },
     { "insert"      , &T_Array_M_insert            },
     { "remove"      , &T_Array_M_remove            },
+    { "sort"        , &T_Array_M_sort              },
 );
 
 ZIS_NATIVE_TYPE_DEF(

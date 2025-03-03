@@ -60,6 +60,15 @@ zis_static_force_inline void zis_array_slots_obj_set(
     zis_object_write_barrier(self, v);
 }
 
+/// Sort elements in place.
+/// `predicate` should be a callable object that takes two arguments and returns
+/// a Bool object indicating whether the two arguments are in order.
+/// Set `predicate` to NULL to use the default predicate.
+int zis_array_slots_obj_sort(
+    struct zis_context *z,
+    struct zis_array_slots_obj *self, struct zis_object *predicate /* = NULL */
+);
+
 /* ----- array -------------------------------------------------------------- */
 
 /// `Array` object. Array of objects with dynamic length.
