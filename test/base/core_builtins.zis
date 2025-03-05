@@ -576,6 +576,18 @@ func test_Array_sort()
     testing.check_equal(array, [5, 4, 3, 2, 1])
 end
 
+func test_Array_reverse()
+    array = []
+    array:reverse()
+    testing.check_equal(array, [])
+    array = [1]
+    array:reverse()
+    testing.check_equal(array, [1])
+    array = [1, 2, 3]
+    array:reverse()
+    testing.check_equal(array, [3, 2, 1])
+end
+
 ## Map
 
 func test_Map_operator_equ()

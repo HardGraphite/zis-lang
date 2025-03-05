@@ -69,6 +69,9 @@ int zis_array_slots_obj_sort(
     struct zis_array_slots_obj *self, struct zis_object *predicate /* = NULL */
 );
 
+/// Reverse the order of the first `n` elements.
+void zis_array_slots_obj_reverse(struct zis_array_slots_obj *self, size_t n /* = -1 */);
+
 /* ----- array -------------------------------------------------------------- */
 
 /// `Array` object. Array of objects with dynamic length.

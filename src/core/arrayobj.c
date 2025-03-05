@@ -308,6 +308,20 @@ int zis_array_slots_obj_sort(
 
 /* }}} sort */
 
+void zis_array_slots_obj_reverse(struct zis_array_slots_obj *self, size_t n) {
+    if (zis_unlikely(n <= 1))
+        return;
+    const size_t len = zis_array_slots_obj_length(self);
+    if (zis_unlikely(n > len))
+        n = len;
+    struct zis_object **const data = self->_data;
+    for (size_t i = 0, j = n - 1; i < j; i++, j--) {
+        struct zis_object *old_i = data[i];
+        data[i] = data[j];
+        data[j] = old_i;
+    }
+}
+
 ZIS_NATIVE_TYPE_DEF_XS_NB(
     Array_Slots,
     struct zis_array_slots_obj,
@@ -869,12 +883,25 @@ ZIS_NATIVE_FUNC_DEF(T_Array_M_sort, z, {1, 1, 2}) {
     /*#DOCSTR# func Array:sort(?predicate :: Function[[Any, Any], Bool])
     Sorts elements in place. */
     assert_arg1_Array(z);
+    struct zis_context_globals *g = z->globals;
     struct zis_object **frame = z->callstack->frame;
     struct zis_array_obj *self = zis_object_cast(frame[1], struct zis_array_obj);
     struct zis_object *pred = frame[2];
-    if (pred == zis_object_from(z->globals->val_nil))
+    if (pred == zis_object_from(g->val_nil))
         pred = NULL;
+    frame[0] = zis_object_from(g->val_nil);
     return zis_array_slots_obj_sort(z, self->_data, pred);
+}
+
+ZIS_NATIVE_FUNC_DEF(T_Array_M_reverse, z, {1, 0, 1}) {
+    /*#DOCSTR# func Array:reverse()
+    Reverse the order of the elements. */
+    assert_arg1_Array(z);
+    struct zis_object **frame = z->callstack->frame;
+    struct zis_array_obj *self = zis_object_cast(frame[1], struct zis_array_obj);
+    zis_array_slots_obj_reverse(self->_data, self->length);
+    frame[0] = zis_object_from(z->globals->val_nil);
+    return ZIS_OK;
 }
 
 ZIS_NATIVE_FUNC_DEF_LIST(
@@ -891,6 +918,7 @@ ZIS_NATIVE_FUNC_DEF_LIST(
     { "insert"      , &T_Array_M_insert            },
     { "remove"      , &T_Array_M_remove            },
     { "sort"        , &T_Array_M_sort              },
+    { "reverse"     , &T_Array_M_reverse           },
 );
 
 ZIS_NATIVE_TYPE_DEF(
